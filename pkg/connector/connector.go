@@ -2,43 +2,72 @@ package connector
 
 import (
 	"context"
-	"io"
+	"fmt"
 
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
-type Connector struct{}
+type Datadog struct {
+	client *datadog.APIClient
+	site   string
+	apiKey string
+	appKey string
+}
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
-func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
+func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
 	return []connectorbuilder.ResourceSyncer{
-		newUserBuilder(),
+		newUserBuilder(d.client, d.site, d.apiKey, d.appKey),
+		newTeamBuilder(d.client, d.site, d.apiKey, d.appKey),
+		newRoleBuilder(d.client, d.site, d.apiKey, d.appKey),
 	}
 }
 
-// Asset takes an input AssetRef and attempts to fetch it using the connector's authenticated http client
-// It streams a response, always starting with a metadata object, following by chunked payloads for the asset.
-func (d *Connector) Asset(ctx context.Context, asset *v2.AssetRef) (string, io.ReadCloser, error) {
-	return "", nil, nil
-}
-
 // Metadata returns metadata about the connector.
-func (d *Connector) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
+func (d *Datadog) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 	return &v2.ConnectorMetadata{
-		DisplayName: "My Baton Connector",
-		Description: "The template implementation of a baton connector",
+		DisplayName: "Baton Datadog Connector",
+		Description: "Connector syncing users, teams, and roles from Datadog.",
 	}, nil
 }
 
 // Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
 // to be sure that they are valid.
-func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
+func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error) {
+	ctx = withAuthContext(ctx, d.apiKey, d.appKey, d.site)
+	api := datadogV1.NewAuthenticationApi(d.client)
+	resp, _, err := api.Validate(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("datadog-connector: failed to validate API key: %w", err)
+	}
+
+	if !resp.GetValid() {
+		return nil, fmt.Errorf("datadog-connector: API key not valid")
+	}
+
 	return nil, nil
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context) (*Connector, error) {
-	return &Connector{}, nil
+func New(ctx context.Context, site, apiKey, appKey string) (*Datadog, error) {
+	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
+	if err != nil {
+		return nil, err
+	}
+
+	conf := datadog.NewConfiguration()
+	conf.HTTPClient = httpClient
+
+	return &Datadog{
+		site:   site,
+		apiKey: apiKey,
+		appKey: appKey,
+		client: datadog.NewAPIClient(conf),
+	}, nil
 }
