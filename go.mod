@@ -3,13 +3,14 @@ module github.com/conductorone/baton-datadog
 go 1.20
 
 require (
+	github.com/DataDog/datadog-api-client-go/v2 v2.19.0
 	github.com/conductorone/baton-sdk v0.1.14
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
+	github.com/spf13/cobra v1.8.0
 	go.uber.org/zap v1.26.0
 )
 
 require (
-	github.com/DataDog/datadog-api-client-go/v2 v2.19.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.23.5 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.5.3 // indirect
@@ -61,7 +62,6 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
-	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.18.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
