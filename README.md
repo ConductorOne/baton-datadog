@@ -64,6 +64,7 @@ Usage:
   baton-datadog [command]
 
 Available Commands:
+  capabilities       Get connector capabilities
   completion         Generate the autocompletion script for the specified shell
   help               Help about any command
 
