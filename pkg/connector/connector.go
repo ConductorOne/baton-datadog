@@ -14,19 +14,24 @@ import (
 )
 
 type Datadog struct {
-	client *datadog.APIClient
-	site   string
-	apiKey string
-	appKey string
+	client      *datadog.APIClient
+	site        string
+	apiKey      string
+	appKey      string
+	syncSecrets bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
-	return []connectorbuilder.ResourceSyncer{
+	resourceSyncers := []connectorbuilder.ResourceSyncer{
 		newUserBuilder(d.client, d.site, d.apiKey, d.appKey),
 		newTeamBuilder(d.client, d.site, d.apiKey, d.appKey),
 		newRoleBuilder(d.client, d.site, d.apiKey, d.appKey),
 	}
+	if d.syncSecrets {
+		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(d.client, d.site, d.apiKey, d.appKey))
+	}
+	return resourceSyncers
 }
 
 // Metadata returns metadata about the connector.
@@ -55,7 +60,7 @@ func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error)
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, site, apiKey, appKey string) (*Datadog, error) {
+func New(ctx context.Context, site, apiKey, appKey string, syncSecrets bool) (*Datadog, error) {
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
 		return nil, err
@@ -65,9 +70,10 @@ func New(ctx context.Context, site, apiKey, appKey string) (*Datadog, error) {
 	conf.HTTPClient = httpClient
 
 	return &Datadog{
-		site:   site,
-		apiKey: apiKey,
-		appKey: appKey,
-		client: datadog.NewAPIClient(conf),
+		site:        site,
+		apiKey:      apiKey,
+		appKey:      appKey,
+		client:      datadog.NewAPIClient(conf),
+		syncSecrets: syncSecrets,
 	}, nil
 }

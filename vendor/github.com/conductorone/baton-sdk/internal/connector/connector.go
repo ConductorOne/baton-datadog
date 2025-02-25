@@ -11,6 +11,15 @@ import (
 	"sync"
 	"time"
 
+	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/proto"
+
 	connectorV2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	connectorwrapperV1 "github.com/conductorone/baton-sdk/pb/c1/connector_wrapper/v1"
 	ratelimitV1 "github.com/conductorone/baton-sdk/pb/c1/ratelimit/v1"
@@ -19,12 +28,6 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types"
 	"github.com/conductorone/baton-sdk/pkg/ugrpc"
 	utls2 "github.com/conductorone/baton-sdk/pkg/utls"
-	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/protobuf/proto"
 )
 
 const listenerFdEnv = "BATON_CONNECTOR_SERVICE_LISTENER_FD"
@@ -38,6 +41,11 @@ type connectorClient struct {
 	connectorV2.AssetServiceClient
 	ratelimitV1.RateLimiterServiceClient
 	connectorV2.GrantManagerServiceClient
+	connectorV2.ResourceManagerServiceClient
+	connectorV2.AccountManagerServiceClient
+	connectorV2.CredentialManagerServiceClient
+	connectorV2.EventServiceClient
+	connectorV2.TicketsServiceClient
 }
 
 var ErrConnectorNotImplemented = errors.New("client does not implement connector connectorV2")
@@ -50,6 +58,8 @@ type wrapper struct {
 	serverStdin         io.WriteCloser
 	conn                *grpc.ClientConn
 	provisioningEnabled bool
+	ticketingEnabled    bool
+	fullSyncDisabled    bool
 
 	rateLimiter   ratelimitV1.RateLimiterServiceServer
 	rlCfg         *ratelimitV1.RateLimiterConfig
@@ -83,6 +93,21 @@ func WithRateLimitDescriptor(entry *ratelimitV1.RateLimitDescriptors_Entry) Opti
 func WithProvisioningEnabled() Option {
 	return func(ctx context.Context, w *wrapper) error {
 		w.provisioningEnabled = true
+
+		return nil
+	}
+}
+
+func WithFullSyncDisabled() Option {
+	return func(ctx context.Context, w *wrapper) error {
+		w.fullSyncDisabled = true
+		return nil
+	}
+}
+
+func WithTicketingEnabled() Option {
+	return func(ctx context.Context, w *wrapper) error {
+		w.ticketingEnabled = true
 
 		return nil
 	}
@@ -129,6 +154,14 @@ func (cw *wrapper) Run(ctx context.Context, serverCfg *connectorwrapperV1.Server
 		grpc.Creds(credentials.NewTLS(tlsConfig)),
 		grpc.ChainUnaryInterceptor(ugrpc.UnaryServerInterceptor(ctx)...),
 		grpc.ChainStreamInterceptor(ugrpc.StreamServerInterceptors(ctx)...),
+		grpc.StatsHandler(otelgrpc.NewServerHandler(
+			otelgrpc.WithPropagators(
+				propagation.NewCompositeTextMapPropagator(
+					propagation.TraceContext{},
+					propagation.Baggage{},
+				),
+			),
+		)),
 	)
 	connectorV2.RegisterConnectorServiceServer(server, cw.server)
 	connectorV2.RegisterGrantsServiceServer(server, cw.server)
@@ -136,11 +169,26 @@ func (cw *wrapper) Run(ctx context.Context, serverCfg *connectorwrapperV1.Server
 	connectorV2.RegisterResourcesServiceServer(server, cw.server)
 	connectorV2.RegisterResourceTypesServiceServer(server, cw.server)
 	connectorV2.RegisterAssetServiceServer(server, cw.server)
+	connectorV2.RegisterEventServiceServer(server, cw.server)
+
+	if cw.ticketingEnabled {
+		connectorV2.RegisterTicketsServiceServer(server, cw.server)
+	} else {
+		noop := &noopTicketing{}
+		connectorV2.RegisterTicketsServiceServer(server, noop)
+	}
 
 	if cw.provisioningEnabled {
 		connectorV2.RegisterGrantManagerServiceServer(server, cw.server)
+		connectorV2.RegisterResourceManagerServiceServer(server, cw.server)
+		connectorV2.RegisterAccountManagerServiceServer(server, cw.server)
+		connectorV2.RegisterCredentialManagerServiceServer(server, cw.server)
 	} else {
-		connectorV2.RegisterGrantManagerServiceServer(server, &noopProvisioner{})
+		noop := &noopProvisioner{}
+		connectorV2.RegisterGrantManagerServiceServer(server, noop)
+		connectorV2.RegisterResourceManagerServiceServer(server, noop)
+		connectorV2.RegisterAccountManagerServiceServer(server, noop)
+		connectorV2.RegisterCredentialManagerServiceServer(server, noop)
 	}
 
 	rl, err := ratelimit2.NewLimiter(ctx, cw.now, serverCfg.RateLimiterConfig)
@@ -218,6 +266,7 @@ func (cw *wrapper) runServer(ctx context.Context, serverCred *tlsV1.Credential) 
 			if waitErr != nil {
 				l.Error("error closing connector wrapper", zap.Error(waitErr))
 			}
+			os.Exit(1)
 		}
 	}()
 
@@ -267,12 +316,20 @@ func (cw *wrapper) C(ctx context.Context) (types.ConnectorClient, error) {
 	var dialErr error
 	var conn *grpc.ClientConn
 	for {
-		conn, err = grpc.DialContext(
+		conn, err = grpc.DialContext( //nolint:staticcheck // grpc.DialContext is deprecated but we are using it still.
 			ctx,
 			fmt.Sprintf("127.0.0.1:%d", listenPort),
 			grpc.WithTransportCredentials(credentials.NewTLS(clientTLSConfig)),
-			grpc.WithBlock(),
+			grpc.WithBlock(), //nolint:staticcheck // grpc.WithBlock is deprecated but we are using it still.
 			grpc.WithChainUnaryInterceptor(ratelimit2.UnaryInterceptor(cw.now, cw.rlDescriptors...)),
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler(
+				otelgrpc.WithPropagators(
+					propagation.NewCompositeTextMapPropagator(
+						propagation.TraceContext{},
+						propagation.Baggage{},
+					),
+				),
+			)),
 		)
 		if err != nil {
 			dialErr = err
@@ -289,14 +346,19 @@ func (cw *wrapper) C(ctx context.Context) (types.ConnectorClient, error) {
 	cw.conn = conn
 
 	cw.client = &connectorClient{
-		ResourceTypesServiceClient: connectorV2.NewResourceTypesServiceClient(cw.conn),
-		ResourcesServiceClient:     connectorV2.NewResourcesServiceClient(cw.conn),
-		EntitlementsServiceClient:  connectorV2.NewEntitlementsServiceClient(cw.conn),
-		GrantsServiceClient:        connectorV2.NewGrantsServiceClient(cw.conn),
-		ConnectorServiceClient:     connectorV2.NewConnectorServiceClient(cw.conn),
-		AssetServiceClient:         connectorV2.NewAssetServiceClient(cw.conn),
-		RateLimiterServiceClient:   ratelimitV1.NewRateLimiterServiceClient(cw.conn),
-		GrantManagerServiceClient:  connectorV2.NewGrantManagerServiceClient(cw.conn),
+		ResourceTypesServiceClient:     connectorV2.NewResourceTypesServiceClient(cw.conn),
+		ResourcesServiceClient:         connectorV2.NewResourcesServiceClient(cw.conn),
+		EntitlementsServiceClient:      connectorV2.NewEntitlementsServiceClient(cw.conn),
+		GrantsServiceClient:            connectorV2.NewGrantsServiceClient(cw.conn),
+		ConnectorServiceClient:         connectorV2.NewConnectorServiceClient(cw.conn),
+		AssetServiceClient:             connectorV2.NewAssetServiceClient(cw.conn),
+		RateLimiterServiceClient:       ratelimitV1.NewRateLimiterServiceClient(cw.conn),
+		GrantManagerServiceClient:      connectorV2.NewGrantManagerServiceClient(cw.conn),
+		ResourceManagerServiceClient:   connectorV2.NewResourceManagerServiceClient(cw.conn),
+		AccountManagerServiceClient:    connectorV2.NewAccountManagerServiceClient(cw.conn),
+		CredentialManagerServiceClient: connectorV2.NewCredentialManagerServiceClient(cw.conn),
+		EventServiceClient:             connectorV2.NewEventServiceClient(cw.conn),
+		TicketsServiceClient:           connectorV2.NewTicketsServiceClient(cw.conn),
 	}
 
 	return cw.client, nil
@@ -317,7 +379,7 @@ func (cw *wrapper) Close() error {
 
 	if cw.serverStdin != nil {
 		err = cw.serverStdin.Close()
-		if err != nil {
+		if err != nil && errors.Is(err, os.ErrClosed) {
 			return fmt.Errorf("error closing connector service stdin: %w", err)
 		}
 	}
