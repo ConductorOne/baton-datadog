@@ -51,7 +51,7 @@ func (o *apiTokenBuilder) List(
 	}
 
 	res, httpRes, err := api.ListAPIKeys(ctx, *datadogV2.NewListAPIKeysOptionalParameters().WithPageNumber(page))
-	if httpRes.StatusCode < 200 || httpRes.StatusCode >= 300 {
+	if httpRes.StatusCode < 200 || httpRes.StatusCode >= 300 || err != nil {
 		l.Info("error listing api tokens", zap.Int("status_code", httpRes.StatusCode))
 		return nil, "", nil, fmt.Errorf("error listing api tokens: %s", httpRes.Status)
 	}
@@ -59,9 +59,15 @@ func (o *apiTokenBuilder) List(
 	ret := make([]*v2.Resource, 0, len(apiTokens))
 	for _, apiToken := range apiTokens {
 		userId := apiToken.Relationships.CreatedBy.Data.Id
-		timeFormat := "2020-11-23T10:00:00.000Z"
+		timeFormat := time.RFC3339Nano
 		createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
+		if err != nil {
+			return nil, "", nil, err
+		}
 		modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
+		if err != nil {
+			return nil, "", nil, err
+		}
 		options := []resource.SecretTraitOption{
 			resource.WithSecretCreatedByID(&v2.ResourceId{
 				ResourceType:  userResourceType.Id,
