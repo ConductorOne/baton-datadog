@@ -10,6 +10,9 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/spf13/viper v1.19.0
 	go.uber.org/zap v1.27.0
+	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
+	github.com/quasilyte/go-ruleguard/dsl v0.3.22
+	github.com/spf13/cobra v1.8.0
 )
 
 require (
@@ -114,6 +117,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250219182151-9fdb1cabc7b2 // indirect
 	google.golang.org/grpc v1.71.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/appengine v1.6.8 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
