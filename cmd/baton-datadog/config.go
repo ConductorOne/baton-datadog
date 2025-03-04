@@ -1,41 +1,49 @@
 package main
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/conductorone/baton-sdk/pkg/cli"
-	"github.com/spf13/cobra"
+	"github.com/conductorone/baton-sdk/pkg/field"
+	"github.com/spf13/viper"
 )
 
-// config defines the external configuration required for the connector to run.
-type config struct {
-	cli.BaseConfig `mapstructure:",squash"` // Puts the base config options in the same place as the connector options
-	Site           string                   `mapstructure:"site"`
-	ApiKey         string                   `mapstructure:"api-key"`
-	AppKey         string                   `mapstructure:"app-key"`
-}
+var (
+	Site = field.StringField(
+		"site",
+		field.WithDescription("Part of your Datadog website URL, e.g. datadoghq.com in https://app.datadoghq.com."),
+		field.WithRequired(true),
+	)
+	ApiKey = field.StringField(
+		"api-key",
+		field.WithDescription("API key used to authenticate to Datadog API."),
+		field.WithRequired(true),
+	)
+	AppKey = field.StringField(
+		"app-key",
+		field.WithDescription("APP key used with API key to assign scopes for API access."),
+		field.WithRequired(true),
+	)
+	SyncSecrets = field.BoolField(
+		"sync-secrets",
+		field.WithDescription("Whether to sync secrets or not"),
+	)
 
-// validateConfig is run after the configuration is loaded, and should return an error if it isn't valid.
-func validateConfig(ctx context.Context, cfg *config) error {
-	if cfg.Site == "" {
-		return fmt.Errorf("site is required, please provide it via --site flag or BATON_SITE environment variable")
+	ConfigurationFields = []field.SchemaField{
+		Site,
+		ApiKey,
+		AppKey,
+		SyncSecrets,
 	}
 
-	if cfg.ApiKey == "" {
-		return fmt.Errorf("API key is required, please provide it via --api-key flag or BATON_API_KEY environment variable")
-	}
+	// FieldRelationships defines relationships between the fields listed in
+	// ConfigurationFields that can be automatically validated. For example, a
+	// username and password can be required together, or an access token can be
+	// marked as mutually exclusive from the username password pair.
+	FieldRelationships = []field.SchemaFieldRelationship{}
+)
 
-	if cfg.AppKey == "" {
-		return fmt.Errorf("app key is required, please provide it via --app-key flag or BATON_APP_KEY environment variable")
-	}
-
+// ValidateConfig is run after the configuration is loaded, and should return an
+// error if it isn't valid. Implementing this function is optional, it only
+// needs to perform extra validations that cannot be encoded with configuration
+// parameters.
+func ValidateConfig(v *viper.Viper) error {
 	return nil
-}
-
-// cmdFlags sets the cmdFlags required for the connector.
-func cmdFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().String("site", "", "Part of your Datadog website URL, e.g. datadoghq.com in https://app.datadoghq.com. ($BATON_SITE)")
-	cmd.PersistentFlags().String("api-key", "", "API key used to authenticate to Datadog API. ($BATON_API_KEY)")
-	cmd.PersistentFlags().String("app-key", "", "APP key used with API key to assign scopes for API access. ($BATON_APP_KEY)")
 }

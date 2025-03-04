@@ -8,7 +8,6 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/helpers"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
@@ -27,7 +26,7 @@ func (u *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 
 // Create a new connector resource for a Datadog user.
 func userResource(user *datadogV2.User) (*v2.Resource, error) {
-	firstname, lastname := helpers.SplitFullName(user.Attributes.GetName())
+	firstname, lastname := rs.SplitFullName(user.Attributes.GetName())
 	profile := map[string]interface{}{
 		"first_name": firstname,
 		"last_name":  lastname,
