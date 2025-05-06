@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"os"
 
+	cfg "github.com/conductorone/baton-datadog/pkg/config"
 	"github.com/conductorone/baton-datadog/pkg/connector"
 	"github.com/conductorone/baton-sdk/pkg/config"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/conductorone/baton-sdk/pkg/types"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"github.com/spf13/viper"
+	// "github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -24,9 +24,7 @@ func main() {
 		ctx,
 		"baton-datadog",
 		getConnector,
-		field.Configuration{
-			Fields: ConfigurationFields,
-		},
+		cfg.Config,
 	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -42,18 +40,18 @@ func main() {
 	}
 }
 
-func getConnector(ctx context.Context, v *viper.Viper) (types.ConnectorServer, error) {
+func getConnector(ctx context.Context, ddc *cfg.Datadog) (types.ConnectorServer, error) {
 	l := ctxzap.Extract(ctx)
-	if err := ValidateConfig(v); err != nil {
-		return nil, err
-	}
+	// if err := ValidateConfig(v); err != nil {
+	// 	return nil, err
+	// }
 
 	cb, err := connector.New(
 		ctx,
-		v.GetString(Site.FieldName),
-		v.GetString(ApiKey.FieldName),
-		v.GetString(AppKey.FieldName),
-		v.GetBool(SyncSecrets.FieldName),
+		ddc.Site,
+		ddc.ApiKey,
+		ddc.AppKey,
+		ddc.SyncSecrets,
 	)
 
 	if err != nil {
