@@ -39,3 +39,11 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	AppKey,
 	SyncSecrets,
 })
+
+// ValidateConfig is run after the configuration is loaded, and should return an
+// error if it isn't valid. Implementing this function is optional, it only
+// needs to perform extra validations that cannot be encoded with configuration
+// parameters.
+func ValidateConfig(cfg *Datadog) error {
+	return nil
+}
