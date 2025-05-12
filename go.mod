@@ -7,8 +7,9 @@ toolchain go1.24.2
 require (
 	github.com/DataDog/datadog-api-client-go/v2 v2.19.0
 	github.com/conductorone/baton-sdk v0.2.93
+	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
-	github.com/spf13/viper v1.19.0
+	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	go.uber.org/zap v1.27.0
 )
 
@@ -84,6 +85,7 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/spf13/viper v1.19.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.14 // indirect
 	github.com/tklauser/numcpus v0.9.0 // indirect
