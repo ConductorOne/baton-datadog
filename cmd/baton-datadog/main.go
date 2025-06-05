@@ -41,9 +41,6 @@ func main() {
 
 func getConnector(ctx context.Context, ddc *cfg.Datadog) (types.ConnectorServer, error) {
 	l := ctxzap.Extract(ctx)
-	if err := cfg.ValidateConfig(ddc); err != nil {
-		return nil, err
-	}
 
 	cb, err := connector.New(
 		ctx,
