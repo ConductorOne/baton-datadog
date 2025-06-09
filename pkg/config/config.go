@@ -5,8 +5,16 @@ import (
 )
 
 var (
-	Site = field.StringField(
+	Site = field.SelectField(
 		"site",
+		[]string{
+			"datadoghq.com",
+			"us3.datadoghq.com",
+			"us5.datadoghq.com",
+			"datadoghq.eu",
+			"ddog-gov.com",
+			"ap1.datadoghq.com",
+		},
 		field.WithDisplayName("Site"),
 		field.WithDescription("Part of your Datadog website URL, e.g. datadoghq.com in https://app.datadoghq.com."),
 		field.WithRequired(true),
@@ -46,7 +54,7 @@ var Config = field.NewConfiguration(
 		AppKey,
 		SyncSecrets,
 	},
-	field.WithConnectorDisplayName("Datadog"),
-	field.WithHelpUrl("/docs/baton/v1/datadog"),
+	field.WithConnectorDisplayName("Datadog v2"),
+	field.WithHelpUrl("/docs/baton/v1/datadog-v2"),
 	field.WithIconUrl("/static/app-icons/datadog.svg"),
 )
