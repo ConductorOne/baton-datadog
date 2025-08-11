@@ -45,7 +45,7 @@ type DistributionWidgetDefinition struct {
 	Yaxis *DistributionWidgetYAxis `json:"yaxis,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewDistributionWidgetDefinition instantiates a new DistributionWidgetDefinition object.
@@ -484,9 +484,6 @@ func (o *DistributionWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 	o.Markers = all.Markers
 	o.Requests = *all.Requests
 	o.ShowLegend = all.ShowLegend
-	if all.Time != nil && all.Time.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
 	o.Time = all.Time
 	o.Title = all.Title
 	if all.TitleAlign != nil && !all.TitleAlign.IsValid() {

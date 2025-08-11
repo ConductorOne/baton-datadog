@@ -21,7 +21,7 @@ type TimeseriesResponseSeries struct {
 	Unit []Unit `json:"unit,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewTimeseriesResponseSeries instantiates a new TimeseriesResponseSeries object.
@@ -97,9 +97,9 @@ func (o *TimeseriesResponseSeries) SetQueryIndex(v int32) {
 	o.QueryIndex = &v
 }
 
-// GetUnit returns the Unit field value if set, zero value otherwise.
+// GetUnit returns the Unit field value if set, zero value otherwise (both if not set or set to explicit null).
 func (o *TimeseriesResponseSeries) GetUnit() []Unit {
-	if o == nil || o.Unit == nil {
+	if o == nil {
 		var ret []Unit
 		return ret
 	}
@@ -108,6 +108,7 @@ func (o *TimeseriesResponseSeries) GetUnit() []Unit {
 
 // GetUnitOk returns a tuple with the Unit field value if set, nil otherwise
 // and a boolean to check if the value has been set.
+// NOTE: If the value is an explicit nil, `nil, true` will be returned.
 func (o *TimeseriesResponseSeries) GetUnitOk() (*[]Unit, bool) {
 	if o == nil || o.Unit == nil {
 		return nil, false

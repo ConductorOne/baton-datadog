@@ -5,24 +5,30 @@
 package datadogV2
 
 import (
+	"time"
+
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
 // FullAPIKeyAttributes Attributes of a full API key.
 type FullAPIKeyAttributes struct {
+	// The category of the API key.
+	Category *string `json:"category,omitempty"`
 	// Creation date of the API key.
-	CreatedAt *string `json:"created_at,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
 	// The API key.
 	Key *string `json:"key,omitempty"`
 	// The last four characters of the API key.
 	Last4 *string `json:"last4,omitempty"`
 	// Date the API key was last modified.
-	ModifiedAt *string `json:"modified_at,omitempty"`
+	ModifiedAt *time.Time `json:"modified_at,omitempty"`
 	// Name of the API key.
 	Name *string `json:"name,omitempty"`
+	// The remote config read enabled status.
+	RemoteConfigReadEnabled *bool `json:"remote_config_read_enabled,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewFullAPIKeyAttributes instantiates a new FullAPIKeyAttributes object.
@@ -42,10 +48,38 @@ func NewFullAPIKeyAttributesWithDefaults() *FullAPIKeyAttributes {
 	return &this
 }
 
-// GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
-func (o *FullAPIKeyAttributes) GetCreatedAt() string {
-	if o == nil || o.CreatedAt == nil {
+// GetCategory returns the Category field value if set, zero value otherwise.
+func (o *FullAPIKeyAttributes) GetCategory() string {
+	if o == nil || o.Category == nil {
 		var ret string
+		return ret
+	}
+	return *o.Category
+}
+
+// GetCategoryOk returns a tuple with the Category field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *FullAPIKeyAttributes) GetCategoryOk() (*string, bool) {
+	if o == nil || o.Category == nil {
+		return nil, false
+	}
+	return o.Category, true
+}
+
+// HasCategory returns a boolean if a field has been set.
+func (o *FullAPIKeyAttributes) HasCategory() bool {
+	return o != nil && o.Category != nil
+}
+
+// SetCategory gets a reference to the given string and assigns it to the Category field.
+func (o *FullAPIKeyAttributes) SetCategory(v string) {
+	o.Category = &v
+}
+
+// GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
+func (o *FullAPIKeyAttributes) GetCreatedAt() time.Time {
+	if o == nil || o.CreatedAt == nil {
+		var ret time.Time
 		return ret
 	}
 	return *o.CreatedAt
@@ -53,7 +87,7 @@ func (o *FullAPIKeyAttributes) GetCreatedAt() string {
 
 // GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *FullAPIKeyAttributes) GetCreatedAtOk() (*string, bool) {
+func (o *FullAPIKeyAttributes) GetCreatedAtOk() (*time.Time, bool) {
 	if o == nil || o.CreatedAt == nil {
 		return nil, false
 	}
@@ -65,8 +99,8 @@ func (o *FullAPIKeyAttributes) HasCreatedAt() bool {
 	return o != nil && o.CreatedAt != nil
 }
 
-// SetCreatedAt gets a reference to the given string and assigns it to the CreatedAt field.
-func (o *FullAPIKeyAttributes) SetCreatedAt(v string) {
+// SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
+func (o *FullAPIKeyAttributes) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
 }
 
@@ -127,9 +161,9 @@ func (o *FullAPIKeyAttributes) SetLast4(v string) {
 }
 
 // GetModifiedAt returns the ModifiedAt field value if set, zero value otherwise.
-func (o *FullAPIKeyAttributes) GetModifiedAt() string {
+func (o *FullAPIKeyAttributes) GetModifiedAt() time.Time {
 	if o == nil || o.ModifiedAt == nil {
-		var ret string
+		var ret time.Time
 		return ret
 	}
 	return *o.ModifiedAt
@@ -137,7 +171,7 @@ func (o *FullAPIKeyAttributes) GetModifiedAt() string {
 
 // GetModifiedAtOk returns a tuple with the ModifiedAt field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *FullAPIKeyAttributes) GetModifiedAtOk() (*string, bool) {
+func (o *FullAPIKeyAttributes) GetModifiedAtOk() (*time.Time, bool) {
 	if o == nil || o.ModifiedAt == nil {
 		return nil, false
 	}
@@ -149,8 +183,8 @@ func (o *FullAPIKeyAttributes) HasModifiedAt() bool {
 	return o != nil && o.ModifiedAt != nil
 }
 
-// SetModifiedAt gets a reference to the given string and assigns it to the ModifiedAt field.
-func (o *FullAPIKeyAttributes) SetModifiedAt(v string) {
+// SetModifiedAt gets a reference to the given time.Time and assigns it to the ModifiedAt field.
+func (o *FullAPIKeyAttributes) SetModifiedAt(v time.Time) {
 	o.ModifiedAt = &v
 }
 
@@ -182,14 +216,49 @@ func (o *FullAPIKeyAttributes) SetName(v string) {
 	o.Name = &v
 }
 
+// GetRemoteConfigReadEnabled returns the RemoteConfigReadEnabled field value if set, zero value otherwise.
+func (o *FullAPIKeyAttributes) GetRemoteConfigReadEnabled() bool {
+	if o == nil || o.RemoteConfigReadEnabled == nil {
+		var ret bool
+		return ret
+	}
+	return *o.RemoteConfigReadEnabled
+}
+
+// GetRemoteConfigReadEnabledOk returns a tuple with the RemoteConfigReadEnabled field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *FullAPIKeyAttributes) GetRemoteConfigReadEnabledOk() (*bool, bool) {
+	if o == nil || o.RemoteConfigReadEnabled == nil {
+		return nil, false
+	}
+	return o.RemoteConfigReadEnabled, true
+}
+
+// HasRemoteConfigReadEnabled returns a boolean if a field has been set.
+func (o *FullAPIKeyAttributes) HasRemoteConfigReadEnabled() bool {
+	return o != nil && o.RemoteConfigReadEnabled != nil
+}
+
+// SetRemoteConfigReadEnabled gets a reference to the given bool and assigns it to the RemoteConfigReadEnabled field.
+func (o *FullAPIKeyAttributes) SetRemoteConfigReadEnabled(v bool) {
+	o.RemoteConfigReadEnabled = &v
+}
+
 // MarshalJSON serializes the struct using spec logic.
 func (o FullAPIKeyAttributes) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
+	if o.Category != nil {
+		toSerialize["category"] = o.Category
+	}
 	if o.CreatedAt != nil {
-		toSerialize["created_at"] = o.CreatedAt
+		if o.CreatedAt.Nanosecond() == 0 {
+			toSerialize["created_at"] = o.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
+		} else {
+			toSerialize["created_at"] = o.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00")
+		}
 	}
 	if o.Key != nil {
 		toSerialize["key"] = o.Key
@@ -198,10 +267,17 @@ func (o FullAPIKeyAttributes) MarshalJSON() ([]byte, error) {
 		toSerialize["last4"] = o.Last4
 	}
 	if o.ModifiedAt != nil {
-		toSerialize["modified_at"] = o.ModifiedAt
+		if o.ModifiedAt.Nanosecond() == 0 {
+			toSerialize["modified_at"] = o.ModifiedAt.Format("2006-01-02T15:04:05Z07:00")
+		} else {
+			toSerialize["modified_at"] = o.ModifiedAt.Format("2006-01-02T15:04:05.000Z07:00")
+		}
 	}
 	if o.Name != nil {
 		toSerialize["name"] = o.Name
+	}
+	if o.RemoteConfigReadEnabled != nil {
+		toSerialize["remote_config_read_enabled"] = o.RemoteConfigReadEnabled
 	}
 
 	for key, value := range o.AdditionalProperties {
@@ -213,26 +289,30 @@ func (o FullAPIKeyAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *FullAPIKeyAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		CreatedAt  *string `json:"created_at,omitempty"`
-		Key        *string `json:"key,omitempty"`
-		Last4      *string `json:"last4,omitempty"`
-		ModifiedAt *string `json:"modified_at,omitempty"`
-		Name       *string `json:"name,omitempty"`
+		Category                *string    `json:"category,omitempty"`
+		CreatedAt               *time.Time `json:"created_at,omitempty"`
+		Key                     *string    `json:"key,omitempty"`
+		Last4                   *string    `json:"last4,omitempty"`
+		ModifiedAt              *time.Time `json:"modified_at,omitempty"`
+		Name                    *string    `json:"name,omitempty"`
+		RemoteConfigReadEnabled *bool      `json:"remote_config_read_enabled,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
 	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"created_at", "key", "last4", "modified_at", "name"})
+		datadog.DeleteKeys(additionalProperties, &[]string{"category", "created_at", "key", "last4", "modified_at", "name", "remote_config_read_enabled"})
 	} else {
 		return err
 	}
+	o.Category = all.Category
 	o.CreatedAt = all.CreatedAt
 	o.Key = all.Key
 	o.Last4 = all.Last4
 	o.ModifiedAt = all.ModifiedAt
 	o.Name = all.Name
+	o.RemoteConfigReadEnabled = all.RemoteConfigReadEnabled
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

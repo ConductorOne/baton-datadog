@@ -15,7 +15,7 @@ import (
 type Series struct {
 	// The name of the host that produced the metric.
 	Host *string `json:"host,omitempty"`
-	// If the type of the metric is rate or count, define the corresponding interval.
+	// If the type of the metric is rate or count, define the corresponding interval in seconds.
 	Interval datadog.NullableInt64 `json:"interval,omitempty"`
 	// The name of the timeseries.
 	Metric string `json:"metric"`
@@ -27,7 +27,7 @@ type Series struct {
 	Type *string `json:"type,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSeries instantiates a new Series object.

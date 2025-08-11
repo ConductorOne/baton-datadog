@@ -12,22 +12,7 @@ import (
 
 // MetricTagConfigurationAttributes Object containing the definition of a metric tag configuration attributes.
 type MetricTagConfigurationAttributes struct {
-	// A list of queryable aggregation combinations for a count, rate, or gauge metric.
-	// By default, count and rate metrics require the (time: sum, space: sum) aggregation and
-	// Gauge metrics require the (time: avg, space: avg) aggregation.
-	// Additional time & space combinations are also available:
-	//
-	// - time: avg, space: avg
-	// - time: avg, space: max
-	// - time: avg, space: min
-	// - time: avg, space: sum
-	// - time: count, space: sum
-	// - time: max, space: max
-	// - time: min, space: min
-	// - time: sum, space: avg
-	// - time: sum, space: sum
-	//
-	// Can only be applied to metrics that have a `metric_type` of `count`, `rate`, or `gauge`.
+	// Deprecated. You no longer need to configure specific time and space aggregations for Metrics Without Limits.
 	Aggregations []MetricCustomAggregation `json:"aggregations,omitempty"`
 	// Timestamp when the tag configuration was created.
 	CreatedAt *time.Time `json:"created_at,omitempty"`
@@ -46,7 +31,7 @@ type MetricTagConfigurationAttributes struct {
 	Tags []string `json:"tags,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewMetricTagConfigurationAttributes instantiates a new MetricTagConfigurationAttributes object.

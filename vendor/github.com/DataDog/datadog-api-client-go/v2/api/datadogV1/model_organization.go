@@ -17,7 +17,7 @@ type Organization struct {
 	Created *string `json:"created,omitempty"`
 	// Description of the organization.
 	Description *string `json:"description,omitempty"`
-	// The name of the new child-organization, limited to 32 characters.
+	// The name of the child organization, limited to 32 characters.
 	Name *string `json:"name,omitempty"`
 	// The `public_id` of the organization you are operating within.
 	PublicId *string `json:"public_id,omitempty"`
@@ -30,7 +30,7 @@ type Organization struct {
 	Trial *bool `json:"trial,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewOrganization instantiates a new Organization object.

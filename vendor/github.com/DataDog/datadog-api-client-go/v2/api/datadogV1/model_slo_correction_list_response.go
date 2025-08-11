@@ -10,13 +10,13 @@ import (
 
 // SLOCorrectionListResponse A list of  SLO correction objects.
 type SLOCorrectionListResponse struct {
-	// The list of of SLO corrections objects.
+	// The list of SLO corrections objects.
 	Data []SLOCorrection `json:"data,omitempty"`
 	// Object describing meta attributes of response.
 	Meta *ResponseMetaAttributes `json:"meta,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSLOCorrectionListResponse instantiates a new SLOCorrectionListResponse object.

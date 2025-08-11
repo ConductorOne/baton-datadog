@@ -8,7 +8,6 @@ import (
 	_context "context"
 	_nethttp "net/http"
 	_neturl "net/url"
-	"strings"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
@@ -186,6 +185,7 @@ func (r *ListHostsOptionalParameters) WithIncludeHostsMetadata(includeHostsMetad
 // Hosts live within the past 3 hours are included by default.
 // Retention is 7 days.
 // Results are paginated with a max of 1000 results at a time.
+// **Note:** If the host is an Amazon EC2 instance, `id` is replaced with `aws_id` in the response.
 func (a *HostsApi) ListHosts(ctx _context.Context, o ...ListHostsOptionalParameters) (HostListResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodGet
@@ -287,7 +287,7 @@ func (a *HostsApi) ListHosts(ctx _context.Context, o ...ListHostsOptionalParamet
 }
 
 // MuteHost Mute a host.
-// Mute a host.
+// Mute a host. **Note:** This creates a [Downtime V2](https://docs.datadoghq.com/api/latest/downtimes/#schedule-a-downtime) for the host.
 func (a *HostsApi) MuteHost(ctx _context.Context, hostName string, body HostMuteSettings) (HostMuteResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -301,7 +301,7 @@ func (a *HostsApi) MuteHost(ctx _context.Context, hostName string, body HostMute
 	}
 
 	localVarPath := localBasePath + "/api/v1/host/{host_name}/mute"
-	localVarPath = strings.Replace(localVarPath, "{"+"host_name"+"}", _neturl.PathEscape(datadog.ParameterToString(hostName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{host_name}", _neturl.PathEscape(datadog.ParameterToString(hostName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -375,7 +375,7 @@ func (a *HostsApi) UnmuteHost(ctx _context.Context, hostName string) (HostMuteRe
 	}
 
 	localVarPath := localBasePath + "/api/v1/host/{host_name}/unmute"
-	localVarPath = strings.Replace(localVarPath, "{"+"host_name"+"}", _neturl.PathEscape(datadog.ParameterToString(hostName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{host_name}", _neturl.PathEscape(datadog.ParameterToString(hostName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}

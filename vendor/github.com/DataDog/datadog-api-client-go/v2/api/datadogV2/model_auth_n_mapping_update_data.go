@@ -16,13 +16,13 @@ type AuthNMappingUpdateData struct {
 	Attributes *AuthNMappingUpdateAttributes `json:"attributes,omitempty"`
 	// ID of the AuthN Mapping.
 	Id string `json:"id"`
-	// Relationship of AuthN Mapping update object to Role.
+	// Relationship of AuthN Mapping update object to a Role or Team.
 	Relationships *AuthNMappingUpdateRelationships `json:"relationships,omitempty"`
 	// AuthN Mappings resource type.
 	Type AuthNMappingsType `json:"type"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewAuthNMappingUpdateData instantiates a new AuthNMappingUpdateData object.
@@ -199,9 +199,6 @@ func (o *AuthNMappingUpdateData) UnmarshalJSON(bytes []byte) (err error) {
 	}
 	o.Attributes = all.Attributes
 	o.Id = *all.Id
-	if all.Relationships != nil && all.Relationships.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
 	o.Relationships = all.Relationships
 	if !all.Type.IsValid() {
 		hasInvalidField = true

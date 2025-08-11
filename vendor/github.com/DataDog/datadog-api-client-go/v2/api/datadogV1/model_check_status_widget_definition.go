@@ -34,7 +34,7 @@ type CheckStatusWidgetDefinition struct {
 	Type CheckStatusWidgetDefinitionType `json:"type"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewCheckStatusWidgetDefinition instantiates a new CheckStatusWidgetDefinition object.
@@ -404,9 +404,6 @@ func (o *CheckStatusWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 		o.Grouping = *all.Grouping
 	}
 	o.Tags = all.Tags
-	if all.Time != nil && all.Time.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
 	o.Time = all.Time
 	o.Title = all.Title
 	if all.TitleAlign != nil && !all.TitleAlign.IsValid() {
