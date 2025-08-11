@@ -13,7 +13,7 @@ import (
 // MetricSeries A metric to submit to Datadog.
 // See [Datadog metrics](https://docs.datadoghq.com/developers/metrics/#custom-metrics-properties).
 type MetricSeries struct {
-	// If the type of the metric is rate or count, define the corresponding interval.
+	// If the type of the metric is rate or count, define the corresponding interval in seconds.
 	Interval *int64 `json:"interval,omitempty"`
 	// Metadata for the metric.
 	Metadata *MetricMetadata `json:"metadata,omitempty"`
@@ -33,7 +33,7 @@ type MetricSeries struct {
 	Unit *string `json:"unit,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewMetricSeries instantiates a new MetricSeries object.

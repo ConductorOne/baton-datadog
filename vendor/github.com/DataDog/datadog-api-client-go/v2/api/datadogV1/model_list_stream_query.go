@@ -12,13 +12,15 @@ import (
 
 // ListStreamQuery Updated list stream widget.
 type ListStreamQuery struct {
+	// Specifies the field for logs pattern clustering. Usable only with logs_pattern_stream.
+	ClusteringPatternFieldPath *string `json:"clustering_pattern_field_path,omitempty"`
 	// Compute configuration for the List Stream Widget. Compute can be used only with the logs_transaction_stream (from 1 to 5 items) list stream source.
 	Compute []ListStreamComputeItems `json:"compute,omitempty"`
 	// Source from which to query items to display in the stream.
 	DataSource ListStreamSource `json:"data_source"`
 	// Size to use to display an event.
 	EventSize *WidgetEventSize `json:"event_size,omitempty"`
-	// Group by configuration for the List Stream Widget. Group by can be used only with logs_pattern_stream (up to 3 items) or logs_transaction_stream (one group by item is required) list stream source.
+	// Group by configuration for the List Stream Widget. Group by can be used only with logs_pattern_stream (up to 4 items) or logs_transaction_stream (one group by item is required) list stream source.
 	GroupBy []ListStreamGroupByItems `json:"group_by,omitempty"`
 	// List of indexes.
 	Indexes []string `json:"indexes,omitempty"`
@@ -30,7 +32,7 @@ type ListStreamQuery struct {
 	Storage *string `json:"storage,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewListStreamQuery instantiates a new ListStreamQuery object.
@@ -52,6 +54,34 @@ func NewListStreamQueryWithDefaults() *ListStreamQuery {
 	var dataSource ListStreamSource = LISTSTREAMSOURCE_APM_ISSUE_STREAM
 	this.DataSource = dataSource
 	return &this
+}
+
+// GetClusteringPatternFieldPath returns the ClusteringPatternFieldPath field value if set, zero value otherwise.
+func (o *ListStreamQuery) GetClusteringPatternFieldPath() string {
+	if o == nil || o.ClusteringPatternFieldPath == nil {
+		var ret string
+		return ret
+	}
+	return *o.ClusteringPatternFieldPath
+}
+
+// GetClusteringPatternFieldPathOk returns a tuple with the ClusteringPatternFieldPath field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ListStreamQuery) GetClusteringPatternFieldPathOk() (*string, bool) {
+	if o == nil || o.ClusteringPatternFieldPath == nil {
+		return nil, false
+	}
+	return o.ClusteringPatternFieldPath, true
+}
+
+// HasClusteringPatternFieldPath returns a boolean if a field has been set.
+func (o *ListStreamQuery) HasClusteringPatternFieldPath() bool {
+	return o != nil && o.ClusteringPatternFieldPath != nil
+}
+
+// SetClusteringPatternFieldPath gets a reference to the given string and assigns it to the ClusteringPatternFieldPath field.
+func (o *ListStreamQuery) SetClusteringPatternFieldPath(v string) {
+	o.ClusteringPatternFieldPath = &v
 }
 
 // GetCompute returns the Compute field value if set, zero value otherwise.
@@ -274,6 +304,9 @@ func (o ListStreamQuery) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
+	if o.ClusteringPatternFieldPath != nil {
+		toSerialize["clustering_pattern_field_path"] = o.ClusteringPatternFieldPath
+	}
 	if o.Compute != nil {
 		toSerialize["compute"] = o.Compute
 	}
@@ -304,14 +337,15 @@ func (o ListStreamQuery) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *ListStreamQuery) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Compute     []ListStreamComputeItems `json:"compute,omitempty"`
-		DataSource  *ListStreamSource        `json:"data_source"`
-		EventSize   *WidgetEventSize         `json:"event_size,omitempty"`
-		GroupBy     []ListStreamGroupByItems `json:"group_by,omitempty"`
-		Indexes     []string                 `json:"indexes,omitempty"`
-		QueryString *string                  `json:"query_string"`
-		Sort        *WidgetFieldSort         `json:"sort,omitempty"`
-		Storage     *string                  `json:"storage,omitempty"`
+		ClusteringPatternFieldPath *string                  `json:"clustering_pattern_field_path,omitempty"`
+		Compute                    []ListStreamComputeItems `json:"compute,omitempty"`
+		DataSource                 *ListStreamSource        `json:"data_source"`
+		EventSize                  *WidgetEventSize         `json:"event_size,omitempty"`
+		GroupBy                    []ListStreamGroupByItems `json:"group_by,omitempty"`
+		Indexes                    []string                 `json:"indexes,omitempty"`
+		QueryString                *string                  `json:"query_string"`
+		Sort                       *WidgetFieldSort         `json:"sort,omitempty"`
+		Storage                    *string                  `json:"storage,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -324,12 +358,13 @@ func (o *ListStreamQuery) UnmarshalJSON(bytes []byte) (err error) {
 	}
 	additionalProperties := make(map[string]interface{})
 	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"compute", "data_source", "event_size", "group_by", "indexes", "query_string", "sort", "storage"})
+		datadog.DeleteKeys(additionalProperties, &[]string{"clustering_pattern_field_path", "compute", "data_source", "event_size", "group_by", "indexes", "query_string", "sort", "storage"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
+	o.ClusteringPatternFieldPath = all.ClusteringPatternFieldPath
 	o.Compute = all.Compute
 	if !all.DataSource.IsValid() {
 		hasInvalidField = true

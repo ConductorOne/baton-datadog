@@ -8,7 +8,6 @@ import (
 	_context "context"
 	_nethttp "net/http"
 	_neturl "net/url"
-	"strings"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
@@ -107,7 +106,6 @@ func (a *MonitorsApi) CheckCanDeleteMonitor(ctx _context.Context, monitorIds []i
 // - APM: `query alert` or `trace-analytics alert`
 // - composite: `composite`
 // - custom: `service check`
-// - event: `event alert`
 // - forecast: `query alert`
 // - host: `service check`
 // - integration: `query alert` or `service check`
@@ -119,14 +117,16 @@ func (a *MonitorsApi) CheckCanDeleteMonitor(ctx _context.Context, monitorIds []i
 // - process: `service check`
 // - rum: `rum alert`
 // - SLO: `slo alert`
-// - watchdog: `event alert`
+// - watchdog: `event-v2 alert`
 // - event-v2: `event-v2 alert`
 // - audit: `audit alert`
 // - error-tracking: `error-tracking alert`
 // - database-monitoring: `database-monitoring alert`
+// - network-performance: `network-performance alert`
+// - cloud cost: `cost alert`
 //
 // **Notes**:
-// - Synthetic monitors are created through the Synthetics API. See the [Synthetics API] (https://docs.datadoghq.com/api/latest/synthetics/) documentation for more information.
+// - Synthetic monitors are created through the Synthetics API. See the [Synthetics API](https://docs.datadoghq.com/api/latest/synthetics/) documentation for more information.
 // - Log monitors require an unscoped App Key.
 //
 // #### Query Types
@@ -257,12 +257,14 @@ func (a *MonitorsApi) CheckCanDeleteMonitor(ctx _context.Context, monitorIds []i
 //
 // ##### Error Tracking Alert Query
 //
-// Example(RUM): `error-tracking-rum(query).rollup(rollup_method[, measure]).last(time_window) operator #`
-// Example(APM Traces): `error-tracking-traces(query).rollup(rollup_method[, measure]).last(time_window) operator #`
+// "New issue" example: `error-tracking(query).source(issue_source).new().rollup(rollup_method[, measure]).by(group_by).last(time_window) operator #`
+// "High impact issue" example: `error-tracking(query).source(issue_source).impact().rollup(rollup_method[, measure]).by(group_by).last(time_window) operator #`
 //
 // - `query` The search query - following the [Log search syntax](https://docs.datadoghq.com/logs/search_syntax/).
-// - `rollup_method` The stats roll-up method - supports `count`, `avg`, and `cardinality`.
+// - `issue_source` The issue source - supports `all`, `browser`, `mobile` and `backend` and defaults to `all` if omitted.
+// - `rollup_method` The stats roll-up method - supports `count`, `avg`, and `cardinality` and defaults to `count` if omitted.
 // - `measure` For `avg` and cardinality `rollup_method` - specify the measure or the facet name you want to use.
+// - `group by` Comma-separated list of attributes to group by - should contain at least `issue.id`.
 // - `time_window` #m (between 1 and 2880), #h (between 1 and 48).
 // - `operator` `<`, `<=`, `>`, `>=`, `==`, or `!=`.
 // - `#` an integer or decimal number used to set the threshold.
@@ -278,7 +280,43 @@ func (a *MonitorsApi) CheckCanDeleteMonitor(ctx _context.Context, monitorIds []i
 // - `operator` `<`, `<=`, `>`, `>=`, `==`, or `!=`.
 // - `#` an integer or decimal number used to set the threshold.
 //
-// **NOTE** Database Monitoring monitors are in alpha on US1.
+// **Network Performance Alert Query**
+//
+// Example: `network-performance(query).rollup(rollup_method[, measure]).last(time_window) operator #`
+//
+// - `query` The search query - following the [Log search syntax](https://docs.datadoghq.com/logs/search_syntax/).
+// - `rollup_method` The stats roll-up method - supports `count`, `avg`, and `cardinality`.
+// - `measure` For `avg` and cardinality `rollup_method` - specify the measure or the facet name you want to use.
+// - `time_window` #m (between 1 and 2880), #h (between 1 and 48).
+// - `operator` `<`, `<=`, `>`, `>=`, `==`, or `!=`.
+// - `#` an integer or decimal number used to set the threshold.
+//
+// **Cost Alert Query**
+//
+// Example: `formula(query).timeframe_type(time_window).function(parameter) operator #`
+//
+// - `query` The search query - following the [Log search syntax](https://docs.datadoghq.com/logs/search_syntax/).
+// - `timeframe_type` The timeframe type to evaluate the cost
+//   - for `forecast` supports `current`
+//   - for `change`, `anomaly`, `threshold` supports `last`
+//
+// - `time_window` - supports daily roll-up e.g. `7d`
+// - `function` - [optional, defaults to `threshold` monitor if omitted] supports `change`, `anomaly`, `forecast`
+// - `parameter` Specify the parameter of the type
+//   - for `change`:
+//   - supports `relative`, `absolute`
+//   - [optional] supports `#`, where `#` is an integer or decimal number used to set the threshold
+//   - for `anomaly`:
+//   - supports `direction=both`, `direction=above`, `direction=below`
+//   - [optional] supports `threshold=#`, where `#` is an integer or decimal number used to set the threshold
+//
+// - `operator`
+//   - for `threshold` supports `<`, `<=`, `>`, `>=`, `==`, or `!=`
+//   - for `change` supports `>`, `<`
+//   - for `anomaly` supports `>=`
+//   - for `forecast` supports `>`
+//
+// - `#` an integer or decimal number used to set the threshold.
 func (a *MonitorsApi) CreateMonitor(ctx _context.Context, body Monitor) (Monitor, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -390,7 +428,7 @@ func (a *MonitorsApi) DeleteMonitor(ctx _context.Context, monitorId int64, o ...
 	}
 
 	localVarPath := localBasePath + "/api/v1/monitor/{monitor_id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"monitor_id"+"}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{monitor_id}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -496,7 +534,7 @@ func (a *MonitorsApi) GetMonitor(ctx _context.Context, monitorId int64, o ...Get
 	}
 
 	localVarPath := localBasePath + "/api/v1/monitor/{monitor_id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"monitor_id"+"}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{monitor_id}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -624,8 +662,8 @@ func (r *ListMonitorsOptionalParameters) WithPageSize(pageSize int32) *ListMonit
 	return r
 }
 
-// ListMonitors Get all monitor details.
-// Get details about the specified monitor from your organization.
+// ListMonitors Get all monitors.
+// Get all monitors from your organization.
 func (a *MonitorsApi) ListMonitors(ctx _context.Context, o ...ListMonitorsOptionalParameters) ([]Monitor, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodGet
@@ -1041,7 +1079,7 @@ func (a *MonitorsApi) UpdateMonitor(ctx _context.Context, monitorId int64, body 
 	}
 
 	localVarPath := localBasePath + "/api/v1/monitor/{monitor_id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"monitor_id"+"}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{monitor_id}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -1115,7 +1153,7 @@ func (a *MonitorsApi) ValidateExistingMonitor(ctx _context.Context, monitorId in
 	}
 
 	localVarPath := localBasePath + "/api/v1/monitor/{monitor_id}/validate"
-	localVarPath = strings.Replace(localVarPath, "{"+"monitor_id"+"}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{monitor_id}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}

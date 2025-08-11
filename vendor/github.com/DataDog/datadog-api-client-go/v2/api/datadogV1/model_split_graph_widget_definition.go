@@ -28,7 +28,7 @@ type SplitGraphWidgetDefinition struct {
 	Type SplitGraphWidgetDefinitionType `json:"type"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSplitGraphWidgetDefinition instantiates a new SplitGraphWidgetDefinition object.
@@ -301,9 +301,6 @@ func (o *SplitGraphWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 		hasInvalidField = true
 	}
 	o.SplitConfig = *all.SplitConfig
-	if all.Time != nil && all.Time.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
 	o.Time = all.Time
 	o.Title = all.Title
 	if !all.Type.IsValid() {

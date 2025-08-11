@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// SLOHistoryMetricsSeries A representation of `metric` based SLO time series for the provided queries.
+// SLOHistoryMetricsSeries A representation of `metric` based SLO timeseries for the provided queries.
 // This is the same response type from `batch_query` endpoint.
 type SLOHistoryMetricsSeries struct {
 	// Count of submitted metrics.
@@ -23,7 +23,7 @@ type SLOHistoryMetricsSeries struct {
 	Values []float64 `json:"values"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSLOHistoryMetricsSeries instantiates a new SLOHistoryMetricsSeries object.

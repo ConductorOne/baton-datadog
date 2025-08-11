@@ -14,7 +14,7 @@ import (
 type SecurityMonitoringSignalRuleCreatePayload struct {
 	// Cases for generating signals.
 	Cases []SecurityMonitoringRuleCaseCreate `json:"cases"`
-	// Additional queries to filter matched events before they are processed.
+	// Additional queries to filter matched events before they are processed. This field is deprecated for log detection, signal correlation, and workload security rules.
 	Filters []SecurityMonitoringFilter `json:"filters,omitempty"`
 	// Whether the notifications include the triggering group-by values in their title.
 	HasExtendedTitle *bool `json:"hasExtendedTitle,omitempty"`
@@ -24,7 +24,7 @@ type SecurityMonitoringSignalRuleCreatePayload struct {
 	Message string `json:"message"`
 	// The name of the rule.
 	Name string `json:"name"`
-	// Options on rules.
+	// Options.
 	Options SecurityMonitoringRuleOptions `json:"options"`
 	// Queries for selecting signals which are part of the rule.
 	Queries []SecurityMonitoringSignalRuleQuery `json:"queries"`
@@ -34,7 +34,7 @@ type SecurityMonitoringSignalRuleCreatePayload struct {
 	Type *SecurityMonitoringSignalRuleType `json:"type,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSecurityMonitoringSignalRuleCreatePayload instantiates a new SecurityMonitoringSignalRuleCreatePayload object.

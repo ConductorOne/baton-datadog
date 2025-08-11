@@ -8,7 +8,6 @@ import (
 	_context "context"
 	_nethttp "net/http"
 	_neturl "net/url"
-	"strings"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
@@ -103,7 +102,7 @@ func (a *ServiceDefinitionApi) DeleteServiceDefinition(ctx _context.Context, ser
 	}
 
 	localVarPath := localBasePath + "/api/v2/services/definitions/{service_name}"
-	localVarPath = strings.Replace(localVarPath, "{"+"service_name"+"}", _neturl.PathEscape(datadog.ParameterToString(serviceName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{service_name}", _neturl.PathEscape(datadog.ParameterToString(serviceName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -190,7 +189,7 @@ func (a *ServiceDefinitionApi) GetServiceDefinition(ctx _context.Context, servic
 	}
 
 	localVarPath := localBasePath + "/api/v2/services/definitions/{service_name}"
-	localVarPath = strings.Replace(localVarPath, "{"+"service_name"+"}", _neturl.PathEscape(datadog.ParameterToString(serviceName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{service_name}", _neturl.PathEscape(datadog.ParameterToString(serviceName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -378,6 +377,8 @@ func (a *ServiceDefinitionApi) ListServiceDefinitionsWithPagination(ctx _context
 		pageSize_ = *o[0].PageSize
 	}
 	o[0].PageSize = &pageSize_
+	page_ := int64(0)
+	o[0].PageNumber = &page_
 
 	items := make(chan datadog.PaginationResult[ServiceDefinitionData], pageSize_)
 	go func() {
@@ -405,12 +406,8 @@ func (a *ServiceDefinitionApi) ListServiceDefinitionsWithPagination(ctx _context
 			if len(results) < int(pageSize_) {
 				break
 			}
-			if o[0].PageNumber == nil {
-				o[0].PageNumber = &pageSize_
-			} else {
-				pageOffset_ := *o[0].PageNumber + pageSize_
-				o[0].PageNumber = &pageOffset_
-			}
+			pageOffset_ := *o[0].PageNumber + 1
+			o[0].PageNumber = &pageOffset_
 		}
 		close(items)
 	}()

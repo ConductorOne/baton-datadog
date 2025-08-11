@@ -8,15 +8,15 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// CloudWorkloadSecurityAgentRuleCreatorAttributes The attributes of the user who created the Agent rule.
+// CloudWorkloadSecurityAgentRuleCreatorAttributes The attributes of the user who created the Agent rule
 type CloudWorkloadSecurityAgentRuleCreatorAttributes struct {
-	// The handle of the user.
+	// The handle of the user
 	Handle *string `json:"handle,omitempty"`
-	// The name of the user.
+	// The name of the user
 	Name datadog.NullableString `json:"name,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewCloudWorkloadSecurityAgentRuleCreatorAttributes instantiates a new CloudWorkloadSecurityAgentRuleCreatorAttributes object.

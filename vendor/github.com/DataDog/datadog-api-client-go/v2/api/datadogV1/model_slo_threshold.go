@@ -21,7 +21,8 @@ type SLOThreshold struct {
 	// Always included in service level objective responses. Ignored in
 	// create/update requests.
 	TargetDisplay *string `json:"target_display,omitempty"`
-	// The SLO time window options.
+	// The SLO time window options. Note that "custom" is not a valid option for creating
+	// or updating SLOs. It is only used when querying SLO history over custom timeframes.
 	Timeframe SLOTimeframe `json:"timeframe"`
 	// The warning value for the service level objective.
 	Warning *float64 `json:"warning,omitempty"`
@@ -33,7 +34,7 @@ type SLOThreshold struct {
 	WarningDisplay *string `json:"warning_display,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSLOThreshold instantiates a new SLOThreshold object.

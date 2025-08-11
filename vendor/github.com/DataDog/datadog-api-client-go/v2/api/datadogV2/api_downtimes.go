@@ -8,7 +8,6 @@ import (
 	_context "context"
 	_nethttp "net/http"
 	_neturl "net/url"
-	"strings"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
@@ -18,6 +17,8 @@ type DowntimesApi datadog.Service
 
 // CancelDowntime Cancel a downtime.
 // Cancel a downtime.
+//
+// **Note**: Downtimes canceled through the API are no longer active, but are retained for approximately two days before being permanently removed. The downtime may still appear in search results until it is permanently removed.
 func (a *DowntimesApi) CancelDowntime(ctx _context.Context, downtimeId string) (*_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod = _nethttp.MethodDelete
@@ -30,7 +31,7 @@ func (a *DowntimesApi) CancelDowntime(ctx _context.Context, downtimeId string) (
 	}
 
 	localVarPath := localBasePath + "/api/v2/downtime/{downtime_id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"downtime_id"+"}", _neturl.PathEscape(datadog.ParameterToString(downtimeId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{downtime_id}", _neturl.PathEscape(datadog.ParameterToString(downtimeId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -190,7 +191,7 @@ func (a *DowntimesApi) GetDowntime(ctx _context.Context, downtimeId string, o ..
 	}
 
 	localVarPath := localBasePath + "/api/v2/downtime/{downtime_id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"downtime_id"+"}", _neturl.PathEscape(datadog.ParameterToString(downtimeId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{downtime_id}", _neturl.PathEscape(datadog.ParameterToString(downtimeId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -427,14 +428,46 @@ func (a *DowntimesApi) ListDowntimesWithPagination(ctx _context.Context, o ...Li
 	return items, cancel
 }
 
+// ListMonitorDowntimesOptionalParameters holds optional parameters for ListMonitorDowntimes.
+type ListMonitorDowntimesOptionalParameters struct {
+	PageOffset *int64
+	PageLimit  *int64
+}
+
+// NewListMonitorDowntimesOptionalParameters creates an empty struct for parameters.
+func NewListMonitorDowntimesOptionalParameters() *ListMonitorDowntimesOptionalParameters {
+	this := ListMonitorDowntimesOptionalParameters{}
+	return &this
+}
+
+// WithPageOffset sets the corresponding parameter name and returns the struct.
+func (r *ListMonitorDowntimesOptionalParameters) WithPageOffset(pageOffset int64) *ListMonitorDowntimesOptionalParameters {
+	r.PageOffset = &pageOffset
+	return r
+}
+
+// WithPageLimit sets the corresponding parameter name and returns the struct.
+func (r *ListMonitorDowntimesOptionalParameters) WithPageLimit(pageLimit int64) *ListMonitorDowntimesOptionalParameters {
+	r.PageLimit = &pageLimit
+	return r
+}
+
 // ListMonitorDowntimes Get active downtimes for a monitor.
 // Get all active downtimes for the specified monitor.
-func (a *DowntimesApi) ListMonitorDowntimes(ctx _context.Context, monitorId int64) (MonitorDowntimeMatchResponse, *_nethttp.Response, error) {
+func (a *DowntimesApi) ListMonitorDowntimes(ctx _context.Context, monitorId int64, o ...ListMonitorDowntimesOptionalParameters) (MonitorDowntimeMatchResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodGet
 		localVarPostBody    interface{}
 		localVarReturnValue MonitorDowntimeMatchResponse
+		optionalParams      ListMonitorDowntimesOptionalParameters
 	)
+
+	if len(o) > 1 {
+		return localVarReturnValue, nil, datadog.ReportError("only one argument of type ListMonitorDowntimesOptionalParameters is allowed")
+	}
+	if len(o) == 1 {
+		optionalParams = o[0]
+	}
 
 	localBasePath, err := a.Client.Cfg.ServerURLWithContext(ctx, "v2.DowntimesApi.ListMonitorDowntimes")
 	if err != nil {
@@ -442,11 +475,17 @@ func (a *DowntimesApi) ListMonitorDowntimes(ctx _context.Context, monitorId int6
 	}
 
 	localVarPath := localBasePath + "/api/v2/monitor/{monitor_id}/downtime_matches"
-	localVarPath = strings.Replace(localVarPath, "{"+"monitor_id"+"}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{monitor_id}", _neturl.PathEscape(datadog.ParameterToString(monitorId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
 	localVarFormParams := _neturl.Values{}
+	if optionalParams.PageOffset != nil {
+		localVarQueryParams.Add("page[offset]", datadog.ParameterToString(*optionalParams.PageOffset, ""))
+	}
+	if optionalParams.PageLimit != nil {
+		localVarQueryParams.Add("page[limit]", datadog.ParameterToString(*optionalParams.PageLimit, ""))
+	}
 	localVarHeaderParams["Accept"] = "application/json"
 
 	datadog.SetAuthKeys(
@@ -498,6 +537,56 @@ func (a *DowntimesApi) ListMonitorDowntimes(ctx _context.Context, monitorId int6
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+// ListMonitorDowntimesWithPagination provides a paginated version of ListMonitorDowntimes returning a channel with all items.
+func (a *DowntimesApi) ListMonitorDowntimesWithPagination(ctx _context.Context, monitorId int64, o ...ListMonitorDowntimesOptionalParameters) (<-chan datadog.PaginationResult[MonitorDowntimeMatchResponseData], func()) {
+	ctx, cancel := _context.WithCancel(ctx)
+	pageSize_ := int64(30)
+	if len(o) == 0 {
+		o = append(o, ListMonitorDowntimesOptionalParameters{})
+	}
+	if o[0].PageLimit != nil {
+		pageSize_ = *o[0].PageLimit
+	}
+	o[0].PageLimit = &pageSize_
+
+	items := make(chan datadog.PaginationResult[MonitorDowntimeMatchResponseData], pageSize_)
+	go func() {
+		for {
+			resp, _, err := a.ListMonitorDowntimes(ctx, monitorId, o...)
+			if err != nil {
+				var returnItem MonitorDowntimeMatchResponseData
+				items <- datadog.PaginationResult[MonitorDowntimeMatchResponseData]{Item: returnItem, Error: err}
+				break
+			}
+			respData, ok := resp.GetDataOk()
+			if !ok {
+				break
+			}
+			results := *respData
+
+			for _, item := range results {
+				select {
+				case items <- datadog.PaginationResult[MonitorDowntimeMatchResponseData]{Item: item, Error: nil}:
+				case <-ctx.Done():
+					close(items)
+					return
+				}
+			}
+			if len(results) < int(pageSize_) {
+				break
+			}
+			if o[0].PageOffset == nil {
+				o[0].PageOffset = &pageSize_
+			} else {
+				pageOffset_ := *o[0].PageOffset + pageSize_
+				o[0].PageOffset = &pageOffset_
+			}
+		}
+		close(items)
+	}()
+	return items, cancel
+}
+
 // UpdateDowntime Update a downtime.
 // Update a downtime by `downtime_id`.
 func (a *DowntimesApi) UpdateDowntime(ctx _context.Context, downtimeId string, body DowntimeUpdateRequest) (DowntimeResponse, *_nethttp.Response, error) {
@@ -513,7 +602,7 @@ func (a *DowntimesApi) UpdateDowntime(ctx _context.Context, downtimeId string, b
 	}
 
 	localVarPath := localBasePath + "/api/v2/downtime/{downtime_id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"downtime_id"+"}", _neturl.PathEscape(datadog.ParameterToString(downtimeId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{downtime_id}", _neturl.PathEscape(datadog.ParameterToString(downtimeId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}

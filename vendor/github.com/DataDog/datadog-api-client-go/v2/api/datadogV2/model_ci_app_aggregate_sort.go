@@ -8,7 +8,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// CIAppAggregateSort A sort rule.
+// CIAppAggregateSort A sort rule. The `aggregation` field is required when `type` is `measure`.
 type CIAppAggregateSort struct {
 	// An aggregation function.
 	Aggregation *CIAppAggregationFunction `json:"aggregation,omitempty"`
@@ -20,7 +20,7 @@ type CIAppAggregateSort struct {
 	Type *CIAppAggregateSortType `json:"type,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewCIAppAggregateSort instantiates a new CIAppAggregateSort object.

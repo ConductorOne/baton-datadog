@@ -6,11 +6,8 @@ package datadogV2
 
 import (
 	_context "context"
-	_fmt "fmt"
-	_log "log"
 	_nethttp "net/http"
 	_neturl "net/url"
-	"strings"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
@@ -99,10 +96,10 @@ func (a *MetricsApi) CreateBulkTagsMetricsConfiguration(ctx _context.Context, bo
 
 // CreateTagConfiguration Create a tag configuration.
 // Create and define a list of queryable tag keys for an existing count/gauge/rate/distribution metric.
-// Optionally, include percentile aggregations on any distribution metric or configure custom aggregations
-// on any count, rate, or gauge metric. By setting `exclude_tags_mode` to true the behavior is changed
-// from an allow-list to a deny-list, and tags in the defined list will not be queryable.
-// Can only be used with application keys of users with the `Manage Tags for Metrics` permission.
+// Optionally, include percentile aggregations on any distribution metric. By setting `exclude_tags_mode`
+// to true, the behavior is changed from an allow-list to a deny-list, and tags in the defined list are
+// not queryable. Can only be used with application keys of users with the `Manage Tags for Metrics`
+// permission.
 func (a *MetricsApi) CreateTagConfiguration(ctx _context.Context, metricName string, body MetricTagConfigurationCreateRequest) (MetricTagConfigurationResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -116,7 +113,7 @@ func (a *MetricsApi) CreateTagConfiguration(ctx _context.Context, metricName str
 	}
 
 	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/tags"
-	localVarPath = strings.Replace(localVarPath, "{"+"metric_name"+"}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -266,7 +263,7 @@ func (a *MetricsApi) DeleteTagConfiguration(ctx _context.Context, metricName str
 	}
 
 	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/tags"
-	localVarPath = strings.Replace(localVarPath, "{"+"metric_name"+"}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -381,7 +378,7 @@ func (a *MetricsApi) EstimateMetricsOutputSeries(ctx _context.Context, metricNam
 	}
 
 	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/estimate"
-	localVarPath = strings.Replace(localVarPath, "{"+"metric_name"+"}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -470,7 +467,7 @@ func (r *ListActiveMetricConfigurationsOptionalParameters) WithWindowSeconds(win
 }
 
 // ListActiveMetricConfigurations List active tags and aggregations.
-// List tags and aggregations that are actively queried on dashboards and monitors for a given metric name.
+// List tags and aggregations that are actively queried on dashboards, notebooks, monitors, the Metrics Explorer, and using the API for a given metric name.
 func (a *MetricsApi) ListActiveMetricConfigurations(ctx _context.Context, metricName string, o ...ListActiveMetricConfigurationsOptionalParameters) (MetricSuggestedTagsAndAggregationsResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodGet
@@ -492,7 +489,7 @@ func (a *MetricsApi) ListActiveMetricConfigurations(ctx _context.Context, metric
 	}
 
 	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/active-configurations"
-	localVarPath = strings.Replace(localVarPath, "{"+"metric_name"+"}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -500,6 +497,77 @@ func (a *MetricsApi) ListActiveMetricConfigurations(ctx _context.Context, metric
 	if optionalParams.WindowSeconds != nil {
 		localVarQueryParams.Add("window[seconds]", datadog.ParameterToString(*optionalParams.WindowSeconds, ""))
 	}
+	localVarHeaderParams["Accept"] = "application/json"
+
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
+	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.Client.CallAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := datadog.ReadBody(localVarHTTPResponse)
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := datadog.GenericOpenAPIError{
+			ErrorBody:    localVarBody,
+			ErrorMessage: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 || localVarHTTPResponse.StatusCode == 403 || localVarHTTPResponse.StatusCode == 404 || localVarHTTPResponse.StatusCode == 429 {
+			var v APIErrorResponse
+			err = a.Client.Decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.ErrorModel = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.Client.Decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := datadog.GenericOpenAPIError{
+			ErrorBody:    localVarBody,
+			ErrorMessage: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+// ListMetricAssets Related Assets to a Metric.
+// Returns dashboards, monitors, notebooks, and SLOs that a metric is stored in, if any.  Updated every 24 hours.
+func (a *MetricsApi) ListMetricAssets(ctx _context.Context, metricName string) (MetricAssetsResponse, *_nethttp.Response, error) {
+	var (
+		localVarHTTPMethod  = _nethttp.MethodGet
+		localVarPostBody    interface{}
+		localVarReturnValue MetricAssetsResponse
+	)
+
+	localBasePath, err := a.Client.Cfg.ServerURLWithContext(ctx, "v2.MetricsApi.ListMetricAssets")
+	if err != nil {
+		return localVarReturnValue, nil, datadog.GenericOpenAPIError{ErrorMessage: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/assets"
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := _neturl.Values{}
+	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "application/json"
 
 	datadog.SetAuthKeys(
@@ -566,7 +634,7 @@ func (a *MetricsApi) ListTagConfigurationByName(ctx _context.Context, metricName
 	}
 
 	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/tags"
-	localVarPath = strings.Replace(localVarPath, "{"+"metric_name"+"}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -626,11 +694,14 @@ func (a *MetricsApi) ListTagConfigurationByName(ctx _context.Context, metricName
 type ListTagConfigurationsOptionalParameters struct {
 	FilterConfigured         *bool
 	FilterTagsConfigured     *string
-	FilterMetricType         *MetricTagConfigurationMetricTypes
+	FilterMetricType         *MetricTagConfigurationMetricTypeCategory
 	FilterIncludePercentiles *bool
 	FilterQueried            *bool
 	FilterTags               *string
+	FilterRelatedAssets      *bool
 	WindowSeconds            *int64
+	PageSize                 *int32
+	PageCursor               *string
 }
 
 // NewListTagConfigurationsOptionalParameters creates an empty struct for parameters.
@@ -652,7 +723,7 @@ func (r *ListTagConfigurationsOptionalParameters) WithFilterTagsConfigured(filte
 }
 
 // WithFilterMetricType sets the corresponding parameter name and returns the struct.
-func (r *ListTagConfigurationsOptionalParameters) WithFilterMetricType(filterMetricType MetricTagConfigurationMetricTypes) *ListTagConfigurationsOptionalParameters {
+func (r *ListTagConfigurationsOptionalParameters) WithFilterMetricType(filterMetricType MetricTagConfigurationMetricTypeCategory) *ListTagConfigurationsOptionalParameters {
 	r.FilterMetricType = &filterMetricType
 	return r
 }
@@ -675,14 +746,35 @@ func (r *ListTagConfigurationsOptionalParameters) WithFilterTags(filterTags stri
 	return r
 }
 
+// WithFilterRelatedAssets sets the corresponding parameter name and returns the struct.
+func (r *ListTagConfigurationsOptionalParameters) WithFilterRelatedAssets(filterRelatedAssets bool) *ListTagConfigurationsOptionalParameters {
+	r.FilterRelatedAssets = &filterRelatedAssets
+	return r
+}
+
 // WithWindowSeconds sets the corresponding parameter name and returns the struct.
 func (r *ListTagConfigurationsOptionalParameters) WithWindowSeconds(windowSeconds int64) *ListTagConfigurationsOptionalParameters {
 	r.WindowSeconds = &windowSeconds
 	return r
 }
 
+// WithPageSize sets the corresponding parameter name and returns the struct.
+func (r *ListTagConfigurationsOptionalParameters) WithPageSize(pageSize int32) *ListTagConfigurationsOptionalParameters {
+	r.PageSize = &pageSize
+	return r
+}
+
+// WithPageCursor sets the corresponding parameter name and returns the struct.
+func (r *ListTagConfigurationsOptionalParameters) WithPageCursor(pageCursor string) *ListTagConfigurationsOptionalParameters {
+	r.PageCursor = &pageCursor
+	return r
+}
+
 // ListTagConfigurations Get a list of metrics.
 // Returns all metrics that can be configured in the Metrics Summary page or with Metrics without Limits™ (matching additional filters if specified).
+// Optionally, paginate by using the `page[cursor]` and/or `page[size]` query parameters.
+// To fetch the first page, pass in a query parameter with either a valid `page[size]` or an empty cursor like `page[cursor]=`. To fetch the next page, pass in the `next_cursor` value from the response as the new `page[cursor]` value.
+// Once the `meta.pagination.next_cursor` value is null, all pages have been retrieved.
 func (a *MetricsApi) ListTagConfigurations(ctx _context.Context, o ...ListTagConfigurationsOptionalParameters) (MetricsAndMetricTagConfigurationsResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodGet
@@ -726,8 +818,17 @@ func (a *MetricsApi) ListTagConfigurations(ctx _context.Context, o ...ListTagCon
 	if optionalParams.FilterTags != nil {
 		localVarQueryParams.Add("filter[tags]", datadog.ParameterToString(*optionalParams.FilterTags, ""))
 	}
+	if optionalParams.FilterRelatedAssets != nil {
+		localVarQueryParams.Add("filter[related_assets]", datadog.ParameterToString(*optionalParams.FilterRelatedAssets, ""))
+	}
 	if optionalParams.WindowSeconds != nil {
 		localVarQueryParams.Add("window[seconds]", datadog.ParameterToString(*optionalParams.WindowSeconds, ""))
+	}
+	if optionalParams.PageSize != nil {
+		localVarQueryParams.Add("page[size]", datadog.ParameterToString(*optionalParams.PageSize, ""))
+	}
+	if optionalParams.PageCursor != nil {
+		localVarQueryParams.Add("page[cursor]", datadog.ParameterToString(*optionalParams.PageCursor, ""))
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
@@ -780,8 +881,66 @@ func (a *MetricsApi) ListTagConfigurations(ctx _context.Context, o ...ListTagCon
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+// ListTagConfigurationsWithPagination provides a paginated version of ListTagConfigurations returning a channel with all items.
+func (a *MetricsApi) ListTagConfigurationsWithPagination(ctx _context.Context, o ...ListTagConfigurationsOptionalParameters) (<-chan datadog.PaginationResult[MetricsAndMetricTagConfigurations], func()) {
+	ctx, cancel := _context.WithCancel(ctx)
+	pageSize_ := int32(10000)
+	if len(o) == 0 {
+		o = append(o, ListTagConfigurationsOptionalParameters{})
+	}
+	if o[0].PageSize != nil {
+		pageSize_ = *o[0].PageSize
+	}
+	o[0].PageSize = &pageSize_
+
+	items := make(chan datadog.PaginationResult[MetricsAndMetricTagConfigurations], pageSize_)
+	go func() {
+		for {
+			resp, _, err := a.ListTagConfigurations(ctx, o...)
+			if err != nil {
+				var returnItem MetricsAndMetricTagConfigurations
+				items <- datadog.PaginationResult[MetricsAndMetricTagConfigurations]{Item: returnItem, Error: err}
+				break
+			}
+			respData, ok := resp.GetDataOk()
+			if !ok {
+				break
+			}
+			results := *respData
+
+			for _, item := range results {
+				select {
+				case items <- datadog.PaginationResult[MetricsAndMetricTagConfigurations]{Item: item, Error: nil}:
+				case <-ctx.Done():
+					close(items)
+					return
+				}
+			}
+			if len(results) < int(pageSize_) {
+				break
+			}
+			cursorMeta, ok := resp.GetMetaOk()
+			if !ok {
+				break
+			}
+			cursorMetaPagination, ok := cursorMeta.GetPaginationOk()
+			if !ok {
+				break
+			}
+			cursorMetaPaginationNextCursor, ok := cursorMetaPagination.GetNextCursorOk()
+			if !ok {
+				break
+			}
+
+			o[0].PageCursor = cursorMetaPaginationNextCursor
+		}
+		close(items)
+	}()
+	return items, cancel
+}
+
 // ListTagsByMetricName List tags by metric name.
-// View indexed tag key-value pairs for a given metric name.
+// View indexed tag key-value pairs for a given metric name over the previous hour.
 func (a *MetricsApi) ListTagsByMetricName(ctx _context.Context, metricName string) (MetricAllTagsResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodGet
@@ -795,7 +954,7 @@ func (a *MetricsApi) ListTagsByMetricName(ctx _context.Context, metricName strin
 	}
 
 	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/all-tags"
-	localVarPath = strings.Replace(localVarPath, "{"+"metric_name"+"}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -868,7 +1027,7 @@ func (a *MetricsApi) ListVolumesByMetricName(ctx _context.Context, metricName st
 	}
 
 	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/volumes"
-	localVarPath = strings.Replace(localVarPath, "{"+"metric_name"+"}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -934,13 +1093,6 @@ func (a *MetricsApi) QueryScalarData(ctx _context.Context, body ScalarFormulaQue
 		localVarPostBody    interface{}
 		localVarReturnValue ScalarFormulaQueryResponse
 	)
-
-	operationId := "v2.QueryScalarData"
-	if a.Client.Cfg.IsUnstableOperationEnabled(operationId) {
-		_log.Printf("WARNING: Using unstable operation '%s'", operationId)
-	} else {
-		return localVarReturnValue, nil, datadog.GenericOpenAPIError{ErrorMessage: _fmt.Sprintf("Unstable operation '%s' is disabled", operationId)}
-	}
 
 	localBasePath, err := a.Client.Cfg.ServerURLWithContext(ctx, "v2.MetricsApi.QueryScalarData")
 	if err != nil {
@@ -1015,13 +1167,6 @@ func (a *MetricsApi) QueryTimeseriesData(ctx _context.Context, body TimeseriesFo
 		localVarPostBody    interface{}
 		localVarReturnValue TimeseriesFormulaQueryResponse
 	)
-
-	operationId := "v2.QueryTimeseriesData"
-	if a.Client.Cfg.IsUnstableOperationEnabled(operationId) {
-		_log.Printf("WARNING: Using unstable operation '%s'", operationId)
-	} else {
-		return localVarReturnValue, nil, datadog.GenericOpenAPIError{ErrorMessage: _fmt.Sprintf("Unstable operation '%s' is disabled", operationId)}
-	}
 
 	localBasePath, err := a.Client.Cfg.ServerURLWithContext(ctx, "v2.MetricsApi.QueryTimeseriesData")
 	if err != nil {
@@ -1203,7 +1348,8 @@ func (a *MetricsApi) SubmitMetrics(ctx _context.Context, body MetricPayload, o .
 // Update the tag configuration of a metric or percentile aggregations of a distribution metric or custom aggregations
 // of a count, rate, or gauge metric. By setting `exclude_tags_mode` to true the behavior is changed
 // from an allow-list to a deny-list, and tags in the defined list will not be queryable.
-// Can only be used with application keys from users with the `Manage Tags for Metrics` permission.
+// Can only be used with application keys from users with the `Manage Tags for Metrics` permission. This endpoint requires
+// a tag configuration to be created first.
 func (a *MetricsApi) UpdateTagConfiguration(ctx _context.Context, metricName string, body MetricTagConfigurationUpdateRequest) (MetricTagConfigurationResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPatch
@@ -1217,7 +1363,7 @@ func (a *MetricsApi) UpdateTagConfiguration(ctx _context.Context, metricName str
 	}
 
 	localVarPath := localBasePath + "/api/v2/metrics/{metric_name}/tags"
-	localVarPath = strings.Replace(localVarPath, "{"+"metric_name"+"}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{metric_name}", _neturl.PathEscape(datadog.ParameterToString(metricName, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}

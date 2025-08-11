@@ -12,11 +12,11 @@ import (
 
 // SyntheticsTriggerBody Object describing the Synthetic tests to trigger.
 type SyntheticsTriggerBody struct {
-	// Individual Synthetic test.
+	// List of Synthetic tests.
 	Tests []SyntheticsTriggerTest `json:"tests"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSyntheticsTriggerBody instantiates a new SyntheticsTriggerBody object.
