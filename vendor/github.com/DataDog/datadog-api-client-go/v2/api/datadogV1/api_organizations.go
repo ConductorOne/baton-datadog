@@ -9,8 +9,6 @@ import (
 	_io "io"
 	_nethttp "net/http"
 	_neturl "net/url"
-	"os"
-	"strings"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
@@ -115,7 +113,7 @@ func (a *OrganizationsApi) DowngradeOrg(ctx _context.Context, publicId string) (
 	}
 
 	localVarPath := localBasePath + "/api/v1/org/{public_id}/downgrade"
-	localVarPath = strings.Replace(localVarPath, "{"+"public_id"+"}", _neturl.PathEscape(datadog.ParameterToString(publicId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{public_id}", _neturl.PathEscape(datadog.ParameterToString(publicId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -186,7 +184,7 @@ func (a *OrganizationsApi) GetOrg(ctx _context.Context, publicId string) (Organi
 	}
 
 	localVarPath := localBasePath + "/api/v1/org/{public_id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"public_id"+"}", _neturl.PathEscape(datadog.ParameterToString(publicId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{public_id}", _neturl.PathEscape(datadog.ParameterToString(publicId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -327,7 +325,7 @@ func (a *OrganizationsApi) UpdateOrg(ctx _context.Context, publicId string, body
 	}
 
 	localVarPath := localBasePath + "/api/v1/org/{public_id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"public_id"+"}", _neturl.PathEscape(datadog.ParameterToString(publicId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{public_id}", _neturl.PathEscape(datadog.ParameterToString(publicId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -393,7 +391,7 @@ func (a *OrganizationsApi) UpdateOrg(ctx _context.Context, publicId string, body
 // * **Multipart Form-Data**: Post the IdP metadata file using a form post.
 //
 // * **XML Body:** Post the IdP metadata file as the body of the request.
-func (a *OrganizationsApi) UploadIdPForOrg(ctx _context.Context, publicId string, idpFile *os.File) (IdpResponse, *_nethttp.Response, error) {
+func (a *OrganizationsApi) UploadIdPForOrg(ctx _context.Context, publicId string, idpFile _io.Reader) (IdpResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
 		localVarPostBody    interface{}
@@ -406,7 +404,7 @@ func (a *OrganizationsApi) UploadIdPForOrg(ctx _context.Context, publicId string
 	}
 
 	localVarPath := localBasePath + "/api/v1/org/{public_id}/idp_metadata"
-	localVarPath = strings.Replace(localVarPath, "{"+"public_id"+"}", _neturl.PathEscape(datadog.ParameterToString(publicId, "")), -1)
+	localVarPath = datadog.ReplacePathParameter(localVarPath, "{public_id}", _neturl.PathEscape(datadog.ParameterToString(publicId, "")))
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
@@ -420,8 +418,6 @@ func (a *OrganizationsApi) UploadIdPForOrg(ctx _context.Context, publicId string
 	if localVarFile != nil {
 		fbs, _ := _io.ReadAll(localVarFile)
 		formFile.FileBytes = fbs
-		formFile.FileName = localVarFile.Name()
-		localVarFile.Close()
 	}
 	datadog.SetAuthKeys(
 		ctx,

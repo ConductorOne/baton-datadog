@@ -4,7 +4,7 @@
 //
 // Requirements
 //
-// • Go 1.19+
+// • Go 1.22+
 //
 // Layout
 //
@@ -114,7 +114,7 @@
 //
 // Enable retry
 //
-// If you want to enable retry when getting status code 429 rate-limited, set EnableRetry to true
+// If you want to enable retry when getting status code 429 rate-limited or 5xx, set EnableRetry to true
 //
 //       configuration.RetryConfiguration.EnableRetry = true
 //

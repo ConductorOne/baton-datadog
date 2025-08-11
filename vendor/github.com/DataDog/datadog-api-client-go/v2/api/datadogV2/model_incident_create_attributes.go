@@ -18,15 +18,19 @@ type IncidentCreateAttributes struct {
 	CustomerImpacted bool `json:"customer_impacted"`
 	// A condensed view of the user-defined fields for which to create initial selections.
 	Fields map[string]IncidentFieldAttributes `json:"fields,omitempty"`
+	// A unique identifier that represents an incident type. The default incident type will be used if this property is not provided.
+	IncidentTypeUuid *string `json:"incident_type_uuid,omitempty"`
 	// An array of initial timeline cells to be placed at the beginning of the incident timeline.
 	InitialCells []IncidentTimelineCellCreateAttributes `json:"initial_cells,omitempty"`
+	// A flag indicating whether the incident is a test incident.
+	IsTest *bool `json:"is_test,omitempty"`
 	// Notification handles that will be notified of the incident at creation.
 	NotificationHandles []IncidentNotificationHandle `json:"notification_handles,omitempty"`
 	// The title of the incident, which summarizes what happened.
 	Title string `json:"title"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewIncidentCreateAttributes instantiates a new IncidentCreateAttributes object.
@@ -127,6 +131,34 @@ func (o *IncidentCreateAttributes) SetFields(v map[string]IncidentFieldAttribute
 	o.Fields = v
 }
 
+// GetIncidentTypeUuid returns the IncidentTypeUuid field value if set, zero value otherwise.
+func (o *IncidentCreateAttributes) GetIncidentTypeUuid() string {
+	if o == nil || o.IncidentTypeUuid == nil {
+		var ret string
+		return ret
+	}
+	return *o.IncidentTypeUuid
+}
+
+// GetIncidentTypeUuidOk returns a tuple with the IncidentTypeUuid field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *IncidentCreateAttributes) GetIncidentTypeUuidOk() (*string, bool) {
+	if o == nil || o.IncidentTypeUuid == nil {
+		return nil, false
+	}
+	return o.IncidentTypeUuid, true
+}
+
+// HasIncidentTypeUuid returns a boolean if a field has been set.
+func (o *IncidentCreateAttributes) HasIncidentTypeUuid() bool {
+	return o != nil && o.IncidentTypeUuid != nil
+}
+
+// SetIncidentTypeUuid gets a reference to the given string and assigns it to the IncidentTypeUuid field.
+func (o *IncidentCreateAttributes) SetIncidentTypeUuid(v string) {
+	o.IncidentTypeUuid = &v
+}
+
 // GetInitialCells returns the InitialCells field value if set, zero value otherwise.
 func (o *IncidentCreateAttributes) GetInitialCells() []IncidentTimelineCellCreateAttributes {
 	if o == nil || o.InitialCells == nil {
@@ -153,6 +185,34 @@ func (o *IncidentCreateAttributes) HasInitialCells() bool {
 // SetInitialCells gets a reference to the given []IncidentTimelineCellCreateAttributes and assigns it to the InitialCells field.
 func (o *IncidentCreateAttributes) SetInitialCells(v []IncidentTimelineCellCreateAttributes) {
 	o.InitialCells = v
+}
+
+// GetIsTest returns the IsTest field value if set, zero value otherwise.
+func (o *IncidentCreateAttributes) GetIsTest() bool {
+	if o == nil || o.IsTest == nil {
+		var ret bool
+		return ret
+	}
+	return *o.IsTest
+}
+
+// GetIsTestOk returns a tuple with the IsTest field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *IncidentCreateAttributes) GetIsTestOk() (*bool, bool) {
+	if o == nil || o.IsTest == nil {
+		return nil, false
+	}
+	return o.IsTest, true
+}
+
+// HasIsTest returns a boolean if a field has been set.
+func (o *IncidentCreateAttributes) HasIsTest() bool {
+	return o != nil && o.IsTest != nil
+}
+
+// SetIsTest gets a reference to the given bool and assigns it to the IsTest field.
+func (o *IncidentCreateAttributes) SetIsTest(v bool) {
+	o.IsTest = &v
 }
 
 // GetNotificationHandles returns the NotificationHandles field value if set, zero value otherwise.
@@ -219,8 +279,14 @@ func (o IncidentCreateAttributes) MarshalJSON() ([]byte, error) {
 	if o.Fields != nil {
 		toSerialize["fields"] = o.Fields
 	}
+	if o.IncidentTypeUuid != nil {
+		toSerialize["incident_type_uuid"] = o.IncidentTypeUuid
+	}
 	if o.InitialCells != nil {
 		toSerialize["initial_cells"] = o.InitialCells
+	}
+	if o.IsTest != nil {
+		toSerialize["is_test"] = o.IsTest
 	}
 	if o.NotificationHandles != nil {
 		toSerialize["notification_handles"] = o.NotificationHandles
@@ -239,7 +305,9 @@ func (o *IncidentCreateAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		CustomerImpactScope *string                                `json:"customer_impact_scope,omitempty"`
 		CustomerImpacted    *bool                                  `json:"customer_impacted"`
 		Fields              map[string]IncidentFieldAttributes     `json:"fields,omitempty"`
+		IncidentTypeUuid    *string                                `json:"incident_type_uuid,omitempty"`
 		InitialCells        []IncidentTimelineCellCreateAttributes `json:"initial_cells,omitempty"`
+		IsTest              *bool                                  `json:"is_test,omitempty"`
 		NotificationHandles []IncidentNotificationHandle           `json:"notification_handles,omitempty"`
 		Title               *string                                `json:"title"`
 	}{}
@@ -254,14 +322,16 @@ func (o *IncidentCreateAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	}
 	additionalProperties := make(map[string]interface{})
 	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"customer_impact_scope", "customer_impacted", "fields", "initial_cells", "notification_handles", "title"})
+		datadog.DeleteKeys(additionalProperties, &[]string{"customer_impact_scope", "customer_impacted", "fields", "incident_type_uuid", "initial_cells", "is_test", "notification_handles", "title"})
 	} else {
 		return err
 	}
 	o.CustomerImpactScope = all.CustomerImpactScope
 	o.CustomerImpacted = *all.CustomerImpacted
 	o.Fields = all.Fields
+	o.IncidentTypeUuid = all.IncidentTypeUuid
 	o.InitialCells = all.InitialCells
+	o.IsTest = all.IsTest
 	o.NotificationHandles = all.NotificationHandles
 	o.Title = *all.Title
 

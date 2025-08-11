@@ -19,7 +19,7 @@ type SLOCorrectionUpdateRequestAttributes struct {
 	// Ending time of the correction in epoch seconds.
 	End *int64 `json:"end,omitempty"`
 	// The recurrence rules as defined in the iCalendar RFC 5545. The supported rules for SLO corrections
-	// are `FREQ`, `INTERVAL`, `COUNT`, and `UNTIL`.
+	// are `FREQ`, `INTERVAL`, `COUNT`, `UNTIL` and `BYDAY`.
 	Rrule *string `json:"rrule,omitempty"`
 	// Starting time of the correction in epoch seconds.
 	Start *int64 `json:"start,omitempty"`
@@ -27,7 +27,7 @@ type SLOCorrectionUpdateRequestAttributes struct {
 	Timezone *string `json:"timezone,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSLOCorrectionUpdateRequestAttributes instantiates a new SLOCorrectionUpdateRequestAttributes object.

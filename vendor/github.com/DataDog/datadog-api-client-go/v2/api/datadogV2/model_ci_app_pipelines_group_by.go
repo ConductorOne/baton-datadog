@@ -21,13 +21,13 @@ type CIAppPipelinesGroupBy struct {
 	Limit *int64 `json:"limit,omitempty"`
 	// The value to use for logs that don't have the facet used to group-by.
 	Missing *CIAppGroupByMissing `json:"missing,omitempty"`
-	// A sort rule.
+	// A sort rule. The `aggregation` field is required when `type` is `measure`.
 	Sort *CIAppAggregateSort `json:"sort,omitempty"`
 	// A resulting object to put the given computes in over all the matching records.
 	Total *CIAppGroupByTotal `json:"total,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewCIAppPipelinesGroupBy instantiates a new CIAppPipelinesGroupBy object.

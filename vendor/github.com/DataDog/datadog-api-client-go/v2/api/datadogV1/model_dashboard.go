@@ -24,7 +24,9 @@ type Dashboard struct {
 	Description datadog.NullableString `json:"description,omitempty"`
 	// ID of the dashboard.
 	Id *string `json:"id,omitempty"`
-	// Whether this dashboard is read-only. If True, only the author and admins can make changes to it. Prefer using `restricted_roles` to manage write authorization.
+	// Whether this dashboard is read-only. If True, only the author and admins can make changes to it.
+	//
+	// This property is deprecated; please use the [Restriction Policies API](https://docs.datadoghq.com/api/latest/restriction-policies/) instead to manage write authorization for individual dashboards.
 	// Deprecated
 	IsReadOnly *bool `json:"is_read_only,omitempty"`
 	// Layout type of the dashboard.
@@ -53,7 +55,7 @@ type Dashboard struct {
 	Widgets []Widget `json:"widgets"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewDashboard instantiates a new Dashboard object.
@@ -62,8 +64,6 @@ type Dashboard struct {
 // will change when the set of required properties is changed.
 func NewDashboard(layoutType DashboardLayoutType, title string, widgets []Widget) *Dashboard {
 	this := Dashboard{}
-	var isReadOnly bool = false
-	this.IsReadOnly = &isReadOnly
 	this.LayoutType = layoutType
 	this.Title = title
 	this.Widgets = widgets
@@ -75,8 +75,6 @@ func NewDashboard(layoutType DashboardLayoutType, title string, widgets []Widget
 // but it doesn't guarantee that properties required by API are set.
 func NewDashboardWithDefaults() *Dashboard {
 	this := Dashboard{}
-	var isReadOnly bool = false
-	this.IsReadOnly = &isReadOnly
 	return &this
 }
 

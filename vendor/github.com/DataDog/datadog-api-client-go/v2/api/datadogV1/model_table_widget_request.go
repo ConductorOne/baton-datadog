@@ -48,9 +48,13 @@ type TableWidgetRequest struct {
 	RumQuery *LogQueryDefinition `json:"rum_query,omitempty"`
 	// The log query.
 	SecurityQuery *LogQueryDefinition `json:"security_query,omitempty"`
+	// The controls for sorting the widget.
+	Sort *WidgetSortBy `json:"sort,omitempty"`
+	// List of text formats for columns produced by tags.
+	TextFormats [][]TableWidgetTextFormatRule `json:"text_formats,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewTableWidgetRequest instantiates a new TableWidgetRequest object.
@@ -602,6 +606,62 @@ func (o *TableWidgetRequest) SetSecurityQuery(v LogQueryDefinition) {
 	o.SecurityQuery = &v
 }
 
+// GetSort returns the Sort field value if set, zero value otherwise.
+func (o *TableWidgetRequest) GetSort() WidgetSortBy {
+	if o == nil || o.Sort == nil {
+		var ret WidgetSortBy
+		return ret
+	}
+	return *o.Sort
+}
+
+// GetSortOk returns a tuple with the Sort field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *TableWidgetRequest) GetSortOk() (*WidgetSortBy, bool) {
+	if o == nil || o.Sort == nil {
+		return nil, false
+	}
+	return o.Sort, true
+}
+
+// HasSort returns a boolean if a field has been set.
+func (o *TableWidgetRequest) HasSort() bool {
+	return o != nil && o.Sort != nil
+}
+
+// SetSort gets a reference to the given WidgetSortBy and assigns it to the Sort field.
+func (o *TableWidgetRequest) SetSort(v WidgetSortBy) {
+	o.Sort = &v
+}
+
+// GetTextFormats returns the TextFormats field value if set, zero value otherwise.
+func (o *TableWidgetRequest) GetTextFormats() [][]TableWidgetTextFormatRule {
+	if o == nil || o.TextFormats == nil {
+		var ret [][]TableWidgetTextFormatRule
+		return ret
+	}
+	return o.TextFormats
+}
+
+// GetTextFormatsOk returns a tuple with the TextFormats field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *TableWidgetRequest) GetTextFormatsOk() (*[][]TableWidgetTextFormatRule, bool) {
+	if o == nil || o.TextFormats == nil {
+		return nil, false
+	}
+	return &o.TextFormats, true
+}
+
+// HasTextFormats returns a boolean if a field has been set.
+func (o *TableWidgetRequest) HasTextFormats() bool {
+	return o != nil && o.TextFormats != nil
+}
+
+// SetTextFormats gets a reference to the given [][]TableWidgetTextFormatRule and assigns it to the TextFormats field.
+func (o *TableWidgetRequest) SetTextFormats(v [][]TableWidgetTextFormatRule) {
+	o.TextFormats = v
+}
+
 // MarshalJSON serializes the struct using spec logic.
 func (o TableWidgetRequest) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
@@ -665,6 +725,12 @@ func (o TableWidgetRequest) MarshalJSON() ([]byte, error) {
 	if o.SecurityQuery != nil {
 		toSerialize["security_query"] = o.SecurityQuery
 	}
+	if o.Sort != nil {
+		toSerialize["sort"] = o.Sort
+	}
+	if o.TextFormats != nil {
+		toSerialize["text_formats"] = o.TextFormats
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -694,13 +760,15 @@ func (o *TableWidgetRequest) UnmarshalJSON(bytes []byte) (err error) {
 		ResponseFormat      *FormulaAndFunctionResponseFormat   `json:"response_format,omitempty"`
 		RumQuery            *LogQueryDefinition                 `json:"rum_query,omitempty"`
 		SecurityQuery       *LogQueryDefinition                 `json:"security_query,omitempty"`
+		Sort                *WidgetSortBy                       `json:"sort,omitempty"`
+		TextFormats         [][]TableWidgetTextFormatRule       `json:"text_formats,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
 	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"aggregator", "alias", "apm_query", "apm_stats_query", "cell_display_mode", "conditional_formats", "event_query", "formulas", "limit", "log_query", "network_query", "order", "process_query", "profile_metrics_query", "q", "queries", "response_format", "rum_query", "security_query"})
+		datadog.DeleteKeys(additionalProperties, &[]string{"aggregator", "alias", "apm_query", "apm_stats_query", "cell_display_mode", "conditional_formats", "event_query", "formulas", "limit", "log_query", "network_query", "order", "process_query", "profile_metrics_query", "q", "queries", "response_format", "rum_query", "security_query", "sort", "text_formats"})
 	} else {
 		return err
 	}
@@ -764,6 +832,11 @@ func (o *TableWidgetRequest) UnmarshalJSON(bytes []byte) (err error) {
 		hasInvalidField = true
 	}
 	o.SecurityQuery = all.SecurityQuery
+	if all.Sort != nil && all.Sort.UnparsedObject != nil && o.UnparsedObject == nil {
+		hasInvalidField = true
+	}
+	o.Sort = all.Sort
+	o.TextFormats = all.TextFormats
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

@@ -16,7 +16,7 @@ type NullableRelationshipToUser struct {
 	Data NullableNullableRelationshipToUserData `json:"data"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewNullableRelationshipToUser instantiates a new NullableRelationshipToUser object.
@@ -100,4 +100,54 @@ func (o *NullableRelationshipToUser) UnmarshalJSON(bytes []byte) (err error) {
 	}
 
 	return nil
+}
+
+// NullableNullableRelationshipToUser handles when a null is used for NullableRelationshipToUser.
+type NullableNullableRelationshipToUser struct {
+	value *NullableRelationshipToUser
+	isSet bool
+}
+
+// Get returns the associated value.
+func (v NullableNullableRelationshipToUser) Get() *NullableRelationshipToUser {
+	return v.value
+}
+
+// Set changes the value and indicates it's been called.
+func (v *NullableNullableRelationshipToUser) Set(val *NullableRelationshipToUser) {
+	v.value = val
+	v.isSet = true
+}
+
+// IsSet returns whether Set has been called.
+func (v NullableNullableRelationshipToUser) IsSet() bool {
+	return v.isSet
+}
+
+// Unset sets the value to nil and resets the set flag/
+func (v *NullableNullableRelationshipToUser) Unset() {
+	v.value = nil
+	v.isSet = false
+}
+
+// NewNullableNullableRelationshipToUser initializes the struct as if Set has been called.
+func NewNullableNullableRelationshipToUser(val *NullableRelationshipToUser) *NullableNullableRelationshipToUser {
+	return &NullableNullableRelationshipToUser{value: val, isSet: true}
+}
+
+// MarshalJSON serializes the associated value.
+func (v NullableNullableRelationshipToUser) MarshalJSON() ([]byte, error) {
+	return datadog.Marshal(v.value)
+}
+
+// UnmarshalJSON deserializes the payload and sets the flag as if Set has been called.
+func (v *NullableNullableRelationshipToUser) UnmarshalJSON(src []byte) error {
+	v.isSet = true
+
+	// this object is nullable so check if the payload is null or empty string
+	if string(src) == "" || string(src) == "{}" {
+		return nil
+	}
+
+	return datadog.Unmarshal(src, &v.value)
 }

@@ -27,7 +27,7 @@ type SLOCorrectionResponseAttributes struct {
 	// Modifier of the object.
 	Modifier NullableSLOCorrectionResponseAttributesModifier `json:"modifier,omitempty"`
 	// The recurrence rules as defined in the iCalendar RFC 5545. The supported rules for SLO corrections
-	// are `FREQ`, `INTERVAL`, `COUNT`, and `UNTIL`.
+	// are `FREQ`, `INTERVAL`, `COUNT`, `UNTIL` and `BYDAY`.
 	Rrule datadog.NullableString `json:"rrule,omitempty"`
 	// ID of the SLO that this correction applies to.
 	SloId *string `json:"slo_id,omitempty"`
@@ -37,7 +37,7 @@ type SLOCorrectionResponseAttributes struct {
 	Timezone *string `json:"timezone,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSLOCorrectionResponseAttributes instantiates a new SLOCorrectionResponseAttributes object.

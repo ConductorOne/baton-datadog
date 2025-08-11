@@ -16,13 +16,13 @@ type LogsQueryFilter struct {
 	Indexes []string `json:"indexes,omitempty"`
 	// The search query - following the log search syntax.
 	Query *string `json:"query,omitempty"`
-	// Specifies storage type as indexes or online-archives
+	// Specifies storage type as indexes, online-archives or flex
 	StorageTier *LogsStorageTier `json:"storage_tier,omitempty"`
 	// The maximum time for the requested logs, supports date math and regular timestamps (milliseconds).
 	To *string `json:"to,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewLogsQueryFilter instantiates a new LogsQueryFilter object.

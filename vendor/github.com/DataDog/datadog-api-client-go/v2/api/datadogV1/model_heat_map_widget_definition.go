@@ -36,7 +36,7 @@ type HeatMapWidgetDefinition struct {
 	Yaxis *WidgetAxis `json:"yaxis,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewHeatMapWidgetDefinition instantiates a new HeatMapWidgetDefinition object.
@@ -437,9 +437,6 @@ func (o *HeatMapWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 	o.LegendSize = all.LegendSize
 	o.Requests = *all.Requests
 	o.ShowLegend = all.ShowLegend
-	if all.Time != nil && all.Time.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
 	o.Time = all.Time
 	o.Title = all.Title
 	if all.TitleAlign != nil && !all.TitleAlign.IsValid() {

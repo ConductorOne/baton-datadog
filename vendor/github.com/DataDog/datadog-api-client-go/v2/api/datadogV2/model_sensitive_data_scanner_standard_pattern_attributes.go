@@ -12,15 +12,20 @@ import (
 type SensitiveDataScannerStandardPatternAttributes struct {
 	// Description of the standard pattern.
 	Description *string `json:"description,omitempty"`
+	// List of included keywords.
+	IncludedKeywords []string `json:"included_keywords,omitempty"`
 	// Name of the standard pattern.
 	Name *string `json:"name,omitempty"`
-	// Regex to match.
+	// (Deprecated) Regex to match, optionally documented for older standard rules. Refer to the `description` field to understand what the rule does.
+	// Deprecated
 	Pattern *string `json:"pattern,omitempty"`
+	// Integer from 1 (high) to 5 (low) indicating standard pattern issue severity.
+	Priority *int64 `json:"priority,omitempty"`
 	// List of tags.
 	Tags []string `json:"tags,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSensitiveDataScannerStandardPatternAttributes instantiates a new SensitiveDataScannerStandardPatternAttributes object.
@@ -68,6 +73,34 @@ func (o *SensitiveDataScannerStandardPatternAttributes) SetDescription(v string)
 	o.Description = &v
 }
 
+// GetIncludedKeywords returns the IncludedKeywords field value if set, zero value otherwise.
+func (o *SensitiveDataScannerStandardPatternAttributes) GetIncludedKeywords() []string {
+	if o == nil || o.IncludedKeywords == nil {
+		var ret []string
+		return ret
+	}
+	return o.IncludedKeywords
+}
+
+// GetIncludedKeywordsOk returns a tuple with the IncludedKeywords field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SensitiveDataScannerStandardPatternAttributes) GetIncludedKeywordsOk() (*[]string, bool) {
+	if o == nil || o.IncludedKeywords == nil {
+		return nil, false
+	}
+	return &o.IncludedKeywords, true
+}
+
+// HasIncludedKeywords returns a boolean if a field has been set.
+func (o *SensitiveDataScannerStandardPatternAttributes) HasIncludedKeywords() bool {
+	return o != nil && o.IncludedKeywords != nil
+}
+
+// SetIncludedKeywords gets a reference to the given []string and assigns it to the IncludedKeywords field.
+func (o *SensitiveDataScannerStandardPatternAttributes) SetIncludedKeywords(v []string) {
+	o.IncludedKeywords = v
+}
+
 // GetName returns the Name field value if set, zero value otherwise.
 func (o *SensitiveDataScannerStandardPatternAttributes) GetName() string {
 	if o == nil || o.Name == nil {
@@ -97,6 +130,7 @@ func (o *SensitiveDataScannerStandardPatternAttributes) SetName(v string) {
 }
 
 // GetPattern returns the Pattern field value if set, zero value otherwise.
+// Deprecated
 func (o *SensitiveDataScannerStandardPatternAttributes) GetPattern() string {
 	if o == nil || o.Pattern == nil {
 		var ret string
@@ -107,6 +141,7 @@ func (o *SensitiveDataScannerStandardPatternAttributes) GetPattern() string {
 
 // GetPatternOk returns a tuple with the Pattern field value if set, nil otherwise
 // and a boolean to check if the value has been set.
+// Deprecated
 func (o *SensitiveDataScannerStandardPatternAttributes) GetPatternOk() (*string, bool) {
 	if o == nil || o.Pattern == nil {
 		return nil, false
@@ -120,8 +155,37 @@ func (o *SensitiveDataScannerStandardPatternAttributes) HasPattern() bool {
 }
 
 // SetPattern gets a reference to the given string and assigns it to the Pattern field.
+// Deprecated
 func (o *SensitiveDataScannerStandardPatternAttributes) SetPattern(v string) {
 	o.Pattern = &v
+}
+
+// GetPriority returns the Priority field value if set, zero value otherwise.
+func (o *SensitiveDataScannerStandardPatternAttributes) GetPriority() int64 {
+	if o == nil || o.Priority == nil {
+		var ret int64
+		return ret
+	}
+	return *o.Priority
+}
+
+// GetPriorityOk returns a tuple with the Priority field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SensitiveDataScannerStandardPatternAttributes) GetPriorityOk() (*int64, bool) {
+	if o == nil || o.Priority == nil {
+		return nil, false
+	}
+	return o.Priority, true
+}
+
+// HasPriority returns a boolean if a field has been set.
+func (o *SensitiveDataScannerStandardPatternAttributes) HasPriority() bool {
+	return o != nil && o.Priority != nil
+}
+
+// SetPriority gets a reference to the given int64 and assigns it to the Priority field.
+func (o *SensitiveDataScannerStandardPatternAttributes) SetPriority(v int64) {
+	o.Priority = &v
 }
 
 // GetTags returns the Tags field value if set, zero value otherwise.
@@ -161,11 +225,17 @@ func (o SensitiveDataScannerStandardPatternAttributes) MarshalJSON() ([]byte, er
 	if o.Description != nil {
 		toSerialize["description"] = o.Description
 	}
+	if o.IncludedKeywords != nil {
+		toSerialize["included_keywords"] = o.IncludedKeywords
+	}
 	if o.Name != nil {
 		toSerialize["name"] = o.Name
 	}
 	if o.Pattern != nil {
 		toSerialize["pattern"] = o.Pattern
+	}
+	if o.Priority != nil {
+		toSerialize["priority"] = o.Priority
 	}
 	if o.Tags != nil {
 		toSerialize["tags"] = o.Tags
@@ -180,23 +250,27 @@ func (o SensitiveDataScannerStandardPatternAttributes) MarshalJSON() ([]byte, er
 // UnmarshalJSON deserializes the given payload.
 func (o *SensitiveDataScannerStandardPatternAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Description *string  `json:"description,omitempty"`
-		Name        *string  `json:"name,omitempty"`
-		Pattern     *string  `json:"pattern,omitempty"`
-		Tags        []string `json:"tags,omitempty"`
+		Description      *string  `json:"description,omitempty"`
+		IncludedKeywords []string `json:"included_keywords,omitempty"`
+		Name             *string  `json:"name,omitempty"`
+		Pattern          *string  `json:"pattern,omitempty"`
+		Priority         *int64   `json:"priority,omitempty"`
+		Tags             []string `json:"tags,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
 	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"description", "name", "pattern", "tags"})
+		datadog.DeleteKeys(additionalProperties, &[]string{"description", "included_keywords", "name", "pattern", "priority", "tags"})
 	} else {
 		return err
 	}
 	o.Description = all.Description
+	o.IncludedKeywords = all.IncludedKeywords
 	o.Name = all.Name
 	o.Pattern = all.Pattern
+	o.Priority = all.Priority
 	o.Tags = all.Tags
 
 	if len(additionalProperties) > 0 {

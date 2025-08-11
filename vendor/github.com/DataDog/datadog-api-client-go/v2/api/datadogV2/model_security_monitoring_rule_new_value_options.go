@@ -8,7 +8,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// SecurityMonitoringRuleNewValueOptions Options on new value rules.
+// SecurityMonitoringRuleNewValueOptions Options on new value detection method.
 type SecurityMonitoringRuleNewValueOptions struct {
 	// The duration in days after which a learned value is forgotten.
 	ForgetAfter *SecurityMonitoringRuleNewValueOptionsForgetAfter `json:"forgetAfter,omitempty"`
@@ -21,7 +21,7 @@ type SecurityMonitoringRuleNewValueOptions struct {
 	LearningThreshold *SecurityMonitoringRuleNewValueOptionsLearningThreshold `json:"learningThreshold,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewSecurityMonitoringRuleNewValueOptions instantiates a new SecurityMonitoringRuleNewValueOptions object.

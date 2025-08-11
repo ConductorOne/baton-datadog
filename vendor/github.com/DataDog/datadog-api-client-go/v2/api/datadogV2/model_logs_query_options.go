@@ -9,7 +9,9 @@ import (
 )
 
 // LogsQueryOptions Global query options that are used during the query.
-// Note: you should supply either timezone or time offset, but not both. Otherwise, the query will fail.
+// Note: These fields are currently deprecated and do not affect the query results.
+//
+// Deprecated: This model is deprecated.
 type LogsQueryOptions struct {
 	// The time offset (in seconds) to apply to the query.
 	TimeOffset *int64 `json:"timeOffset,omitempty"`
@@ -17,7 +19,7 @@ type LogsQueryOptions struct {
 	Timezone *string `json:"timezone,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
-	AdditionalProperties map[string]interface{}
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // NewLogsQueryOptions instantiates a new LogsQueryOptions object.
