@@ -40,7 +40,6 @@ func NewDatadogRestClient(site, apiKey, appKey string) *DatadogRestClient {
 // ListOnCallSchedules lists all on-call schedules.
 func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context) (*OnCallSchedulesResponse, error) {
 	l := ctxzap.Extract(ctx)
-	l.Info("Listing on-call schedules via REST API")
 
 	// Build the URL.
 	baseURL := fmt.Sprintf(datadogAPIBaseURL, c.site)
@@ -79,17 +78,12 @@ func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context) (*OnCallSch
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 
-	l.Info("Successfully retrieved on-call schedules",
-		zap.Int("count", len(schedulesResponse.Data)),
-		zap.Int("total", schedulesResponse.Meta.Page.Total))
-
 	return &schedulesResponse, nil
 }
 
 // GetScheduleOnCallUser gets the user who is currently on-call for a specific schedule.
 func (c *DatadogRestClient) GetScheduleOnCallUser(ctx context.Context, scheduleID string) (*OnCallUserResponse, error) {
 	l := ctxzap.Extract(ctx)
-	l.Info("Getting on-call user for schedule", zap.String("schedule_id", scheduleID))
 
 	// Build the URL
 	baseURL := fmt.Sprintf(datadogAPIBaseURL, c.site)
@@ -127,10 +121,6 @@ func (c *DatadogRestClient) GetScheduleOnCallUser(ctx context.Context, scheduleI
 		l.Error("Failed to decode response", zap.Error(err))
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
-
-	l.Info("Successfully retrieved on-call user",
-		zap.String("schedule_id", scheduleID),
-		zap.String("user_id", onCallUserResponse.Data.ID))
 
 	return &onCallUserResponse, nil
 }

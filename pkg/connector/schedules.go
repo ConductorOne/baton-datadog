@@ -65,7 +65,6 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 // List returns all the on-call schedules from Datadog as resource objects.
 func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
-	l.Info("Attempting to list on-call schedules from Datadog")
 
 	// Use the REST client to get schedules
 	schedulesResponse, err := s.restClient.ListOnCallSchedules(ctx)
@@ -74,14 +73,8 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		return nil, "", nil, fmt.Errorf("error listing on-call schedules: %w", err)
 	}
 
-	l.Info("Successfully retrieved on-call schedules", zap.Int("count", len(schedulesResponse.Data)))
-
 	var rv []*v2.Resource
 	for _, schedule := range schedulesResponse.Data {
-		l.Info("Processing schedule",
-			zap.String("schedule_id", schedule.ID),
-			zap.String("schedule_name", schedule.Attributes.Name),
-			zap.String("schedule_type", schedule.Type))
 
 		sr, err := scheduleResource(&schedule)
 		if err != nil {
@@ -114,10 +107,6 @@ func (s *scheduleBuilder) Entitlements(_ context.Context, resource *v2.Resource,
 
 func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
-	l.Info("Getting grants for schedule",
-		zap.String("schedule_id", resource.Id.Resource),
-		zap.String("resource_id", resource.Id.Resource),
-		zap.String("display_name", resource.DisplayName))
 
 	var rv []*v2.Grant
 
@@ -128,9 +117,7 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 	oncallAPI := datadogV2.NewOnCallApi(s.client)
 
 	// Get the current on-call user
-	l.Info("Calling GetScheduleOnCallUser API",
-		zap.String("schedule_id", resource.Id.Resource),
-		zap.String("site", s.site))
+
 	shift, resp, err := oncallAPI.GetScheduleOnCallUser(ctx, resource.Id.Resource)
 	if err != nil {
 		l.Error("Failed to get on-call user from Datadog",
@@ -140,19 +127,10 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 		return rv, "", nil, nil
 	}
 
-	l.Info("GetScheduleOnCallUser response",
-		zap.String("schedule_id", resource.Id.Resource),
-		zap.Int("status_code", resp.StatusCode),
-		zap.Bool("has_data", shift.Data != nil),
-		zap.Int("included_count", len(shift.Included)))
-
 	if shift.Data != nil && shift.Data.Relationships != nil && shift.Data.Relationships.User != nil {
 		userID := shift.Data.Relationships.User.Data.Id
 
 		if userID != "" {
-			l.Info("Found on-call user",
-				zap.String("user_id", userID),
-				zap.String("schedule_id", resource.Id.Resource))
 
 			// Get user name from included section
 			userName := userID
@@ -191,18 +169,11 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 			}
 
 			rv = append(rv, onCallGrant)
-			l.Info("Created on-call grant",
-				zap.String("grant_id", onCallGrantID),
-				zap.String("user_id", userID),
-				zap.String("schedule_id", resource.Id.Resource))
+
 		}
 	} else {
 		l.Debug("No on-call user found for schedule", zap.String("schedule_id", resource.Id.Resource))
 	}
-
-	l.Info("Total grants created",
-		zap.String("schedule_id", resource.Id.Resource),
-		zap.Int("total_grants_count", len(rv)))
 
 	return rv, "", nil, nil
 }
