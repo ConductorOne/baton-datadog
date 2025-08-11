@@ -75,7 +75,6 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 	var rv []*v2.Resource
 	for _, schedule := range schedulesResponse.Data {
-
 		sr, err := scheduleResource(&schedule)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error creating schedule resource: %w", err)
@@ -117,7 +116,6 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 	oncallAPI := datadogV2.NewOnCallApi(s.client)
 
 	// Get the current on-call user
-
 	shift, resp, err := oncallAPI.GetScheduleOnCallUser(ctx, resource.Id.Resource)
 	if err != nil {
 		l.Error("Failed to get on-call user from Datadog",
@@ -131,7 +129,6 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 		userID := shift.Data.Relationships.User.Data.Id
 
 		if userID != "" {
-
 			// Get user name from included section
 			userName := userID
 			for _, incl := range shift.Included {
@@ -169,7 +166,6 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 			}
 
 			rv = append(rv, onCallGrant)
-
 		}
 	} else {
 		l.Debug("No on-call user found for schedule", zap.String("schedule_id", resource.Id.Resource))
