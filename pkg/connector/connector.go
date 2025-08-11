@@ -27,6 +27,7 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newUserBuilder(d.client, d.site, d.apiKey, d.appKey),
 		newTeamBuilder(d.client, d.site, d.apiKey, d.appKey),
 		newRoleBuilder(d.client, d.site, d.apiKey, d.appKey),
+		newScheduleBuilder(d.client, d.site, d.apiKey, d.appKey),
 	}
 	if d.syncSecrets {
 		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(d.client, d.site, d.apiKey, d.appKey))
