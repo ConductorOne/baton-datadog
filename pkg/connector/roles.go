@@ -65,11 +65,11 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	}
 
 	roles, httpRes, err := api.ListRoles(ctx, *datadogV2.NewListRolesOptionalParameters().WithPageNumber(page))
-	if err != nil {
-		return nil, "", nil, err
-	}
 	if httpRes != nil {
 		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, "", nil, err
 	}
 
 	var rv []*v2.Resource
@@ -120,11 +120,11 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	}
 
 	users, httpRes, err := rolesApi.ListRoleUsers(ctx, resource.Id.Resource, *datadogV2.NewListRoleUsersOptionalParameters().WithPageNumber(page))
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("error listing users for role %s: %w", resource.DisplayName, err)
-	}
 	if httpRes != nil {
 		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("error listing users for role %s: %w", resource.DisplayName, err)
 	}
 
 	var rv []*v2.Grant
@@ -171,11 +171,11 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
 	rolesApi := datadogV2.NewRolesApi(r.client)
 	_, httpRes, err := rolesApi.AddUserToRole(ctx, entitlement.Resource.Id.Resource, body)
-	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: failed to add user to role: %w", err)
-	}
 	if httpRes != nil {
 		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: failed to add user to role: %w", err)
 	}
 
 	return nil, nil
@@ -205,11 +205,11 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
 	rolesApi := datadogV2.NewRolesApi(r.client)
 	_, httpRes, err := rolesApi.RemoveUserFromRole(ctx, entitlement.Resource.Id.Resource, body)
-	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: failed to remove user from role: %w", err)
-	}
 	if httpRes != nil {
 		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: failed to remove user from role: %w", err)
 	}
 
 	return nil, nil

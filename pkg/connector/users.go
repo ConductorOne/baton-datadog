@@ -81,11 +81,11 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	}
 
 	users, httpRes, err := api.ListUsers(ctx, *datadogV2.NewListUsersOptionalParameters().WithPageNumber(page))
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("error listing users: %w", err)
-	}
 	if httpRes != nil {
 		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("error listing users: %w", err)
 	}
 
 	var rv []*v2.Resource

@@ -189,6 +189,9 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 
 	// Get the current on-call user
 	shift, resp, err := oncallAPI.GetScheduleOnCallUser(ctx, resource.Id.Resource)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		statusCode := 0
 		if resp != nil {
@@ -205,7 +208,6 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 		}
 		return rv, "", nil, fmt.Errorf("failed to get on-call user for schedule %s: %w", resource.Id.Resource, err)
 	}
-	defer resp.Body.Close()
 
 	if shift.Data == nil || shift.Data.Relationships == nil || shift.Data.Relationships.User == nil {
 		l.Debug("No on-call user found for schedule", zap.String("schedule_id", resource.Id.Resource))

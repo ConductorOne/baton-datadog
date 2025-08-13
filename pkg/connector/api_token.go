@@ -51,12 +51,13 @@ func (o *apiTokenBuilder) List(
 	}
 
 	res, httpRes, err := api.ListAPIKeys(ctx, *datadogV2.NewListAPIKeysOptionalParameters().WithPageNumber(page))
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing api tokens: %w", err)
 	}
 	if httpRes != nil {
-		defer httpRes.Body.Close()
-
 		if httpRes.StatusCode < 200 || httpRes.StatusCode >= 300 {
 			l.Info("error listing api tokens", zap.Int("status_code", httpRes.StatusCode))
 			return nil, "", nil, fmt.Errorf("error listing api tokens: %s", httpRes.Status)
