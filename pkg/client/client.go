@@ -50,7 +50,8 @@ func NewDatadogRestClient(site, apiKey, appKey string) (*DatadogRestClient, erro
 		return nil, fmt.Errorf("application key cannot be empty")
 	}
 
-	httpClient, err := uhttp.NewClient(context.Background(), uhttp.WithLogger(true, nil))
+	// Provide a non-nil logger to avoid silent failures when logging is enabled.
+	httpClient, err := uhttp.NewClient(context.Background(), uhttp.WithLogger(true, zap.L()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
 	}
