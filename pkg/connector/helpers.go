@@ -44,17 +44,19 @@ func parsePageToken(i string, resourceID *v2.ResourceId) (*pagination.Bag, int64
 	if i == "" {
 		// Return default values for empty token
 		b := &pagination.Bag{}
-		resourceTypeID := scheduleResourceType.Id
-		resourceIDStr := ""
-		if resourceID != nil {
-			resourceTypeID = resourceID.ResourceType
-			resourceIDStr = resourceID.Resource
-		}
 
-		b.Push(pagination.PageState{
-			ResourceTypeID: resourceTypeID,
-			ResourceID:     resourceIDStr,
-		})
+		if resourceID != nil {
+			// Use the provided resource ID
+			b.Push(pagination.PageState{
+				ResourceTypeID: resourceID.ResourceType,
+				ResourceID:     resourceID.Resource,
+			})
+		} else {
+			b.Push(pagination.PageState{
+				ResourceTypeID: "",
+				ResourceID:     "",
+			})
+		}
 		return b, 0, nil
 	}
 
@@ -66,17 +68,18 @@ func parsePageToken(i string, resourceID *v2.ResourceId) (*pagination.Bag, int64
 
 	if b.Current() == nil {
 		// Use default values if resourceID is nil
-		resourceTypeID := scheduleResourceType.Id
-		resourceIDStr := ""
 		if resourceID != nil {
-			resourceTypeID = resourceID.ResourceType
-			resourceIDStr = resourceID.Resource
+			// Use the provided resource ID
+			b.Push(pagination.PageState{
+				ResourceTypeID: resourceID.ResourceType,
+				ResourceID:     resourceID.Resource,
+			})
+		} else {
+			b.Push(pagination.PageState{
+				ResourceTypeID: "",
+				ResourceID:     "",
+			})
 		}
-
-		b.Push(pagination.PageState{
-			ResourceTypeID: resourceTypeID,
-			ResourceID:     resourceIDStr,
-		})
 	}
 
 	page, err := getPageFromPageToken(b.PageToken())
