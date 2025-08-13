@@ -68,10 +68,11 @@ func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	teams, _, err := api.ListTeams(ctx, *datadogV2.NewListTeamsOptionalParameters().WithPageNumber(page))
+	teams, httpRes, err := api.ListTeams(ctx, *datadogV2.NewListTeamsOptionalParameters().WithPageNumber(page))
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing teams: %w", err)
 	}
+	defer httpRes.Body.Close()
 
 	var rv []*v2.Resource
 	for _, team := range teams.GetData() {
@@ -117,18 +118,20 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		return nil, "", nil, err
 	}
 
-	memberships, _, err := teamsApi.GetTeamMemberships(ctx, resource.Id.Resource, *datadogV2.NewGetTeamMembershipsOptionalParameters().WithPageNumber(page))
+	memberships, httpRes, err := teamsApi.GetTeamMemberships(ctx, resource.Id.Resource, *datadogV2.NewGetTeamMembershipsOptionalParameters().WithPageNumber(page))
 	if err != nil {
 		return nil, "", nil, err
 	}
+	defer httpRes.Body.Close()
 
 	var rv []*v2.Grant
 	for _, membership := range memberships.GetData() {
 		userId := membership.Relationships.User.GetData().Id
-		res, _, err := usersApi.GetUser(ctx, userId)
+		res, httpRes, err := usersApi.GetUser(ctx, userId)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error getting user %s from team membership: %w", userId, err)
 		}
+		defer httpRes.Body.Close()
 		user := res.GetData()
 		ur, err := userResource(&user)
 		if err != nil {
@@ -192,10 +195,11 @@ func (t *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
 	teamsApi := datadogV2.NewTeamsApi(t.client)
-	_, _, err := teamsApi.CreateTeamMembership(ctx, entitlement.Resource.Id.Resource, body)
+	_, httpRes, err := teamsApi.CreateTeamMembership(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: failed to add user to role: %w", err)
 	}
+	defer httpRes.Body.Close()
 
 	return nil, nil
 }
@@ -217,10 +221,11 @@ func (t *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
 	teamsApi := datadogV2.NewTeamsApi(t.client)
 
-	_, err := teamsApi.DeleteTeamMembership(ctx, entitlement.Resource.Id.Resource, principal.Id.Resource)
+	httpRes, err := teamsApi.DeleteTeamMembership(ctx, entitlement.Resource.Id.Resource, principal.Id.Resource)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: failed to remove user from team: %w", err)
 	}
+	defer httpRes.Body.Close()
 
 	return nil, nil
 }

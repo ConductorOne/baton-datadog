@@ -13,6 +13,11 @@ type OnCallSchedule struct {
 	Attributes OnCallScheduleAttributes `json:"attributes"`
 }
 
+// SimpleOnCallScheduleList represents a simple list of schedules without pagination metadata.
+type SimpleOnCallScheduleList struct {
+	Schedules []OnCallSchedule `json:"schedules"`
+}
+
 // OnCallSchedulesResponse represents the response of the on-call schedules API.
 type OnCallSchedulesResponse struct {
 	Data []OnCallSchedule `json:"data"`

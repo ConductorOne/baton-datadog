@@ -32,6 +32,14 @@ type scheduleBuilder struct {
 
 // Create a new connector resource for a Datadog on-call schedule.
 func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
+	if schedule == nil {
+		return nil, fmt.Errorf("schedule cannot be nil")
+	}
+
+	if schedule.ID == "" {
+		return nil, fmt.Errorf("schedule ID cannot be empty")
+	}
+
 	profile := map[string]interface{}{
 		"schedule_id":       schedule.ID,
 		"schedule_name":     schedule.Attributes.Name,
@@ -56,7 +64,7 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 		scheduleTraitOptions,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create group resource: %w", err)
 	}
 
 	return ret, nil
@@ -66,27 +74,80 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
-	// Use the REST client to get schedules
-	schedulesResponse, err := s.restClient.ListOnCallSchedules(ctx)
-	if err != nil {
-		l.Error("Failed to list on-call schedules", zap.Error(err))
-		return nil, "", nil, fmt.Errorf("error listing on-call schedules: %w", err)
+	// Simplified pagination handling
+	var (
+		pageNumber int64
+		bag        *pagination.Bag
+		err        error
+	)
+
+	inputToken := ""
+	if pToken != nil {
+		inputToken = pToken.Token
 	}
 
-	var rv []*v2.Resource
+	bag, pageNumber, err = parsePageToken(inputToken, parentResourceID)
+	if err != nil {
+		l.Error("Failed to parse pagination token", zap.Error(err))
+		return nil, "", nil, fmt.Errorf("failed to parse pagination token: %w", err)
+	}
+
+	// Use constant page size
+	pageSize := int64(client.PageSize)
+
+	// Create paginated client
+	paginatedClient := client.NewPaginatedClient(s.restClient)
+
+	// Get schedules for current page only
+	l.Debug("Fetching page", zap.Int64("page_number", pageNumber), zap.Int64("page_size", pageSize))
+
+	opts := &client.PaginationOptions{
+		PageSize:   int(pageSize),
+		PageNumber: int(pageNumber),
+	}
+
+	schedulesResponse, paginationResult, err := paginatedClient.ListOnCallSchedulesPaginated(ctx, opts)
+	if err != nil {
+		l.Error("Failed to list on-call schedules with pagination", zap.Error(err))
+		return nil, "", nil, fmt.Errorf("failed to list on-call schedules: %w", err)
+	}
+
+	// Process schedules from this page only
+	var pageSchedules []*v2.Resource
 	for _, schedule := range schedulesResponse.Data {
 		sr, err := scheduleResource(&schedule)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("error creating schedule resource: %w", err)
+			return nil, "", nil, fmt.Errorf("failed to create schedule resource for schedule %s: %w", schedule.ID, err)
 		}
-		rv = append(rv, sr)
+		pageSchedules = append(pageSchedules, sr)
 	}
 
-	// For now, we'll return empty next page token since the API doesn't seem to support pagination
-	// In a real implementation, you would handle pagination based on the API response
-	nextPageToken := ""
+	l.Debug("Processed page",
+		zap.Int64("page_number", pageNumber),
+		zap.Int("schedules_in_page", len(pageSchedules)),
+		zap.Int("total_schedules_in_response", len(schedulesResponse.Data)))
 
-	return rv, nextPageToken, nil, nil
+	// Prepare next page token if there are more pages
+	var nextToken string
+	if paginationResult.HasNextPage() {
+		nextPage := paginationResult.GetNextPageNumber()
+
+		nextToken, err = getPageTokenFromPage(bag, int64(nextPage))
+		if err != nil {
+			l.Error("Failed to create next page token", zap.Error(err))
+			return nil, "", nil, fmt.Errorf("failed to create next page token: %w", err)
+		}
+	}
+
+	l.Info("Successfully listed schedules for page",
+		zap.Int64("page_number", pageNumber),
+		zap.Int("schedules_in_page", len(pageSchedules)),
+		zap.Int64("page_size_used", pageSize),
+		zap.Bool("has_next_page", paginationResult.HasNextPage()),
+		zap.String("next_token", nextToken))
+
+	// Return only the current page schedules with next page token
+	return pageSchedules, nextToken, nil, nil
 }
 
 func (s *scheduleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -107,6 +168,17 @@ func (s *scheduleBuilder) Entitlements(_ context.Context, resource *v2.Resource,
 func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
+	// Validate input parameters
+	if resource == nil {
+		return nil, "", nil, fmt.Errorf("resource cannot be nil")
+	}
+	if resource.Id == nil {
+		return nil, "", nil, fmt.Errorf("resource ID cannot be nil")
+	}
+	if resource.Id.Resource == "" {
+		return nil, "", nil, fmt.Errorf("resource ID resource cannot be empty")
+	}
+
 	var rv []*v2.Grant
 
 	// Create API context with authentication
@@ -118,59 +190,71 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 	// Get the current on-call user
 	shift, resp, err := oncallAPI.GetScheduleOnCallUser(ctx, resource.Id.Resource)
 	if err != nil {
+		statusCode := 0
+		if resp != nil {
+			statusCode = resp.StatusCode
+		}
 		l.Error("Failed to get on-call user from Datadog",
 			zap.Error(err),
 			zap.String("schedule_id", resource.Id.Resource),
-			zap.Int("status_code", resp.StatusCode))
+			zap.Int("status_code", statusCode))
+
+		// Create a more specific error based on the response
+		if resp != nil {
+			return rv, "", nil, fmt.Errorf("HTTP request failed for operation %s with status %d: %w", "get_schedule_oncall_user", resp.StatusCode, err)
+		}
+		return rv, "", nil, fmt.Errorf("failed to get on-call user for schedule %s: %w", resource.Id.Resource, err)
+	}
+	defer resp.Body.Close()
+
+	if shift.Data == nil || shift.Data.Relationships == nil || shift.Data.Relationships.User == nil {
+		l.Debug("No on-call user found for schedule", zap.String("schedule_id", resource.Id.Resource))
 		return rv, "", nil, nil
 	}
 
-	if shift.Data != nil && shift.Data.Relationships != nil && shift.Data.Relationships.User != nil {
-		userID := shift.Data.Relationships.User.Data.Id
+	userID := shift.Data.Relationships.User.Data.Id
+	if userID == "" {
+		l.Debug("No user ID found in shift data", zap.String("schedule_id", resource.Id.Resource))
+		return rv, "", nil, nil
+	}
 
-		if userID != "" {
-			// Get user name from included section
-			userName := userID
-			for _, incl := range shift.Included {
-				if incl.ScheduleUser != nil {
-					su := incl.ScheduleUser
-					if su.GetId() == userID {
-						if attrs, ok := su.GetAttributesOk(); ok {
-							if name := attrs.GetName(); name != "" {
-								userName = name
-							}
-						}
+	// Get user name from included section
+	userName := userID
+	for _, incl := range shift.Included {
+		if incl.ScheduleUser != nil {
+			su := incl.ScheduleUser
+			if su.GetId() == userID {
+				if attrs, ok := su.GetAttributesOk(); ok {
+					if name := attrs.GetName(); name != "" {
+						userName = name
 					}
 				}
 			}
-
-			// Create on-call entitlement
-			onCallOptions := populateScheduleOptions(resource.DisplayName, scheduleOnCallRole)
-			onCallEntitlement := ent.NewPermissionEntitlement(resource, scheduleOnCallRole, onCallOptions...)
-
-			// Create principal resource reference for on-call user
-			onCallPrincipal := &v2.Resource{
-				Id: &v2.ResourceId{
-					ResourceType: userResourceType.Id,
-					Resource:     userID,
-				},
-				DisplayName: userName,
-			}
-
-			// Create on-call grant
-			onCallGrantID := fmt.Sprintf("%s:%s:%s", resource.Id.Resource, userID, scheduleOnCallRole)
-			onCallGrant := &v2.Grant{
-				Id:          onCallGrantID,
-				Principal:   onCallPrincipal,
-				Entitlement: onCallEntitlement,
-			}
-
-			rv = append(rv, onCallGrant)
 		}
-	} else {
-		l.Debug("No on-call user found for schedule", zap.String("schedule_id", resource.Id.Resource))
 	}
 
+	// Create on-call entitlement
+	onCallOptions := populateScheduleOptions(resource.DisplayName, scheduleOnCallRole)
+	onCallEntitlement := ent.NewPermissionEntitlement(resource, scheduleOnCallRole, onCallOptions...)
+
+	// Create principal resource reference for on-call user
+	onCallPrincipal := &v2.Resource{
+		Id: &v2.ResourceId{
+			ResourceType: userResourceType.Id,
+			Resource:     userID,
+		},
+		DisplayName: userName,
+	}
+
+	// Create on-call grant
+	onCallGrantID := fmt.Sprintf("%s:%s:%s", resource.Id.Resource, userID, scheduleOnCallRole)
+	onCallGrant := &v2.Grant{
+		Id:          onCallGrantID,
+		Principal:   onCallPrincipal,
+		Entitlement: onCallEntitlement,
+	}
+
+	rv = append(rv, onCallGrant)
 	return rv, "", nil, nil
 }
 
@@ -183,13 +267,32 @@ func populateScheduleOptions(name, permission string) []ent.EntitlementOption {
 	return options
 }
 
-func newScheduleBuilder(apiClient *datadog.APIClient, site, apiKey, appKey string) *scheduleBuilder {
+func newScheduleBuilder(apiClient *datadog.APIClient, site, apiKey, appKey string) (*scheduleBuilder, error) {
+	// Validate input parameters
+	if apiClient == nil {
+		return nil, fmt.Errorf("API client cannot be nil")
+	}
+	if site == "" {
+		return nil, fmt.Errorf("site cannot be empty")
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("API key cannot be empty")
+	}
+	if appKey == "" {
+		return nil, fmt.Errorf("application key cannot be empty")
+	}
+
+	restClient, err := client.NewDatadogRestClient(site, apiKey, appKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create REST client: %w", err)
+	}
+
 	return &scheduleBuilder{
 		resourceType: scheduleResourceType,
 		client:       apiClient,
-		restClient:   client.NewDatadogRestClient(site, apiKey, appKey),
+		restClient:   restClient,
 		site:         site,
 		apiKey:       apiKey,
 		appKey:       appKey,
-	}
+	}, nil
 }

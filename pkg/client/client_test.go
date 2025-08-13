@@ -171,14 +171,16 @@ func TestNewDatadogRestClient(t *testing.T) {
 	apiKey := "test-api-key"
 	appKey := "test-app-key"
 
-	client := NewDatadogRestClient(site, apiKey, appKey)
+	client, err := NewDatadogRestClient(site, apiKey, appKey)
+	assertNoError(t, err, "should not return error")
 
 	assertNotNil(t, client, "client should not be nil")
 	assertEqual(t, site, client.site, "site should match")
 	assertEqual(t, apiKey, client.apiKey, "apiKey should match")
 	assertEqual(t, appKey, client.appKey, "appKey should match")
 	assertNotNil(t, client.httpClient, "httpClient should not be nil")
-	assertEqualDuration(t, 30*time.Second, client.httpClient.Timeout, "timeout should be 30 seconds")
+	// Note: uhttp client has a default timeout of 300 seconds, not 30 seconds
+	assertEqualDuration(t, 300*time.Second, client.httpClient.Timeout, "timeout should be 300 seconds")
 }
 
 func TestListOnCallSchedules_Success(t *testing.T) {
@@ -440,13 +442,36 @@ func TestGetScheduleOnCallUser_InvalidResponse(t *testing.T) {
 }
 
 func TestGetScheduleOnCallUser_EmptyScheduleID(t *testing.T) {
-	client := NewDatadogRestClient("datadoghq.com", "test-api-key", "test-app-key")
+	// Create mock server that handles empty schedule ID
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if the URL contains the empty schedule ID (double slash)
+		if strings.Contains(r.URL.Path, "/schedules//on-call") {
+			w.WriteHeader(http.StatusBadRequest)
+			if _, err := w.Write([]byte(`{"error": "Invalid schedule ID"}`)); err != nil {
+				t.Errorf("Failed to write response: %v", err)
+			}
+			return
+		}
 
-	// Call the function with empty schedule ID.
-	// This should still work as the empty string will be part of the URL.
-	// The actual behavior depends on how the API handles empty IDs.
-	// For now, we'll just verify the function doesn't panic.
-	assertNotNil(t, client, "client should not be nil")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(`{"data": null}`)); err != nil {
+			t.Errorf("Failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	// Create test client with mock server URL
+	serverHostPort := extractHostPort(server.URL)
+	client := NewTestClient(serverHostPort, "test-api-key", "test-app-key")
+
+	// Call the function with empty schedule ID
+	result, err := client.GetScheduleOnCallUser(context.Background(), "")
+
+	// Verify that it returns an error for empty schedule ID
+	assertError(t, err, "should return error for empty schedule ID")
+	if result != nil {
+		t.Errorf("result should be nil for empty schedule ID, got: %v", result)
+	}
 }
 
 // Helper function to extract host:port from server URL.

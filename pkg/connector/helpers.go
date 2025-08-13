@@ -41,22 +41,47 @@ func withAuthContext(ctx context.Context, apiKey, appKey, site string) context.C
 }
 
 func parsePageToken(i string, resourceID *v2.ResourceId) (*pagination.Bag, int64, error) {
+	if i == "" {
+		// Return default values for empty token
+		b := &pagination.Bag{}
+		resourceTypeID := scheduleResourceType.Id
+		resourceIDStr := ""
+		if resourceID != nil {
+			resourceTypeID = resourceID.ResourceType
+			resourceIDStr = resourceID.Resource
+		}
+
+		b.Push(pagination.PageState{
+			ResourceTypeID: resourceTypeID,
+			ResourceID:     resourceIDStr,
+		})
+		return b, 0, nil
+	}
+
 	b := &pagination.Bag{}
 	err := b.Unmarshal(i)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to unmarshal pagination token: %w", err)
 	}
 
 	if b.Current() == nil {
+		// Use default values if resourceID is nil
+		resourceTypeID := scheduleResourceType.Id
+		resourceIDStr := ""
+		if resourceID != nil {
+			resourceTypeID = resourceID.ResourceType
+			resourceIDStr = resourceID.Resource
+		}
+
 		b.Push(pagination.PageState{
-			ResourceTypeID: resourceID.ResourceType,
-			ResourceID:     resourceID.Resource,
+			ResourceTypeID: resourceTypeID,
+			ResourceID:     resourceIDStr,
 		})
 	}
 
 	page, err := getPageFromPageToken(b.PageToken())
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to get page from token: %w", err)
 	}
 
 	return b, page, nil
@@ -69,17 +94,25 @@ func getPageFromPageToken(token string) (int64, error) {
 
 	page, err := strconv.ParseInt(token, 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to parse page number from token: %w", err)
 	}
 
 	return page, nil
 }
 
 func getPageTokenFromPage(bag *pagination.Bag, page int64) (string, error) {
+	if bag == nil {
+		return "", fmt.Errorf("pagination bag cannot be nil")
+	}
+
+	if page < 0 {
+		return "", fmt.Errorf("page number cannot be negative")
+	}
+
 	nextPage := fmt.Sprintf("%d", page)
 	pageToken, err := bag.NextToken(nextPage)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to generate next page token: %w", err)
 	}
 
 	return pageToken, nil
