@@ -54,7 +54,9 @@ func (o *apiTokenBuilder) List(
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing api tokens: %w", err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	if httpRes.StatusCode < 200 || httpRes.StatusCode >= 300 {
 		l.Info("error listing api tokens", zap.Int("status_code", httpRes.StatusCode))

@@ -84,7 +84,9 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing users: %w", err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	var rv []*v2.Resource
 	for _, user := range users.GetData() {

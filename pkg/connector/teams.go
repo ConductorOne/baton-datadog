@@ -72,7 +72,9 @@ func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing teams: %w", err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	var rv []*v2.Resource
 	for _, team := range teams.GetData() {
@@ -122,7 +124,9 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	if err != nil {
 		return nil, "", nil, err
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	var rv []*v2.Grant
 	for _, membership := range memberships.GetData() {
@@ -131,7 +135,9 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error getting user %s from team membership: %w", userId, err)
 		}
-		defer httpRes.Body.Close()
+		if httpRes != nil {
+			defer httpRes.Body.Close()
+		}
 		user := res.GetData()
 		ur, err := userResource(&user)
 		if err != nil {
@@ -197,9 +203,11 @@ func (t *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 	teamsApi := datadogV2.NewTeamsApi(t.client)
 	_, httpRes, err := teamsApi.CreateTeamMembership(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: failed to add user to role: %w", err)
+		return nil, fmt.Errorf("error adding user to team: %w", err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	return nil, nil
 }
@@ -223,9 +231,11 @@ func (t *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	httpRes, err := teamsApi.DeleteTeamMembership(ctx, entitlement.Resource.Id.Resource, principal.Id.Resource)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: failed to remove user from team: %w", err)
+		return nil, fmt.Errorf("error removing user from team: %w", err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	return nil, nil
 }

@@ -68,7 +68,9 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if err != nil {
 		return nil, "", nil, err
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	var rv []*v2.Resource
 	for _, role := range roles.GetData() {
@@ -121,7 +123,9 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing users for role %s: %w", resource.DisplayName, err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	var rv []*v2.Grant
 	for _, user := range users.GetData() {
@@ -170,7 +174,9 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: failed to add user to role: %w", err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	return nil, nil
 }
@@ -202,7 +208,9 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: failed to remove user from role: %w", err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	return nil, nil
 }

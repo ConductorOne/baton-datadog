@@ -75,7 +75,9 @@ func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate API key: %w", err)
 	}
-	defer httpRes.Body.Close()
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 
 	if !resp.GetValid() {
 		return nil, fmt.Errorf("API key not valid with status %d", httpRes.StatusCode)
