@@ -244,12 +244,12 @@ func buildPaginationResult(resp *OnCallSchedulesResponse) *PaginationResult {
 
 // ListOnCallSchedules lists on-call schedules with optional pagination.
 func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context, opts *PaginationOptions) ([]OnCallSchedule, *PaginationResult, error) {
-	// Validate options: from ahora siempre se esperan opciones válidas.
+	// Validate options: from now on, always expect valid options.
 	if opts == nil {
 		return nil, nil, fmt.Errorf("pagination options cannot be nil")
 	}
 
-	// Aplicar valores por defecto si fuera necesario.
+	// Apply default values if necessary.
 	if opts.PageSize == 0 {
 		opts.PageSize = PageSize
 	}
@@ -257,7 +257,7 @@ func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context, opts *Pagin
 	l := ctxzap.Extract(ctx)
 	l.Debug("Fetching on-call schedules page", zap.Int("page_number", opts.PageNumber), zap.Int("page_size", opts.PageSize))
 
-	// Obtener la página solicitada.
+	// Get the requested page.
 	schedulesResp, err := c.fetchSchedulePage(ctx, opts.PageNumber, opts.PageSize)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error fetching schedules: %w", err)
