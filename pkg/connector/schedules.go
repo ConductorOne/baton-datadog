@@ -95,9 +95,6 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	// Use constant page size
 	pageSize := int64(client.PageSize)
 
-	// Create paginated client
-	paginatedClient := client.NewPaginatedClient(s.restClient)
-
 	// Get schedules for current page only
 	l.Debug("Fetching page", zap.Int64("page_number", pageNumber), zap.Int64("page_size", pageSize))
 
@@ -106,7 +103,7 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		PageNumber: int(pageNumber),
 	}
 
-	schedulesResponse, paginationResult, err := paginatedClient.ListOnCallSchedulesPaginated(ctx, opts)
+	schedules, paginationResult, err := s.restClient.ListOnCallSchedules(ctx, opts)
 	if err != nil {
 		l.Error("Failed to list on-call schedules with pagination", zap.Error(err))
 		return nil, "", nil, fmt.Errorf("failed to list on-call schedules: %w", err)
@@ -114,7 +111,7 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 	// Process schedules from this page only
 	var pageSchedules []*v2.Resource
-	for _, schedule := range schedulesResponse.Data {
+	for _, schedule := range schedules {
 		sr, err := scheduleResource(&schedule)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("failed to create schedule resource for schedule %s: %w", schedule.ID, err)
@@ -125,7 +122,7 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	l.Debug("Processed page",
 		zap.Int64("page_number", pageNumber),
 		zap.Int("schedules_in_page", len(pageSchedules)),
-		zap.Int("total_schedules_in_response", len(schedulesResponse.Data)))
+		zap.Int("total_schedules_in_response", len(schedules)))
 
 	// Prepare next page token if there are more pages
 	var nextToken string

@@ -418,3 +418,8 @@ func (pr *PaginationResult) GetTotalPages() int {
 	}
 	return (pr.Total + pr.PageSize - 1) / pr.PageSize
 }
+
+// IsLastPage checks if it is the last page (helper for unit tests).
+func (pr *PaginationResult) IsLastPage() bool {
+	return pr.NextPage == nil
+}
