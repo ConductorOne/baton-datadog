@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
@@ -13,7 +12,6 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 
-	datadogV2 "github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
 )
 
@@ -23,7 +21,6 @@ const (
 
 type scheduleBuilder struct {
 	resourceType *v2.ResourceType
-	client       *datadog.APIClient
 	restClient   *client.DatadogRestClient
 	site         string
 	apiKey       string
@@ -77,7 +74,6 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	// Simplified pagination handling
 	var (
 		pageNumber int64
-		bag        *pagination.Bag
 		err        error
 	)
 
@@ -86,20 +82,17 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		inputToken = pToken.Token
 	}
 
-	bag, pageNumber, err = parsePageToken(inputToken, parentResourceID)
+	_, pageNumber, err = parsePageToken(inputToken, parentResourceID)
 	if err != nil {
 		l.Error("Failed to parse pagination token", zap.Error(err))
 		return nil, "", nil, fmt.Errorf("failed to parse pagination token: %w", err)
 	}
 
-	// Use constant page size
-	pageSize := int64(client.PageSize)
-
 	// Get schedules for current page only
-	l.Debug("Fetching page", zap.Int64("page_number", pageNumber), zap.Int64("page_size", pageSize))
+	l.Debug("Fetching page", zap.Int64("page_number", pageNumber), zap.Int64("page_size", client.PageSize))
 
 	opts := &client.PaginationOptions{
-		PageSize:   int(pageSize),
+		PageSize:   client.PageSize,
 		PageNumber: int(pageNumber),
 	}
 
@@ -124,22 +117,18 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		zap.Int("schedules_in_page", len(pageSchedules)),
 		zap.Int("total_schedules_in_response", len(schedules)))
 
-	// Prepare next page token if there are more pages
+	// Generate next page token using the client's pagination logic
 	var nextToken string
-	if paginationResult.HasNextPage() {
-		nextPage := paginationResult.GetNextPageNumber()
-
-		nextToken, err = getPageTokenFromPage(bag, int64(nextPage))
-		if err != nil {
-			l.Error("Failed to create next page token", zap.Error(err))
-			return nil, "", nil, fmt.Errorf("failed to create next page token: %w", err)
-		}
+	nextToken, err = paginationResult.GenerateNextPageToken(pageNumber)
+	if err != nil {
+		l.Error("Failed to generate next page token", zap.Error(err))
+		return nil, "", nil, fmt.Errorf("failed to generate next page token: %w", err)
 	}
 
 	l.Info("Successfully listed schedules for page",
 		zap.Int64("page_number", pageNumber),
 		zap.Int("schedules_in_page", len(pageSchedules)),
-		zap.Int64("page_size_used", pageSize),
+		zap.Int64("page_size_used", int64(client.PageSize)),
 		zap.Bool("has_next_page", paginationResult.HasNextPage()),
 		zap.String("next_token", nextToken))
 
@@ -165,71 +154,32 @@ func (s *scheduleBuilder) Entitlements(_ context.Context, resource *v2.Resource,
 func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
-	// Validate input parameters
-	if resource == nil {
-		return nil, "", nil, fmt.Errorf("resource cannot be nil")
-	}
-	if resource.Id == nil {
-		return nil, "", nil, fmt.Errorf("resource ID cannot be nil")
-	}
-	if resource.Id.Resource == "" {
-		return nil, "", nil, fmt.Errorf("resource ID resource cannot be empty")
-	}
-
 	var rv []*v2.Grant
 
-	// Create API context with authentication
-	ctx = withAuthContext(ctx, s.apiKey, s.appKey, s.site)
-
-	// Use Datadog V2 OnCall API
-	oncallAPI := datadogV2.NewOnCallApi(s.client)
-
-	// Get the current on-call user
-	shift, resp, err := oncallAPI.GetScheduleOnCallUser(ctx, resource.Id.Resource)
-	if resp != nil {
-		defer resp.Body.Close()
-	}
+	// Get the current on-call user using our REST client
+	shift, err := s.restClient.GetScheduleOnCallUser(ctx, resource.Id.Resource)
 	if err != nil {
-		statusCode := 0
-		if resp != nil {
-			statusCode = resp.StatusCode
-		}
 		l.Error("Failed to get on-call user from Datadog",
 			zap.Error(err),
-			zap.String("schedule_id", resource.Id.Resource),
-			zap.Int("status_code", statusCode))
-
-		// Create a more specific error based on the response
-		if resp != nil {
-			return rv, "", nil, fmt.Errorf("HTTP request failed for operation %s with status %d: %w", "get_schedule_oncall_user", resp.StatusCode, err)
-		}
+			zap.String("schedule_id", resource.Id.Resource))
 		return rv, "", nil, fmt.Errorf("failed to get on-call user for schedule %s: %w", resource.Id.Resource, err)
 	}
 
-	if shift.Data == nil || shift.Data.Relationships == nil || shift.Data.Relationships.User == nil {
+	if shift.Data.ID == "" {
 		l.Debug("No on-call user found for schedule", zap.String("schedule_id", resource.Id.Resource))
 		return rv, "", nil, nil
 	}
 
-	userID := shift.Data.Relationships.User.Data.Id
-	if userID == "" {
-		l.Debug("No user ID found in shift data", zap.String("schedule_id", resource.Id.Resource))
-		return rv, "", nil, nil
+	userID := shift.Data.ID
+	// Extract base UUID without time ranges (first 36 characters of a standard UUID)
+	if len(userID) > 36 {
+		userID = userID[:36]
 	}
-
-	// Get user name from included section
 	userName := userID
-	for _, incl := range shift.Included {
-		if incl.ScheduleUser != nil {
-			su := incl.ScheduleUser
-			if su.GetId() == userID {
-				if attrs, ok := su.GetAttributesOk(); ok {
-					if name := attrs.GetName(); name != "" {
-						userName = name
-					}
-				}
-			}
-		}
+
+	// Use the name from attributes if available
+	if shift.Data.Attributes.Name != "" {
+		userName = shift.Data.Attributes.Name
 	}
 
 	// Create on-call entitlement
@@ -266,11 +216,8 @@ func populateScheduleOptions(name, permission string) []ent.EntitlementOption {
 	return options
 }
 
-func newScheduleBuilder(apiClient *datadog.APIClient, site, apiKey, appKey string) (*scheduleBuilder, error) {
+func newScheduleBuilder(site, apiKey, appKey string) (*scheduleBuilder, error) {
 	// Validate input parameters
-	if apiClient == nil {
-		return nil, fmt.Errorf("API client cannot be nil")
-	}
 	if site == "" {
 		return nil, fmt.Errorf("site cannot be empty")
 	}
@@ -288,7 +235,6 @@ func newScheduleBuilder(apiClient *datadog.APIClient, site, apiKey, appKey strin
 
 	return &scheduleBuilder{
 		resourceType: scheduleResourceType,
-		client:       apiClient,
 		restClient:   restClient,
 		site:         site,
 		apiKey:       apiKey,

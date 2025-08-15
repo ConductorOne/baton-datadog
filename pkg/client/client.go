@@ -136,8 +136,10 @@ func (c *DatadogRestClient) doRequest(ctx context.Context, method, endpoint stri
 		apiURL = baseUrlParsed.ResolveReference(endpointParsed).String()
 	}
 
-	// Create the request based on whether body is provided
+	// Create the request
 	var req *http.Request
+	var err error
+
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
@@ -148,7 +150,6 @@ func (c *DatadogRestClient) doRequest(ctx context.Context, method, endpoint stri
 			return fmt.Errorf("error creating HTTP request: %w", err)
 		}
 	} else {
-		var err error
 		req, err = http.NewRequestWithContext(ctx, method, apiURL, nil)
 		if err != nil {
 			return fmt.Errorf("error creating HTTP request: %w", err)
@@ -294,4 +295,20 @@ func (pr *PaginationResult) GetNextPageNumber() int {
 		return *pr.NextPage
 	}
 	return -1
+}
+
+// GenerateNextPageToken generates a pagination token for the next page.
+// This method encapsulates the token generation logic that was previously in the connector.
+func (pr *PaginationResult) GenerateNextPageToken(currentPage int64) (string, error) {
+	if !pr.HasNextPage() {
+		return "", nil
+	}
+
+	nextPage := int64(pr.GetNextPageNumber())
+	if nextPage <= 0 {
+		return "", fmt.Errorf("invalid next page number: %d", nextPage)
+	}
+
+	// Create a simple token format: "page:<page_number>"
+	return fmt.Sprintf("page:%d", nextPage), nil
 }

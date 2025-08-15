@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV1"
+	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
@@ -24,14 +24,29 @@ type Datadog struct {
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
+	// Create REST client for custom endpoints
+	restClient, err := client.NewDatadogRestClient(d.site, d.apiKey, d.appKey)
+	if err != nil {
+		// Log error but continue with other resource syncers
+		l := ctxzap.Extract(ctx)
+		l.Warn("Failed to create REST client, continuing without custom endpoints", zap.Error(err))
+		restClient = nil
+	}
+
+	// Create wrapper that uses the REST client
+	var wrapper *client.DatadogWrapper
+	if restClient != nil {
+		wrapper = client.NewDatadogWrapper(restClient, d.client)
+	}
+
 	resourceSyncers := []connectorbuilder.ResourceSyncer{
-		newUserBuilder(d.client, d.site, d.apiKey, d.appKey),
-		newTeamBuilder(d.client, d.site, d.apiKey, d.appKey),
-		newRoleBuilder(d.client, d.site, d.apiKey, d.appKey),
+		newUserBuilder(wrapper, d.site, d.apiKey, d.appKey),
+		newTeamBuilder(wrapper, d.site, d.apiKey, d.appKey),
+		newRoleBuilder(wrapper, d.site, d.apiKey, d.appKey),
 	}
 
 	// Try to create schedule builder, but don't fail if it errors
-	if scheduleBuilder, err := newScheduleBuilder(d.client, d.site, d.apiKey, d.appKey); err == nil {
+	if scheduleBuilder, err := newScheduleBuilder(d.site, d.apiKey, d.appKey); err == nil {
 		resourceSyncers = append(resourceSyncers, scheduleBuilder)
 	} else {
 		// Log the error but continue with other resource syncers
@@ -41,7 +56,7 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 	}
 
 	if d.syncSecrets {
-		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(d.client, d.site, d.apiKey, d.appKey))
+		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(wrapper, d.site, d.apiKey, d.appKey))
 	}
 	return resourceSyncers
 }
@@ -69,21 +84,16 @@ func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error)
 	}
 
 	ctx = withAuthContext(ctx, d.apiKey, d.appKey, d.site)
-	api := datadogV1.NewAuthenticationApi(d.client)
-	resp, httpRes, err := api.Validate(ctx)
-	if httpRes != nil {
-		defer httpRes.Body.Close()
-	}
+
+	// Create wrapper for validation which handles HTTP response body closing automatically
+	wrapper := client.NewDatadogWrapper(nil, d.client)
+	resp, err := wrapper.ValidateCredentials(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate API key: %w", err)
 	}
-	if httpRes != nil {
-		if !resp.GetValid() {
-			return nil, fmt.Errorf("API key not valid with status %d", httpRes.StatusCode)
-		}
-	} else {
-		// If there's no HTTP response, return an error
-		return nil, fmt.Errorf("failed to validate API key: no HTTP response received")
+
+	if !resp.GetValid() {
+		return nil, fmt.Errorf("API key not valid")
 	}
 
 	return nil, nil

@@ -164,12 +164,14 @@ func (c *TestClient) GetScheduleOnCallUser(ctx context.Context, scheduleID strin
 // Constants for test data.
 const (
 	testScheduleID = "schedule-1"
+	testAPIKey     = "test-api-key"
+	testAppKey     = "test-app-key"
 )
 
 func TestNewDatadogRestClient(t *testing.T) {
 	site := "datadoghq.com"
-	apiKey := "test-api-key"
-	appKey := "test-app-key"
+	apiKey := testAPIKey
+	appKey := testAppKey
 
 	client, err := NewDatadogRestClient(site, apiKey, appKey)
 	assertNoError(t, err, "should not return error")
@@ -246,8 +248,8 @@ func TestListOnCallSchedules_Success(t *testing.T) {
 
 		// Verify headers.
 		assertEqual(t, "application/json", r.Header.Get("Content-Type"), "Content-Type header should match")
-		assertEqual(t, "test-api-key", r.Header.Get("DD-API-KEY"), "DD-API-KEY header should match")
-		assertEqual(t, "test-app-key", r.Header.Get("DD-APPLICATION-KEY"), "DD-APPLICATION-KEY header should match")
+		assertEqual(t, testAPIKey, r.Header.Get("DD-API-KEY"), "DD-API-KEY header should match")
+		assertEqual(t, testAppKey, r.Header.Get("DD-APPLICATION-KEY"), "DD-APPLICATION-KEY header should match")
 
 		// Return mock response.
 		w.Header().Set("Content-Type", "application/json")
@@ -480,4 +482,32 @@ func extractHostPort(serverURL string) string {
 		return serverURL[7:] // Remove "http://" prefix.
 	}
 	return serverURL
+}
+
+func TestDatadogRestClient_OnCallMethods(t *testing.T) {
+	site := "test.datadoghq.com"
+	apiKey := testAPIKey
+	appKey := testAppKey
+
+	client, err := NewDatadogRestClient(site, apiKey, appKey)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Test that the on-call methods work with the REST client
+	ctx := context.Background()
+
+	// Test ListOnCallSchedules method
+	_, _, err = client.ListOnCallSchedules(ctx, &PaginationOptions{PageSize: 10, PageNumber: 1})
+	// We expect an error due to connection issues in tests, but the method should be callable
+	if err == nil {
+		t.Error("Expected error due to connection issues in test environment")
+	}
+
+	// Test GetScheduleOnCallUser method
+	_, err = client.GetScheduleOnCallUser(ctx, "test-schedule-id")
+	// We expect an error due to connection issues in tests, but the method should be callable
+	if err == nil {
+		t.Error("Expected error due to connection issues in test environment")
+	}
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
+	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
@@ -23,7 +23,7 @@ const (
 
 type teamBuilder struct {
 	resourceType *v2.ResourceType
-	client       *datadog.APIClient
+	wrapper      *client.DatadogWrapper
 	apiKey       string
 	appKey       string
 	site         string
@@ -61,17 +61,13 @@ func teamResource(team *datadogV2.Team) (*v2.Resource, error) {
 // List returns all the teams from the database as resource objects.
 func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
-	api := datadogV2.NewTeamsApi(t.client)
 
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	teams, httpRes, err := api.ListTeams(ctx, *datadogV2.NewListTeamsOptionalParameters().WithPageNumber(page))
-	if httpRes != nil {
-		defer httpRes.Body.Close()
-	}
+	teams, err := t.wrapper.ListTeams(ctx, datadogV2.NewListTeamsOptionalParameters().WithPageNumber(page))
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing teams: %w", err)
 	}
@@ -97,7 +93,7 @@ func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	return rv, nextPageToken, nil, nil
 }
 
-func (t *teamBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (t *teamBuilder) Entitlements(ctx context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	var rv []*v2.Entitlement
 	memberOptions := populateOptions(resource.DisplayName, memberRole)
 	memberEntitlement := ent.NewAssignmentEntitlement(resource, memberRole, memberOptions...)
@@ -112,18 +108,13 @@ func (t *teamBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *
 
 func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
-	teamsApi := datadogV2.NewTeamsApi(t.client)
-	usersApi := datadogV2.NewUsersApi(t.client)
 
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	memberships, httpRes, err := teamsApi.GetTeamMemberships(ctx, resource.Id.Resource, *datadogV2.NewGetTeamMembershipsOptionalParameters().WithPageNumber(page))
-	if httpRes != nil {
-		defer httpRes.Body.Close()
-	}
+	memberships, err := t.wrapper.GetTeamMemberships(ctx, resource.Id.Resource, datadogV2.NewGetTeamMembershipsOptionalParameters().WithPageNumber(page))
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -131,10 +122,7 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	var rv []*v2.Grant
 	for _, membership := range memberships.GetData() {
 		userId := membership.Relationships.User.GetData().Id
-		res, httpRes, err := usersApi.GetUser(ctx, userId)
-		if httpRes != nil {
-			defer httpRes.Body.Close()
-		}
+		res, err := t.wrapper.GetUser(ctx, userId)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("error getting user %s from team membership: %w", userId, err)
 		}
@@ -200,11 +188,7 @@ func (t *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 	}
 
 	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
-	teamsApi := datadogV2.NewTeamsApi(t.client)
-	_, httpRes, err := teamsApi.CreateTeamMembership(ctx, entitlement.Resource.Id.Resource, body)
-	if httpRes != nil {
-		defer httpRes.Body.Close()
-	}
+	_, err := t.wrapper.CreateTeamMembership(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
 		return nil, fmt.Errorf("error adding user to team: %w", err)
 	}
@@ -227,12 +211,8 @@ func (t *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	}
 
 	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
-	teamsApi := datadogV2.NewTeamsApi(t.client)
 
-	httpRes, err := teamsApi.DeleteTeamMembership(ctx, entitlement.Resource.Id.Resource, principal.Id.Resource)
-	if httpRes != nil {
-		defer httpRes.Body.Close()
-	}
+	err := t.wrapper.DeleteTeamMembership(ctx, entitlement.Resource.Id.Resource, principal.Id.Resource)
 	if err != nil {
 		return nil, fmt.Errorf("error removing user from team: %w", err)
 	}
@@ -249,10 +229,10 @@ func populateOptions(name, permission string) []ent.EntitlementOption {
 	return options
 }
 
-func newTeamBuilder(client *datadog.APIClient, site, apiKey, appKey string) *teamBuilder {
+func newTeamBuilder(wrapper *client.DatadogWrapper, site, apiKey, appKey string) *teamBuilder {
 	return &teamBuilder{
 		resourceType: teamResourceType,
-		client:       client,
+		wrapper:      wrapper,
 		site:         site,
 		apiKey:       apiKey,
 		appKey:       appKey,
