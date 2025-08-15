@@ -299,7 +299,7 @@ func (pr *PaginationResult) GetNextPageNumber() int {
 
 // GenerateNextPageToken generates a pagination token for the next page.
 // This method encapsulates the token generation logic that was previously in the connector.
-func (pr *PaginationResult) GenerateNextPageToken(currentPage int64) (string, error) {
+func (pr *PaginationResult) GenerateNextPageToken() (string, error) {
 	if !pr.HasNextPage() {
 		return "", nil
 	}

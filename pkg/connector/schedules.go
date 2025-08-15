@@ -119,7 +119,7 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 
 	// Generate next page token using the client's pagination logic
 	var nextToken string
-	nextToken, err = paginationResult.GenerateNextPageToken(pageNumber)
+	nextToken, err = paginationResult.GenerateNextPageToken()
 	if err != nil {
 		l.Error("Failed to generate next page token", zap.Error(err))
 		return nil, "", nil, fmt.Errorf("failed to generate next page token: %w", err)
