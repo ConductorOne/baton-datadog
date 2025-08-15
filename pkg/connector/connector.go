@@ -33,11 +33,7 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		restClient = nil
 	}
 
-	// Create wrapper that uses the REST client
-	var wrapper *client.DatadogWrapper
-	if restClient != nil {
-		wrapper = client.NewDatadogWrapper(restClient, d.client)
-	}
+	wrapper := client.NewDatadogWrapper(restClient, d.client)
 
 	resourceSyncers := []connectorbuilder.ResourceSyncer{
 		newUserBuilder(wrapper, d.site, d.apiKey, d.appKey),
