@@ -14,7 +14,7 @@ import (
 
 type userBuilder struct {
 	resourceType *v2.ResourceType
-	wrapper      *client.DatadogWrapper
+	wrapper      *client.DatadogClient
 	apiKey       string
 	appKey       string
 	site         string
@@ -115,7 +115,7 @@ func (u *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	return nil, "", nil, nil
 }
 
-func newUserBuilder(wrapper *client.DatadogWrapper, site, apiKey, appKey string) *userBuilder {
+func newUserBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *userBuilder {
 	return &userBuilder{
 		resourceType: userResourceType,
 		wrapper:      wrapper,

@@ -21,7 +21,7 @@ const (
 
 type scheduleBuilder struct {
 	resourceType *v2.ResourceType
-	restClient   *client.DatadogRestClient
+	wrapper      *client.DatadogClient
 	site         string
 	apiKey       string
 	appKey       string
@@ -96,7 +96,7 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		PageNumber: int(pageNumber),
 	}
 
-	schedules, paginationResult, err := s.restClient.ListOnCallSchedules(ctx, opts)
+	schedules, paginationResult, err := s.wrapper.GetRestClient().ListOnCallSchedules(ctx, opts)
 	if err != nil {
 		l.Error("Failed to list on-call schedules with pagination", zap.Error(err))
 		return nil, "", nil, fmt.Errorf("failed to list on-call schedules: %w", err)
@@ -157,7 +157,7 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 	var rv []*v2.Grant
 
 	// Get the current on-call user using our REST client
-	shift, err := s.restClient.GetScheduleOnCallUser(ctx, resource.Id.Resource)
+	shift, err := s.wrapper.GetRestClient().GetScheduleOnCallUser(ctx, resource.Id.Resource)
 	if err != nil {
 		l.Error("Failed to get on-call user from Datadog",
 			zap.Error(err),
@@ -216,28 +216,12 @@ func populateScheduleOptions(name, permission string) []ent.EntitlementOption {
 	return options
 }
 
-func newScheduleBuilder(site, apiKey, appKey string) (*scheduleBuilder, error) {
-	// Validate input parameters
-	if site == "" {
-		return nil, fmt.Errorf("site cannot be empty")
-	}
-	if apiKey == "" {
-		return nil, fmt.Errorf("API key cannot be empty")
-	}
-	if appKey == "" {
-		return nil, fmt.Errorf("application key cannot be empty")
-	}
-
-	restClient, err := client.NewDatadogRestClient(site, apiKey, appKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create REST client: %w", err)
-	}
-
+func newScheduleBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *scheduleBuilder {
 	return &scheduleBuilder{
 		resourceType: scheduleResourceType,
-		restClient:   restClient,
+		wrapper:      wrapper,
 		site:         site,
 		apiKey:       apiKey,
 		appKey:       appKey,
-	}, nil
+	}
 }

@@ -15,7 +15,7 @@ import (
 
 type apiTokenBuilder struct {
 	resourceType *v2.ResourceType
-	wrapper      *client.DatadogWrapper
+	wrapper      *client.DatadogClient
 	site         string
 	apiKey       string
 	appKey       string
@@ -97,7 +97,7 @@ func (o *apiTokenBuilder) List(
 	return ret, nextPageToken, nil, nil
 }
 
-func newApiTokenBuilder(wrapper *client.DatadogWrapper, site, apiKey, appKey string) *apiTokenBuilder {
+func newApiTokenBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *apiTokenBuilder {
 	return &apiTokenBuilder{
 		resourceType: apiTokenResourceType,
 		wrapper:      wrapper,

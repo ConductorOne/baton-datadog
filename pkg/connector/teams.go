@@ -23,7 +23,7 @@ const (
 
 type teamBuilder struct {
 	resourceType *v2.ResourceType
-	wrapper      *client.DatadogWrapper
+	wrapper      *client.DatadogClient
 	apiKey       string
 	appKey       string
 	site         string
@@ -229,7 +229,7 @@ func populateOptions(name, permission string) []ent.EntitlementOption {
 	return options
 }
 
-func newTeamBuilder(wrapper *client.DatadogWrapper, site, apiKey, appKey string) *teamBuilder {
+func newTeamBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *teamBuilder {
 	return &teamBuilder{
 		resourceType: teamResourceType,
 		wrapper:      wrapper,

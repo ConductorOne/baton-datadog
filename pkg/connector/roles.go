@@ -20,7 +20,7 @@ const roleMembership = "member"
 
 type roleBuilder struct {
 	resourceType *v2.ResourceType
-	wrapper      *client.DatadogWrapper
+	wrapper      *client.DatadogClient
 	apiKey       string
 	appKey       string
 	site         string
@@ -199,7 +199,7 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	return nil, nil
 }
 
-func newRoleBuilder(wrapper *client.DatadogWrapper, site, apiKey, appKey string) *roleBuilder {
+func newRoleBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *roleBuilder {
 	return &roleBuilder{
 		resourceType: roleResourceType,
 		wrapper:      wrapper,

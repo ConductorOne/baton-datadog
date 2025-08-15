@@ -2,313 +2,212 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
 
-	"github.com/conductorone/baton-sdk/pkg/uhttp"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.uber.org/zap"
-
-	pbv2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV1"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 )
 
-const (
-	datadogAPIBaseURL       = "https://%s"
-	onCallSchedulesEndpoint = "/api/v2/on-call/schedules"
-	// PageSize is the page size for pagination (maximum allowed by Datadog API: 100).
-	PageSize = 100
-)
-
-// PaginationOptions contains the options for pagination.
-type PaginationOptions struct {
-	PageSize   int
-	PageNumber int
+// DatadogClient wraps the Datadog REST client to provide a clean interface for all endpoints.
+// This client delegates to the DatadogRestClient which already handles HTTP response body closing correctly.
+type DatadogClient struct {
+	restClient     *DatadogRestClient
+	officialClient *datadog.APIClient
 }
 
-// PaginationResult contains the result of a page and pagination metadata.
-type PaginationResult struct {
-	Data       interface{}
-	NextPage   *int
-	Total      int
-	PageNumber int
-	PageSize   int
-	LastNumber int
-	HasMore    bool
+// NewDatadogClient creates a new client that uses the custom REST client.
+func NewDatadogClient(restClient *DatadogRestClient, officialClient *datadog.APIClient) *DatadogClient {
+	return &DatadogClient{
+		restClient:     restClient,
+		officialClient: officialClient,
+	}
 }
 
-// datadogErrorItem represents an individual error item within the "errors" array returned by the API.
-type datadogErrorItem struct {
-	Status string `json:"status"`
-	Title  string `json:"title"`
-	Detail string `json:"detail"`
+// GetRestClient returns the underlying REST client.
+func (w *DatadogClient) GetRestClient() *DatadogRestClient {
+	return w.restClient
 }
 
-// datadogErrorResponse represents the complete error payload.
-type datadogErrorResponse struct {
-	Errors []datadogErrorItem `json:"errors"`
+// GetOfficialClient returns the underlying official Datadog API client for operations that need it.
+func (w *DatadogClient) GetOfficialClient() *datadog.APIClient {
+	return w.officialClient
 }
 
-// Message concatenates all errors into a single readable string.
-func (d *datadogErrorResponse) Message() string {
-	if d == nil || len(d.Errors) == 0 {
-		return ""
-	}
-
-	parts := make([]string, 0, len(d.Errors))
-	for _, e := range d.Errors {
-		// Format: "<status> <title>: <detail>"
-		if e.Status != "" {
-			parts = append(parts, fmt.Sprintf("%s %s: %s", e.Status, e.Title, e.Detail))
-		} else {
-			parts = append(parts, fmt.Sprintf("%s: %s", e.Title, e.Detail))
-		}
-	}
-	return strings.Join(parts, "; ")
-}
-
-// DatadogRestClient is a client for Datadog REST API.
-// that is not available in the official client library.
-type DatadogRestClient struct {
-	httpClient *http.Client
-	site       string
-	apiKey     string
-	appKey     string
-}
-
-// DatadogClientInterface defines the interface for Datadog client operations.
-type DatadogClientInterface interface {
-	ListOnCallSchedules(ctx context.Context, opts *PaginationOptions) ([]OnCallSchedule, *PaginationResult, error)
-	GetScheduleOnCallUser(ctx context.Context, scheduleID string) (*OnCallUserResponse, error)
-}
-
-// Ensure DatadogRestClient implements DatadogClientInterface.
-var _ DatadogClientInterface = (*DatadogRestClient)(nil)
-
-// NewDatadogRestClient creates a new instance of the REST client.
-func NewDatadogRestClient(site, apiKey, appKey string) (*DatadogRestClient, error) {
-	// Validate input parameters
-	if site == "" {
-		return nil, fmt.Errorf("site cannot be empty")
-	}
-	if apiKey == "" {
-		return nil, fmt.Errorf("API key cannot be empty")
-	}
-	if appKey == "" {
-		return nil, fmt.Errorf("application key cannot be empty")
-	}
-
-	// Provide a non-nil logger to avoid silent failures when logging is enabled.
-	httpClient, err := uhttp.NewClient(context.Background(), uhttp.WithLogger(true, zap.L()))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
-	}
-
-	return &DatadogRestClient{
-		httpClient: httpClient,
-		site:       site,
-		apiKey:     apiKey,
-		appKey:     appKey,
-	}, nil
-}
-
-// doRequest is a helper function that handles the common HTTP request logic.
-func (c *DatadogRestClient) doRequest(ctx context.Context, method, endpoint string, body interface{}, result interface{}) error {
-	// Build the URL - check if endpoint is already a full URL
-	var apiURL string
-	if strings.HasPrefix(endpoint, "http") {
-		apiURL = endpoint
-	} else {
-		baseURL := fmt.Sprintf(datadogAPIBaseURL, c.site)
-		baseUrlParsed, err := url.Parse(baseURL)
-		if err != nil {
-			return fmt.Errorf("error parsing base URL: %w", err)
-		}
-
-		endpointParsed, err := url.Parse(endpoint)
-		if err != nil {
-			return fmt.Errorf("error parsing endpoint: %w", err)
-		}
-
-		apiURL = baseUrlParsed.ResolveReference(endpointParsed).String()
-	}
-
-	// Create the request
-	var req *http.Request
-	var err error
-
-	if body != nil {
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("failed to marshal request body: %w", err)
-		}
-		req, err = http.NewRequestWithContext(ctx, method, apiURL, strings.NewReader(string(jsonBody)))
-		if err != nil {
-			return fmt.Errorf("error creating HTTP request: %w", err)
-		}
-	} else {
-		req, err = http.NewRequestWithContext(ctx, method, apiURL, nil)
-		if err != nil {
-			return fmt.Errorf("error creating HTTP request: %w", err)
-		}
-	}
-
-	// Add headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("DD-API-KEY", c.apiKey)
-	req.Header.Set("DD-APPLICATION-KEY", c.appKey)
-
-	// Prepare helpers for rate-limit tracking and rich error handling.
-	var rlDesc pbv2.RateLimitDescription
-	var ddErr datadogErrorResponse
-
-	// Create a BaseHttpClient so we can leverage uhttp options.
-	baseClient := uhttp.NewBaseHttpClient(c.httpClient)
-
-	// Execute the request with the desired options.
-	resp, err := baseClient.Do(
-		req,
-		uhttp.WithRatelimitData(&rlDesc),
-		uhttp.WithErrorResponse(&ddErr),
+// ListUsers lists users using the REST client.
+func (w *DatadogClient) ListUsers(ctx context.Context, params *datadogV2.ListUsersOptionalParameters) (*datadogV2.UsersResponse, error) {
+	usersApi := datadogV2.NewUsersApi(w.officialClient)
+	var (
+		resp    datadogV2.UsersResponse
+		httpRes *http.Response
+		err     error
 	)
+	if params != nil {
+		resp, httpRes, err = usersApi.ListUsers(ctx, *params)
+	} else {
+		resp, httpRes, err = usersApi.ListUsers(ctx)
+	}
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Parse the response if result is provided.
-	if result != nil {
-		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
-			return fmt.Errorf("error decoding response: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (c *DatadogRestClient) fetchSchedulePage(ctx context.Context, pageNumber, pageSize int) (*OnCallSchedulesResponse, error) {
-	if pageSize == 0 {
-		pageSize = PageSize
-	}
-
-	baseURL := fmt.Sprintf(datadogAPIBaseURL, c.site)
-	baseUrlParsed, err := url.Parse(baseURL)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing base URL: %w", err)
-	}
-
-	endpointParsed, err := url.Parse(onCallSchedulesEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing endpoint: %w", err)
-	}
-
-	apiURL := baseUrlParsed.ResolveReference(endpointParsed).String()
-
-	u, err := url.Parse(apiURL)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing URL: %w", err)
-	}
-
-	q := u.Query()
-	q.Set("page[size]", strconv.Itoa(pageSize))
-	q.Set("page[number]", strconv.Itoa(pageNumber))
-	u.RawQuery = q.Encode()
-
-	var schedulesResponse OnCallSchedulesResponse
-	if err := c.doRequest(ctx, http.MethodGet, u.String(), nil, &schedulesResponse); err != nil {
 		return nil, err
 	}
-
-	return &schedulesResponse, nil
+	return &resp, nil
 }
 
-// buildPaginationResult converts the raw API response into the PaginationResult
-// used internally by the client.
-func buildPaginationResult(resp *OnCallSchedulesResponse) *PaginationResult {
-	if resp == nil {
-		return nil
-	}
-
-	return &PaginationResult{
-		Data:       resp.Data,
-		NextPage:   resp.Meta.Page.NextNumber,
-		Total:      resp.Meta.Page.Total,
-		PageNumber: resp.Meta.Page.Number,
-		PageSize:   resp.Meta.Page.Size,
-		LastNumber: resp.Meta.Page.LastNumber,
-		HasMore:    resp.Meta.Page.NextNumber != nil,
-	}
+// Validate validates API credentials using the REST client.
+func (w *DatadogClient) Validate(ctx context.Context) (*datadogV1.AuthenticationValidationResponse, error) {
+	// TODO: Implement in DatadogRestClient
+	// For now, return error indicating this needs to be implemented
+	return nil, fmt.Errorf("Validate not yet implemented in REST client")
 }
 
-// ListOnCallSchedules lists on-call schedules with optional pagination.
-func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context, opts *PaginationOptions) ([]OnCallSchedule, *PaginationResult, error) {
-	// Validate options: from now on, always expect valid options.
-	if opts == nil {
-		return nil, nil, fmt.Errorf("pagination options cannot be nil")
+// ListTeams lists teams using the REST client.
+func (w *DatadogClient) ListTeams(ctx context.Context, params *datadogV2.ListTeamsOptionalParameters) (*datadogV2.TeamsResponse, error) {
+	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
+	var (
+		resp    datadogV2.TeamsResponse
+		httpRes *http.Response
+		err     error
+	)
+	if params != nil {
+		resp, httpRes, err = teamsApi.ListTeams(ctx, *params)
+	} else {
+		resp, httpRes, err = teamsApi.ListTeams(ctx)
 	}
-
-	// Apply default values if necessary.
-	if opts.PageSize == 0 {
-		opts.PageSize = PageSize
+	if httpRes != nil {
+		defer httpRes.Body.Close()
 	}
-
-	l := ctxzap.Extract(ctx)
-	l.Debug("Fetching on-call schedules page", zap.Int("page_number", opts.PageNumber), zap.Int("page_size", opts.PageSize))
-
-	// Get the requested page.
-	schedulesResp, err := c.fetchSchedulePage(ctx, opts.PageNumber, opts.PageSize)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error fetching schedules: %w", err)
+		return nil, err
 	}
-
-	paginationResult := buildPaginationResult(schedulesResp)
-	return schedulesResp.Data, paginationResult, nil
+	return &resp, nil
 }
 
-// GetScheduleOnCallUser gets the user who is currently on-call for a specific schedule.
-func (c *DatadogRestClient) GetScheduleOnCallUser(ctx context.Context, scheduleID string) (*OnCallUserResponse, error) {
-	// Validate scheduleID
-	if scheduleID == "" {
-		return nil, fmt.Errorf("schedule ID cannot be empty")
+// ListRoles lists roles using the REST client.
+func (w *DatadogClient) ListRoles(ctx context.Context, params *datadogV2.ListRolesOptionalParameters) (*datadogV2.RolesResponse, error) {
+	rolesApi := datadogV2.NewRolesApi(w.officialClient)
+	var (
+		resp    datadogV2.RolesResponse
+		httpRes *http.Response
+		err     error
+	)
+	if params != nil {
+		resp, httpRes, err = rolesApi.ListRoles(ctx, *params)
+	} else {
+		resp, httpRes, err = rolesApi.ListRoles(ctx)
 	}
-
-	endpoint := fmt.Sprintf("/api/v2/on-call/schedules/%s/on-call", scheduleID)
-	var onCallUserResponse OnCallUserResponse
-	err := c.doRequest(ctx, http.MethodGet, endpoint, nil, &onCallUserResponse)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to get on-call user for schedule %s: %w", scheduleID, err)
+		return nil, err
 	}
-	return &onCallUserResponse, nil
+	return &resp, nil
 }
 
-// HasNextPage checks if there is a next page available.
-func (pr *PaginationResult) HasNextPage() bool {
-	return pr.NextPage != nil
+// ListAPIKeys lists API keys using the REST client.
+func (w *DatadogClient) ListAPIKeys(ctx context.Context, params *datadogV2.ListAPIKeysOptionalParameters) (*datadogV2.APIKeysResponse, error) {
+	keysApi := datadogV2.NewKeyManagementApi(w.officialClient)
+	var (
+		resp    datadogV2.APIKeysResponse
+		httpRes *http.Response
+		err     error
+	)
+	if params != nil {
+		resp, httpRes, err = keysApi.ListAPIKeys(ctx, *params)
+	} else {
+		resp, httpRes, err = keysApi.ListAPIKeys(ctx)
+	}
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
-// GetNextPageNumber returns the number of the next page.
-func (pr *PaginationResult) GetNextPageNumber() int {
-	if pr.NextPage != nil {
-		return *pr.NextPage
+// Wrapper methods that handle HTTP response body closing automatically
+
+// ListRoleUsers lists users for a specific role and automatically handles HTTP response body closing.
+func (w *DatadogClient) ListRoleUsers(ctx context.Context, roleId string, params *datadogV2.ListRoleUsersOptionalParameters) (*datadogV2.UsersResponse, error) {
+	rolesApi := datadogV2.NewRolesApi(w.officialClient)
+	users, httpRes, err := rolesApi.ListRoleUsers(ctx, roleId, *params)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
 	}
-	return -1
+	return &users, err
 }
 
-// GenerateNextPageToken generates a pagination token for the next page.
-// This method encapsulates the token generation logic that was previously in the connector.
-func (pr *PaginationResult) GenerateNextPageToken() (string, error) {
-	if !pr.HasNextPage() {
-		return "", nil
+// AddUserToRole adds a user to a role and automatically handles HTTP response body closing.
+func (w *DatadogClient) AddUserToRole(ctx context.Context, roleId string, body datadogV2.RelationshipToUser) (*datadogV2.UsersResponse, error) {
+	rolesApi := datadogV2.NewRolesApi(w.officialClient)
+	resp, httpRes, err := rolesApi.AddUserToRole(ctx, roleId, body)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
 	}
+	return &resp, err
+}
 
-	nextPage := int64(pr.GetNextPageNumber())
-	if nextPage <= 0 {
-		return "", fmt.Errorf("invalid next page number: %d", nextPage)
+// RemoveUserFromRole removes a user from a role and automatically handles HTTP response body closing.
+func (w *DatadogClient) RemoveUserFromRole(ctx context.Context, roleId string, body datadogV2.RelationshipToUser) (*datadogV2.UsersResponse, error) {
+	rolesApi := datadogV2.NewRolesApi(w.officialClient)
+	resp, httpRes, err := rolesApi.RemoveUserFromRole(ctx, roleId, body)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
 	}
+	return &resp, err
+}
 
-	// Create a simple token format: "page:<page_number>"
-	return fmt.Sprintf("page:%d", nextPage), nil
+// GetTeamMemberships gets team memberships and automatically handles HTTP response body closing.
+func (w *DatadogClient) GetTeamMemberships(ctx context.Context, teamId string, params *datadogV2.GetTeamMembershipsOptionalParameters) (*datadogV2.UserTeamsResponse, error) {
+	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
+	memberships, httpRes, err := teamsApi.GetTeamMemberships(ctx, teamId, *params)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	return &memberships, err
+}
+
+// GetUser gets a user by ID and automatically handles HTTP response body closing.
+func (w *DatadogClient) GetUser(ctx context.Context, userId string) (*datadogV2.UserResponse, error) {
+	usersApi := datadogV2.NewUsersApi(w.officialClient)
+	user, httpRes, err := usersApi.GetUser(ctx, userId)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	return &user, err
+}
+
+// CreateTeamMembership creates a team membership and automatically handles HTTP response body closing.
+func (w *DatadogClient) CreateTeamMembership(ctx context.Context, teamId string, body datadogV2.UserTeamRequest) (*datadogV2.UserTeamResponse, error) {
+	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
+	resp, httpRes, err := teamsApi.CreateTeamMembership(ctx, teamId, body)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	return &resp, err
+}
+
+// DeleteTeamMembership deletes a team membership and automatically handles HTTP response body closing.
+func (w *DatadogClient) DeleteTeamMembership(ctx context.Context, teamId string, userId string) error {
+	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
+	httpRes, err := teamsApi.DeleteTeamMembership(ctx, teamId, userId)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	return err
+}
+
+// ValidateCredentials validates API credentials and automatically handles HTTP response body closing.
+func (w *DatadogClient) ValidateCredentials(ctx context.Context) (*datadogV1.AuthenticationValidationResponse, error) {
+	api := datadogV1.NewAuthenticationApi(w.officialClient)
+	resp, httpRes, err := api.Validate(ctx)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	return &resp, err
 }

@@ -33,7 +33,7 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		restClient = nil
 	}
 
-	wrapper := client.NewDatadogWrapper(restClient, d.client)
+	wrapper := client.NewDatadogClient(restClient, d.client)
 
 	resourceSyncers := []connectorbuilder.ResourceSyncer{
 		newUserBuilder(wrapper, d.site, d.apiKey, d.appKey),
@@ -41,15 +41,7 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newRoleBuilder(wrapper, d.site, d.apiKey, d.appKey),
 	}
 
-	// Try to create schedule builder, but don't fail if it errors
-	if scheduleBuilder, err := newScheduleBuilder(d.site, d.apiKey, d.appKey); err == nil {
-		resourceSyncers = append(resourceSyncers, scheduleBuilder)
-	} else {
-		// Log the error but continue with other resource syncers
-		l := ctxzap.Extract(ctx)
-		l.Warn("Failed to create schedule builder, continuing without schedule sync",
-			zap.Error(err))
-	}
+	resourceSyncers = append(resourceSyncers, newScheduleBuilder(wrapper, d.site, d.apiKey, d.appKey))
 
 	if d.syncSecrets {
 		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(wrapper, d.site, d.apiKey, d.appKey))
@@ -82,7 +74,7 @@ func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error)
 	ctx = withAuthContext(ctx, d.apiKey, d.appKey, d.site)
 
 	// Create wrapper for validation which handles HTTP response body closing automatically
-	wrapper := client.NewDatadogWrapper(nil, d.client)
+	wrapper := client.NewDatadogClient(nil, d.client)
 	resp, err := wrapper.ValidateCredentials(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate API key: %w", err)
