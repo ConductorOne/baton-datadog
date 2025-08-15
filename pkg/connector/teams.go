@@ -24,9 +24,6 @@ const (
 type teamBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
-	apiKey       string
-	appKey       string
-	site         string
 }
 
 func (t *teamBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -60,8 +57,6 @@ func teamResource(team *datadogV2.Team) (*v2.Resource, error) {
 
 // List returns all the teams from the database as resource objects.
 func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -107,8 +102,6 @@ func (t *teamBuilder) Entitlements(ctx context.Context, resource *v2.Resource, _
 }
 
 func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -187,7 +180,6 @@ func (t *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		},
 	}
 
-	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
 	_, err := t.wrapper.CreateTeamMembership(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
 		return nil, fmt.Errorf("error adding user to team: %w", err)
@@ -210,8 +202,6 @@ func (t *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		return nil, fmt.Errorf("baton-datadog: only users can have team membership revoked")
 	}
 
-	ctx = withAuthContext(ctx, t.apiKey, t.appKey, t.site)
-
 	err := t.wrapper.DeleteTeamMembership(ctx, entitlement.Resource.Id.Resource, principal.Id.Resource)
 	if err != nil {
 		return nil, fmt.Errorf("error removing user from team: %w", err)
@@ -229,12 +219,9 @@ func populateOptions(name, permission string) []ent.EntitlementOption {
 	return options
 }
 
-func newTeamBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *teamBuilder {
+func newTeamBuilder(wrapper *client.DatadogClient) *teamBuilder {
 	return &teamBuilder{
 		resourceType: teamResourceType,
 		wrapper:      wrapper,
-		site:         site,
-		apiKey:       apiKey,
-		appKey:       appKey,
 	}
 }

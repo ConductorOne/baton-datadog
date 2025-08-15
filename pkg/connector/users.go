@@ -15,9 +15,6 @@ import (
 type userBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
-	apiKey       string
-	appKey       string
-	site         string
 }
 
 func (u *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -72,8 +69,6 @@ func userResource(user *datadogV2.User) (*v2.Resource, error) {
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, u.apiKey, u.appKey, u.site)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: u.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -115,12 +110,9 @@ func (u *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	return nil, "", nil, nil
 }
 
-func newUserBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *userBuilder {
+func newUserBuilder(wrapper *client.DatadogClient) *userBuilder {
 	return &userBuilder{
 		resourceType: userResourceType,
 		wrapper:      wrapper,
-		site:         site,
-		apiKey:       apiKey,
-		appKey:       appKey,
 	}
 }

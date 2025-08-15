@@ -18,7 +18,8 @@ import (
 
 const (
 	datadogAPIBaseURL       = "https://%s"
-	onCallSchedulesEndpoint = "/api/v2/on-call/schedules"
+	OnCallSchedulesEndpoint = "/api/v2/on-call/schedules"
+	OnCallUserEndpoint      = "/api/v2/on-call/schedules/%s/on-call"
 	// PageSize is the page size for pagination (maximum allowed by Datadog API: 100).
 	PageSize = 100
 )
@@ -200,7 +201,7 @@ func (c *DatadogRestClient) fetchSchedulePage(ctx context.Context, pageNumber, p
 		return nil, fmt.Errorf("error parsing base URL: %w", err)
 	}
 
-	endpointParsed, err := url.Parse(onCallSchedulesEndpoint)
+	endpointParsed, err := url.Parse(OnCallSchedulesEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing endpoint: %w", err)
 	}
@@ -275,7 +276,7 @@ func (c *DatadogRestClient) GetScheduleOnCallUser(ctx context.Context, scheduleI
 		return nil, fmt.Errorf("schedule ID cannot be empty")
 	}
 
-	endpoint := fmt.Sprintf("/api/v2/on-call/schedules/%s/on-call", scheduleID)
+	endpoint := fmt.Sprintf(OnCallUserEndpoint, scheduleID)
 	var onCallUserResponse OnCallUserResponse
 	err := c.doRequest(ctx, http.MethodGet, endpoint, nil, &onCallUserResponse)
 	if err != nil {

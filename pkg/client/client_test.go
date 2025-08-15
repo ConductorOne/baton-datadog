@@ -89,7 +89,7 @@ func NewTestClient(site, apiKey, appKey string) *TestClient {
 func (c *TestClient) ListOnCallSchedules(ctx context.Context) (*OnCallSchedulesResponse, error) {
 	// Build the URL using HTTP instead of HTTPS.
 	baseURL := fmt.Sprintf("http://%s", c.site)
-	apiURL := fmt.Sprintf("%s/api/v2/on-call/schedules", baseURL)
+	apiURL := fmt.Sprintf("%s%s", baseURL, OnCallSchedulesEndpoint)
 
 	// Create the request.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
@@ -127,7 +127,7 @@ func (c *TestClient) ListOnCallSchedules(ctx context.Context) (*OnCallSchedulesR
 func (c *TestClient) GetScheduleOnCallUser(ctx context.Context, scheduleID string) (*OnCallUserResponse, error) {
 	// Build the URL using HTTP instead of HTTPS.
 	baseURL := fmt.Sprintf("http://%s", c.site)
-	apiURL := fmt.Sprintf("%s/api/v2/on-call/schedules/%s/on-call", baseURL, scheduleID)
+	apiURL := fmt.Sprintf("%s%s", baseURL, fmt.Sprintf(OnCallUserEndpoint, scheduleID))
 
 	// Create the request.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
@@ -244,7 +244,7 @@ func TestListOnCallSchedules_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request method and path.
 		assertEqual(t, "GET", r.Method, "HTTP method should be GET")
-		assertEqual(t, "/api/v2/on-call/schedules", r.URL.Path, "URL path should match")
+		assertEqual(t, OnCallSchedulesEndpoint, r.URL.Path, "URL path should match")
 
 		// Verify headers.
 		assertEqual(t, "application/json", r.Header.Get("Content-Type"), "Content-Type header should match")
@@ -353,7 +353,7 @@ func TestGetScheduleOnCallUser_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request method and path.
 		assertEqual(t, "GET", r.Method, "HTTP method should be GET")
-		expectedPath := "/api/v2/on-call/schedules/" + testScheduleID + "/on-call"
+		expectedPath := fmt.Sprintf(OnCallUserEndpoint, testScheduleID)
 		assertEqual(t, expectedPath, r.URL.Path, "URL path should match")
 
 		// Verify headers.

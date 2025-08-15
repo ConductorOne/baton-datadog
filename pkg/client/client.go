@@ -15,13 +15,19 @@ import (
 type DatadogClient struct {
 	restClient     *DatadogRestClient
 	officialClient *datadog.APIClient
+	site           string
+	apiKey         string
+	appKey         string
 }
 
 // NewDatadogClient creates a new client that uses the custom REST client.
-func NewDatadogClient(restClient *DatadogRestClient, officialClient *datadog.APIClient) *DatadogClient {
+func NewDatadogClient(restClient *DatadogRestClient, officialClient *datadog.APIClient, site, apiKey, appKey string) *DatadogClient {
 	return &DatadogClient{
 		restClient:     restClient,
 		officialClient: officialClient,
+		site:           site,
+		apiKey:         apiKey,
+		appKey:         appKey,
 	}
 }
 
@@ -35,8 +41,33 @@ func (w *DatadogClient) GetOfficialClient() *datadog.APIClient {
 	return w.officialClient
 }
 
+// withAuthContext adds authentication context to the request context.
+func (w *DatadogClient) withAuthContext(ctx context.Context) context.Context {
+	ctx = context.WithValue(
+		ctx,
+		datadog.ContextAPIKeys,
+		map[string]datadog.APIKey{
+			"apiKeyAuth": {
+				Key: w.apiKey,
+			},
+			"appKeyAuth": {
+				Key: w.appKey,
+			},
+		},
+	)
+
+	ctx = context.WithValue(ctx,
+		datadog.ContextServerVariables,
+		map[string]string{
+			"site": w.site,
+		})
+
+	return ctx
+}
+
 // ListUsers lists users using the REST client.
 func (w *DatadogClient) ListUsers(ctx context.Context, params *datadogV2.ListUsersOptionalParameters) (*datadogV2.UsersResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	usersApi := datadogV2.NewUsersApi(w.officialClient)
 	var (
 		resp    datadogV2.UsersResponse
@@ -66,6 +97,7 @@ func (w *DatadogClient) Validate(ctx context.Context) (*datadogV1.Authentication
 
 // ListTeams lists teams using the REST client.
 func (w *DatadogClient) ListTeams(ctx context.Context, params *datadogV2.ListTeamsOptionalParameters) (*datadogV2.TeamsResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
 	var (
 		resp    datadogV2.TeamsResponse
@@ -88,6 +120,7 @@ func (w *DatadogClient) ListTeams(ctx context.Context, params *datadogV2.ListTea
 
 // ListRoles lists roles using the REST client.
 func (w *DatadogClient) ListRoles(ctx context.Context, params *datadogV2.ListRolesOptionalParameters) (*datadogV2.RolesResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	rolesApi := datadogV2.NewRolesApi(w.officialClient)
 	var (
 		resp    datadogV2.RolesResponse
@@ -110,6 +143,7 @@ func (w *DatadogClient) ListRoles(ctx context.Context, params *datadogV2.ListRol
 
 // ListAPIKeys lists API keys using the REST client.
 func (w *DatadogClient) ListAPIKeys(ctx context.Context, params *datadogV2.ListAPIKeysOptionalParameters) (*datadogV2.APIKeysResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	keysApi := datadogV2.NewKeyManagementApi(w.officialClient)
 	var (
 		resp    datadogV2.APIKeysResponse
@@ -134,6 +168,7 @@ func (w *DatadogClient) ListAPIKeys(ctx context.Context, params *datadogV2.ListA
 
 // ListRoleUsers lists users for a specific role and automatically handles HTTP response body closing.
 func (w *DatadogClient) ListRoleUsers(ctx context.Context, roleId string, params *datadogV2.ListRoleUsersOptionalParameters) (*datadogV2.UsersResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	rolesApi := datadogV2.NewRolesApi(w.officialClient)
 	users, httpRes, err := rolesApi.ListRoleUsers(ctx, roleId, *params)
 	if httpRes != nil {
@@ -144,6 +179,7 @@ func (w *DatadogClient) ListRoleUsers(ctx context.Context, roleId string, params
 
 // AddUserToRole adds a user to a role and automatically handles HTTP response body closing.
 func (w *DatadogClient) AddUserToRole(ctx context.Context, roleId string, body datadogV2.RelationshipToUser) (*datadogV2.UsersResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	rolesApi := datadogV2.NewRolesApi(w.officialClient)
 	resp, httpRes, err := rolesApi.AddUserToRole(ctx, roleId, body)
 	if httpRes != nil {
@@ -154,6 +190,7 @@ func (w *DatadogClient) AddUserToRole(ctx context.Context, roleId string, body d
 
 // RemoveUserFromRole removes a user from a role and automatically handles HTTP response body closing.
 func (w *DatadogClient) RemoveUserFromRole(ctx context.Context, roleId string, body datadogV2.RelationshipToUser) (*datadogV2.UsersResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	rolesApi := datadogV2.NewRolesApi(w.officialClient)
 	resp, httpRes, err := rolesApi.RemoveUserFromRole(ctx, roleId, body)
 	if httpRes != nil {
@@ -164,6 +201,7 @@ func (w *DatadogClient) RemoveUserFromRole(ctx context.Context, roleId string, b
 
 // GetTeamMemberships gets team memberships and automatically handles HTTP response body closing.
 func (w *DatadogClient) GetTeamMemberships(ctx context.Context, teamId string, params *datadogV2.GetTeamMembershipsOptionalParameters) (*datadogV2.UserTeamsResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
 	memberships, httpRes, err := teamsApi.GetTeamMemberships(ctx, teamId, *params)
 	if httpRes != nil {
@@ -174,6 +212,7 @@ func (w *DatadogClient) GetTeamMemberships(ctx context.Context, teamId string, p
 
 // GetUser gets a user by ID and automatically handles HTTP response body closing.
 func (w *DatadogClient) GetUser(ctx context.Context, userId string) (*datadogV2.UserResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	usersApi := datadogV2.NewUsersApi(w.officialClient)
 	user, httpRes, err := usersApi.GetUser(ctx, userId)
 	if httpRes != nil {
@@ -184,6 +223,7 @@ func (w *DatadogClient) GetUser(ctx context.Context, userId string) (*datadogV2.
 
 // CreateTeamMembership creates a team membership and automatically handles HTTP response body closing.
 func (w *DatadogClient) CreateTeamMembership(ctx context.Context, teamId string, body datadogV2.UserTeamRequest) (*datadogV2.UserTeamResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
 	resp, httpRes, err := teamsApi.CreateTeamMembership(ctx, teamId, body)
 	if httpRes != nil {
@@ -194,6 +234,7 @@ func (w *DatadogClient) CreateTeamMembership(ctx context.Context, teamId string,
 
 // DeleteTeamMembership deletes a team membership and automatically handles HTTP response body closing.
 func (w *DatadogClient) DeleteTeamMembership(ctx context.Context, teamId string, userId string) error {
+	ctx = w.withAuthContext(ctx)
 	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
 	httpRes, err := teamsApi.DeleteTeamMembership(ctx, teamId, userId)
 	if httpRes != nil {
@@ -204,6 +245,7 @@ func (w *DatadogClient) DeleteTeamMembership(ctx context.Context, teamId string,
 
 // ValidateCredentials validates API credentials and automatically handles HTTP response body closing.
 func (w *DatadogClient) ValidateCredentials(ctx context.Context) (*datadogV1.AuthenticationValidationResponse, error) {
+	ctx = w.withAuthContext(ctx)
 	api := datadogV1.NewAuthenticationApi(w.officialClient)
 	resp, httpRes, err := api.Validate(ctx)
 	if httpRes != nil {

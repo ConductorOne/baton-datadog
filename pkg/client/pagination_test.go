@@ -31,7 +31,7 @@ func (c *TestPaginatedClient) ListOnCallSchedulesPaginated(ctx context.Context, 
 
 	// Build the URL using HTTP for tests
 	baseURL := fmt.Sprintf("http://%s", c.site)
-	apiURL := fmt.Sprintf("%s/api/v2/on-call/schedules", baseURL)
+	apiURL := fmt.Sprintf("%s%s", baseURL, OnCallSchedulesEndpoint)
 
 	// Add pagination parameters
 	u, err := url.Parse(apiURL)

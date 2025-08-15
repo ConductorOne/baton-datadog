@@ -22,9 +22,6 @@ const (
 type scheduleBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
-	site         string
-	apiKey       string
-	appKey       string
 }
 
 // Create a new connector resource for a Datadog on-call schedule.
@@ -216,12 +213,9 @@ func populateScheduleOptions(name, permission string) []ent.EntitlementOption {
 	return options
 }
 
-func newScheduleBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *scheduleBuilder {
+func newScheduleBuilder(wrapper *client.DatadogClient) *scheduleBuilder {
 	return &scheduleBuilder{
 		resourceType: scheduleResourceType,
 		wrapper:      wrapper,
-		site:         site,
-		apiKey:       apiKey,
-		appKey:       appKey,
 	}
 }

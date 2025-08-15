@@ -16,9 +16,6 @@ import (
 type apiTokenBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
-	site         string
-	apiKey       string
-	appKey       string
 }
 
 func (o *apiTokenBuilder) Entitlements(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
@@ -40,8 +37,6 @@ func (o *apiTokenBuilder) List(
 	resourceID *v2.ResourceId,
 	pToken *pagination.Token,
 ) ([]*v2.Resource, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, o.apiKey, o.appKey, o.site)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -97,12 +92,9 @@ func (o *apiTokenBuilder) List(
 	return ret, nextPageToken, nil, nil
 }
 
-func newApiTokenBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *apiTokenBuilder {
+func newApiTokenBuilder(wrapper *client.DatadogClient) *apiTokenBuilder {
 	return &apiTokenBuilder{
 		resourceType: apiTokenResourceType,
 		wrapper:      wrapper,
-		site:         site,
-		apiKey:       apiKey,
-		appKey:       appKey,
 	}
 }

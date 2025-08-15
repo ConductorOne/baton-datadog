@@ -11,11 +11,11 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.uber.org/zap"
 )
 
 type Datadog struct {
 	client      *datadog.APIClient
+	wrapper     *client.DatadogClient
 	site        string
 	apiKey      string
 	appKey      string
@@ -24,26 +24,15 @@ type Datadog struct {
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
-	// Create REST client for custom endpoints
-	restClient, err := client.NewDatadogRestClient(d.site, d.apiKey, d.appKey)
-	if err != nil {
-		// Log error but continue with other resource syncers
-		l := ctxzap.Extract(ctx)
-		l.Warn("Failed to create REST client, continuing without custom endpoints", zap.Error(err))
-		restClient = nil
-	}
-
-	wrapper := client.NewDatadogClient(restClient, d.client)
-
 	resourceSyncers := []connectorbuilder.ResourceSyncer{
-		newUserBuilder(wrapper, d.site, d.apiKey, d.appKey),
-		newTeamBuilder(wrapper, d.site, d.apiKey, d.appKey),
-		newRoleBuilder(wrapper, d.site, d.apiKey, d.appKey),
-		newScheduleBuilder(wrapper, d.site, d.apiKey, d.appKey),
+		newUserBuilder(d.wrapper),
+		newTeamBuilder(d.wrapper),
+		newRoleBuilder(d.wrapper),
+		newScheduleBuilder(d.wrapper),
 	}
 
 	if d.syncSecrets {
-		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(wrapper, d.site, d.apiKey, d.appKey))
+		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(d.wrapper))
 	}
 	return resourceSyncers
 }
@@ -70,11 +59,8 @@ func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error)
 		return nil, fmt.Errorf("application key cannot be empty")
 	}
 
-	ctx = withAuthContext(ctx, d.apiKey, d.appKey, d.site)
-
-	// Create wrapper for validation which handles HTTP response body closing automatically
-	wrapper := client.NewDatadogClient(nil, d.client)
-	resp, err := wrapper.ValidateCredentials(ctx)
+	// Use the existing wrapper for validation
+	resp, err := d.wrapper.ValidateCredentials(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate API key: %w", err)
 	}
@@ -107,11 +93,24 @@ func New(ctx context.Context, site, apiKey, appKey string, syncSecrets bool) (*D
 	conf := datadog.NewConfiguration()
 	conf.HTTPClient = httpClient
 
+	// Create REST client for custom endpoints
+	restClient, err := client.NewDatadogRestClient(site, apiKey, appKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create REST client: %w", err)
+	}
+
+	// Create the official client
+	officialClient := datadog.NewAPIClient(conf)
+
+	// Create the wrapper client
+	wrapper := client.NewDatadogClient(restClient, officialClient, site, apiKey, appKey)
+
 	return &Datadog{
 		site:        site,
 		apiKey:      apiKey,
 		appKey:      appKey,
-		client:      datadog.NewAPIClient(conf),
+		client:      officialClient,
+		wrapper:     wrapper,
 		syncSecrets: syncSecrets,
 	}, nil
 }

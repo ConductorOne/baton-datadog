@@ -21,9 +21,6 @@ const roleMembership = "member"
 type roleBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
-	apiKey       string
-	appKey       string
-	site         string
 }
 
 func (r *roleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -56,8 +53,6 @@ func roleResource(role *datadogV2.Role) (*v2.Resource, error) {
 
 // List returns all the roles from the database as resource objects.
 func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: r.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -107,8 +102,6 @@ func (r *roleBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *
 }
 
 func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: userResourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -160,7 +153,6 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		},
 	}
 
-	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
 	_, err := r.wrapper.AddUserToRole(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: failed to add user to role: %w", err)
@@ -190,7 +182,6 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		},
 	}
 
-	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
 	_, err := r.wrapper.RemoveUserFromRole(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: failed to remove user from role: %w", err)
@@ -199,12 +190,9 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	return nil, nil
 }
 
-func newRoleBuilder(wrapper *client.DatadogClient, site, apiKey, appKey string) *roleBuilder {
+func newRoleBuilder(wrapper *client.DatadogClient) *roleBuilder {
 	return &roleBuilder{
 		resourceType: roleResourceType,
 		wrapper:      wrapper,
-		site:         site,
-		apiKey:       apiKey,
-		appKey:       appKey,
 	}
 }

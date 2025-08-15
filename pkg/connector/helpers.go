@@ -1,12 +1,10 @@
 package connector
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
@@ -16,29 +14,6 @@ func annotationsForUserResourceType() annotations.Annotations {
 	annos := annotations.Annotations{}
 	annos.Update(&v2.SkipEntitlementsAndGrants{})
 	return annos
-}
-
-func withAuthContext(ctx context.Context, apiKey, appKey, site string) context.Context {
-	ctx = context.WithValue(
-		ctx,
-		datadog.ContextAPIKeys,
-		map[string]datadog.APIKey{
-			"apiKeyAuth": {
-				Key: apiKey,
-			},
-			"appKeyAuth": {
-				Key: appKey,
-			},
-		},
-	)
-
-	ctx = context.WithValue(ctx,
-		datadog.ContextServerVariables,
-		map[string]string{
-			"site": site,
-		})
-
-	return ctx
 }
 
 func parsePageToken(i string, resourceID *v2.ResourceId) (*pagination.Bag, int64, error) {
