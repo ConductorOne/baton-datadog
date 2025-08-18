@@ -20,7 +20,7 @@ type SimpleOnCallScheduleList struct {
 
 // OnCallSchedulesResponse represents the response of the on-call schedules API.
 type OnCallSchedulesResponse struct {
-	Data []OnCallSchedule `json:"data"`
+	Data []*OnCallSchedule `json:"data"`
 	Meta struct {
 		Page struct {
 			Type        string `json:"type"`

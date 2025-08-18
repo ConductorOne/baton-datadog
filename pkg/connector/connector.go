@@ -94,7 +94,7 @@ func New(ctx context.Context, site, apiKey, appKey string, syncSecrets bool) (*D
 	conf.HTTPClient = httpClient
 
 	// Create REST client for custom endpoints
-	restClient, err := client.NewDatadogRestClient(site, apiKey, appKey)
+	restClient, err := client.NewDatadogRestClient(ctx, site, apiKey, appKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create REST client: %w", err)
 	}

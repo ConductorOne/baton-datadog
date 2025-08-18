@@ -8,6 +8,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
+	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -26,10 +27,6 @@ type scheduleBuilder struct {
 
 // Create a new connector resource for a Datadog on-call schedule.
 func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
-	if schedule == nil {
-		return nil, fmt.Errorf("schedule cannot be nil")
-	}
-
 	if schedule.ID == "" {
 		return nil, fmt.Errorf("schedule ID cannot be empty")
 	}
@@ -93,16 +90,16 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		PageNumber: int(pageNumber),
 	}
 
-	schedules, paginationResult, err := s.wrapper.GetRestClient().ListOnCallSchedules(ctx, opts)
+	schedules, nextPageToken, annos, err := s.wrapper.GetRestClient().ListOnCallSchedules(ctx, opts)
 	if err != nil {
 		l.Error("Failed to list on-call schedules with pagination", zap.Error(err))
-		return nil, "", nil, fmt.Errorf("failed to list on-call schedules: %w", err)
+		return nil, "", annos, fmt.Errorf("failed to list on-call schedules: %w", err)
 	}
 
 	// Process schedules from this page only
 	var pageSchedules []*v2.Resource
 	for _, schedule := range schedules {
-		sr, err := scheduleResource(&schedule)
+		sr, err := scheduleResource(schedule)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("failed to create schedule resource for schedule %s: %w", schedule.ID, err)
 		}
@@ -114,23 +111,8 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		zap.Int("schedules_in_page", len(pageSchedules)),
 		zap.Int("total_schedules_in_response", len(schedules)))
 
-	// Generate next page token using the client's pagination logic
-	var nextToken string
-	nextToken, err = paginationResult.GenerateNextPageToken()
-	if err != nil {
-		l.Error("Failed to generate next page token", zap.Error(err))
-		return nil, "", nil, fmt.Errorf("failed to generate next page token: %w", err)
-	}
-
-	l.Info("Successfully listed schedules for page",
-		zap.Int64("page_number", pageNumber),
-		zap.Int("schedules_in_page", len(pageSchedules)),
-		zap.Int64("page_size_used", int64(client.PageSize)),
-		zap.Bool("has_next_page", paginationResult.HasNextPage()),
-		zap.String("next_token", nextToken))
-
 	// Return only the current page schedules with next page token
-	return pageSchedules, nextToken, nil, nil
+	return pageSchedules, nextPageToken, annos, nil
 }
 
 func (s *scheduleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -154,17 +136,17 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 	var rv []*v2.Grant
 
 	// Get the current on-call user using our REST client
-	shift, err := s.wrapper.GetRestClient().GetScheduleOnCallUser(ctx, resource.Id.Resource)
+	shift, annos, err := s.wrapper.GetRestClient().GetScheduleOnCallUser(ctx, resource.Id.Resource)
 	if err != nil {
 		l.Error("Failed to get on-call user from Datadog",
 			zap.Error(err),
 			zap.String("schedule_id", resource.Id.Resource))
-		return rv, "", nil, fmt.Errorf("failed to get on-call user for schedule %s: %w", resource.Id.Resource, err)
+		return rv, "", annos, fmt.Errorf("failed to get on-call user for schedule %s: %w", resource.Id.Resource, err)
 	}
 
 	if shift.Data.ID == "" {
 		l.Debug("No on-call user found for schedule", zap.String("schedule_id", resource.Id.Resource))
-		return rv, "", nil, nil
+		return rv, "", annos, nil
 	}
 
 	userID := shift.Data.ID
@@ -172,16 +154,6 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 	if len(userID) > 36 {
 		userID = userID[:36]
 	}
-	userName := userID
-
-	// Use the name from attributes if available
-	if shift.Data.Attributes.Name != "" {
-		userName = shift.Data.Attributes.Name
-	}
-
-	// Create on-call entitlement
-	onCallOptions := populateScheduleOptions(resource.DisplayName, scheduleOnCallRole)
-	onCallEntitlement := ent.NewPermissionEntitlement(resource, scheduleOnCallRole, onCallOptions...)
 
 	// Create principal resource reference for on-call user
 	onCallPrincipal := &v2.Resource{
@@ -189,19 +161,12 @@ func (s *scheduleBuilder) Grants(ctx context.Context, resource *v2.Resource, pTo
 			ResourceType: userResourceType.Id,
 			Resource:     userID,
 		},
-		DisplayName: userName,
 	}
 
-	// Create on-call grant
-	onCallGrantID := fmt.Sprintf("%s:%s:%s", resource.Id.Resource, userID, scheduleOnCallRole)
-	onCallGrant := &v2.Grant{
-		Id:          onCallGrantID,
-		Principal:   onCallPrincipal,
-		Entitlement: onCallEntitlement,
-	}
+	onCallGrant := grant.NewGrant(resource, scheduleOnCallRole, onCallPrincipal)
 
 	rv = append(rv, onCallGrant)
-	return rv, "", nil, nil
+	return rv, "", annos, nil
 }
 
 func populateScheduleOptions(name, permission string) []ent.EntitlementOption {
