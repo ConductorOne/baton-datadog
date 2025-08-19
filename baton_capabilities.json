@@ -16,6 +16,18 @@
     },
     {
       "resourceType":  {
+        "id":  "schedule",
+        "displayName":  "Schedule",
+        "traits":  [
+          "TRAIT_GROUP"
+        ]
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC"
+      ]
+    },
+    {
+      "resourceType":  {
         "id":  "team",
         "displayName":  "Team",
         "traits":  [
