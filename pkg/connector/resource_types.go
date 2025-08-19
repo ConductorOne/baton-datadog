@@ -28,6 +28,11 @@ var (
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
 		Annotations: annotationsForResourceType(true),
 	}
+	scheduleResourceType = &v2.ResourceType{
+		Id:          "schedule",
+		DisplayName: "Schedule",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_GROUP},
+	}
 )
 
 func annotationsForResourceType(skipEntitlementsAndGrants bool) annotations.Annotations {

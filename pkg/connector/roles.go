@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
+	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
@@ -20,10 +20,7 @@ const roleMembership = "member"
 
 type roleBuilder struct {
 	resourceType *v2.ResourceType
-	client       *datadog.APIClient
-	apiKey       string
-	appKey       string
-	site         string
+	wrapper      *client.DatadogClient
 }
 
 func (r *roleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -56,15 +53,12 @@ func roleResource(role *datadogV2.Role) (*v2.Resource, error) {
 
 // List returns all the roles from the database as resource objects.
 func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
-	api := datadogV2.NewRolesApi(r.client)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: r.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	roles, _, err := api.ListRoles(ctx, *datadogV2.NewListRolesOptionalParameters().WithPageNumber(page))
+	roles, err := r.wrapper.ListRoles(ctx, datadogV2.NewListRolesOptionalParameters().WithPageNumber(page))
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -108,15 +102,12 @@ func (r *roleBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *
 }
 
 func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
-	rolesApi := datadogV2.NewRolesApi(r.client)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: userResourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	users, _, err := rolesApi.ListRoleUsers(ctx, resource.Id.Resource, *datadogV2.NewListRoleUsersOptionalParameters().WithPageNumber(page))
+	users, err := r.wrapper.ListRoleUsers(ctx, resource.Id.Resource, datadogV2.NewListRoleUsersOptionalParameters().WithPageNumber(page))
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing users for role %s: %w", resource.DisplayName, err)
 	}
@@ -162,9 +153,7 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 		},
 	}
 
-	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
-	rolesApi := datadogV2.NewRolesApi(r.client)
-	_, _, err := rolesApi.AddUserToRole(ctx, entitlement.Resource.Id.Resource, body)
+	_, err := r.wrapper.AddUserToRole(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: failed to add user to role: %w", err)
 	}
@@ -193,9 +182,7 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 		},
 	}
 
-	ctx = withAuthContext(ctx, r.apiKey, r.appKey, r.site)
-	rolesApi := datadogV2.NewRolesApi(r.client)
-	_, _, err := rolesApi.RemoveUserFromRole(ctx, entitlement.Resource.Id.Resource, body)
+	_, err := r.wrapper.RemoveUserFromRole(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: failed to remove user from role: %w", err)
 	}
@@ -203,12 +190,9 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	return nil, nil
 }
 
-func newRoleBuilder(client *datadog.APIClient, site, apiKey, appKey string) *roleBuilder {
+func newRoleBuilder(wrapper *client.DatadogClient) *roleBuilder {
 	return &roleBuilder{
 		resourceType: roleResourceType,
-		client:       client,
-		site:         site,
-		apiKey:       apiKey,
-		appKey:       appKey,
+		wrapper:      wrapper,
 	}
 }

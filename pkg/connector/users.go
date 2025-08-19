@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
+	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
@@ -14,10 +14,7 @@ import (
 
 type userBuilder struct {
 	resourceType *v2.ResourceType
-	client       *datadog.APIClient
-	apiKey       string
-	appKey       string
-	site         string
+	wrapper      *client.DatadogClient
 }
 
 func (u *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -72,15 +69,12 @@ func userResource(user *datadogV2.User) (*v2.Resource, error) {
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	ctx = withAuthContext(ctx, u.apiKey, u.appKey, u.site)
-	api := datadogV2.NewUsersApi(u.client)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: u.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	users, _, err := api.ListUsers(ctx, *datadogV2.NewListUsersOptionalParameters().WithPageNumber(page))
+	users, err := u.wrapper.ListUsers(ctx, datadogV2.NewListUsersOptionalParameters().WithPageNumber(page))
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("error listing users: %w", err)
 	}
@@ -116,12 +110,9 @@ func (u *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	return nil, "", nil, nil
 }
 
-func newUserBuilder(client *datadog.APIClient, site, apiKey, appKey string) *userBuilder {
+func newUserBuilder(wrapper *client.DatadogClient) *userBuilder {
 	return &userBuilder{
 		resourceType: userResourceType,
-		client:       client,
-		site:         site,
-		apiKey:       apiKey,
-		appKey:       appKey,
+		wrapper:      wrapper,
 	}
 }
