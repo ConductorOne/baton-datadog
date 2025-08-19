@@ -20,7 +20,7 @@ type TestPaginatedClient struct {
 }
 
 // ListOnCallSchedulesPaginated implements pagination for tests using HTTP.
-func (c *TestPaginatedClient) ListOnCallSchedulesPaginated(ctx context.Context, opts *PaginationOptions) (*OnCallSchedulesResponse, *PaginationResult, error) {
+func (c *TestPaginatedClient) ListOnCallSchedulesPaginated(ctx context.Context, opts *PaginationOptions) (*OnCallSchedulesResponse, error) {
 	// Set default options if not provided
 	if opts == nil {
 		opts = &PaginationOptions{
@@ -36,7 +36,7 @@ func (c *TestPaginatedClient) ListOnCallSchedulesPaginated(ctx context.Context, 
 	// Add pagination parameters
 	u, err := url.Parse(apiURL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error parsing URL: %w", err)
+		return nil, fmt.Errorf("error parsing URL: %w", err)
 	}
 
 	q := u.Query()
@@ -47,7 +47,7 @@ func (c *TestPaginatedClient) ListOnCallSchedulesPaginated(ctx context.Context, 
 	// Create the request
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error creating HTTP request: %w", err)
+		return nil, fmt.Errorf("error creating HTTP request: %w", err)
 	}
 
 	// Add headers
@@ -58,32 +58,22 @@ func (c *TestPaginatedClient) ListOnCallSchedulesPaginated(ctx context.Context, 
 	// Make the request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error making HTTP request: %w", err)
+		return nil, fmt.Errorf("error making HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Verify the status code
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("HTTP request failed with status: %d", resp.StatusCode)
+		return nil, fmt.Errorf("HTTP request failed with status: %d", resp.StatusCode)
 	}
 
 	// Parse the response
 	var schedulesResponse OnCallSchedulesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&schedulesResponse); err != nil {
-		return nil, nil, fmt.Errorf("error decoding response: %w", err)
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 
-	// Create pagination result
-	paginationResult := &PaginationResult{
-		Data:       schedulesResponse.Data,
-		NextPage:   schedulesResponse.Meta.Page.NextNumber,
-		Total:      schedulesResponse.Meta.Page.Total,
-		PageNumber: schedulesResponse.Meta.Page.Number,
-		PageSize:   schedulesResponse.Meta.Page.Size,
-		LastNumber: schedulesResponse.Meta.Page.LastNumber,
-	}
-
-	return &schedulesResponse, paginationResult, nil
+	return &schedulesResponse, nil
 }
 
 func TestPaginationOptions_DefaultValues(t *testing.T) {
@@ -98,60 +88,10 @@ func TestPaginationOptions_DefaultValues(t *testing.T) {
 	}
 }
 
-func TestPaginationResult_Methods(t *testing.T) {
-	// Case with next page
-	resultWithNext := &PaginationResult{
-		Data:       []OnCallSchedule{},
-		NextPage:   &[]int{1}[0],
-		Total:      100,
-		PageNumber: 0,
-		PageSize:   50,
-		LastNumber: 1,
-	}
-
-	if !resultWithNext.HasNextPage() {
-		t.Error("Expected HasNextPage to return true when NextPage is not nil")
-	}
-
-	if resultWithNext.GetNextPageNumber() != 1 {
-		t.Errorf("Expected GetNextPageNumber to return 1, got %d", resultWithNext.GetNextPageNumber())
-	}
-
-	if resultWithNext.IsLastPage() {
-		t.Error("Expected IsLastPage to return false when NextPage is not nil")
-	}
-
-	if resultWithNext.GetTotalPages() != 2 {
-		t.Errorf("Expected GetTotalPages to return 2, got %d", resultWithNext.GetTotalPages())
-	}
-
-	// Case without next page (last page)
-	resultWithoutNext := &PaginationResult{
-		Data:       []OnCallSchedule{},
-		NextPage:   nil,
-		Total:      100,
-		PageNumber: 1,
-		PageSize:   50,
-		LastNumber: 1,
-	}
-
-	if resultWithoutNext.HasNextPage() {
-		t.Error("Expected HasNextPage to return false when NextPage is nil")
-	}
-
-	if resultWithoutNext.GetNextPageNumber() != -1 {
-		t.Errorf("Expected GetNextPageNumber to return -1, got %d", resultWithoutNext.GetNextPageNumber())
-	}
-
-	if !resultWithoutNext.IsLastPage() {
-		t.Error("Expected IsLastPage to return true when NextPage is nil")
-	}
-}
-
 func TestListOnCallSchedulesPaginated_WithPagination(t *testing.T) {
 	// Mock response with pagination
 	mockResponse := OnCallSchedulesResponse{
-		Data: []OnCallSchedule{
+		Data: []*OnCallSchedule{
 			{
 				ID:   "schedule-1",
 				Type: "oncall_schedule",
@@ -252,7 +192,7 @@ func TestListOnCallSchedulesPaginated_WithPagination(t *testing.T) {
 		PageNumber: 0,
 	}
 
-	response, paginationResult, err := paginatedClient.ListOnCallSchedulesPaginated(context.Background(), opts)
+	response, err := paginatedClient.ListOnCallSchedulesPaginated(context.Background(), opts)
 
 	// Verify results
 	if err != nil {
@@ -261,55 +201,51 @@ func TestListOnCallSchedulesPaginated_WithPagination(t *testing.T) {
 
 	if response == nil {
 		t.Error("Expected response to not be nil")
-	}
-
-	if paginationResult == nil {
-		t.Error("Expected paginationResult to not be nil")
 		return
 	}
 
 	// Verify pagination data
-	if paginationResult.Total != 5 {
-		t.Errorf("Expected Total to be 5, got %d", paginationResult.Total)
+	if response.Meta.Page.Total != 5 {
+		t.Errorf("Expected Total to be 5, got %d", response.Meta.Page.Total)
 	}
 
-	if paginationResult.PageNumber != 0 {
-		t.Errorf("Expected PageNumber to be 0, got %d", paginationResult.PageNumber)
+	if response.Meta.Page.Number != 0 {
+		t.Errorf("Expected PageNumber to be 0, got %d", response.Meta.Page.Number)
 	}
 
-	if paginationResult.PageSize != 2 {
-		t.Errorf("Expected PageSize to be 2, got %d", paginationResult.PageSize)
+	if response.Meta.Page.Size != 2 {
+		t.Errorf("Expected PageSize to be 2, got %d", response.Meta.Page.Size)
 	}
 
-	if paginationResult.LastNumber != 2 {
-		t.Errorf("Expected LastNumber to be 2, got %d", paginationResult.LastNumber)
+	if response.Meta.Page.LastNumber != 2 {
+		t.Errorf("Expected LastNumber to be 2, got %d", response.Meta.Page.LastNumber)
 	}
 
 	// Verify that there is a next page
-	if !paginationResult.HasNextPage() {
+	if !hasNextPage(response.Meta.Page) {
 		t.Error("Expected HasNextPage to return true")
 	}
 
-	if paginationResult.GetNextPageNumber() != 1 {
-		t.Errorf("Expected GetNextPageNumber to return 1, got %d", paginationResult.GetNextPageNumber())
+	if getNextPageNumber(response.Meta.Page) != 1 {
+		t.Errorf("Expected GetNextPageNumber to return 1, got %d", getNextPageNumber(response.Meta.Page))
 	}
 
 	// Verify that it is not the last page
-	if paginationResult.IsLastPage() {
+	if isLastPage(response.Meta.Page) {
 		t.Error("Expected IsLastPage to return false")
 	}
 
 	// Verify total pages calculation
 	expectedTotalPages := 3 // (5 total + 2 size - 1) / 2 size = 3
-	if paginationResult.GetTotalPages() != expectedTotalPages {
-		t.Errorf("Expected GetTotalPages to return %d, got %d", expectedTotalPages, paginationResult.GetTotalPages())
+	if getTotalPages(response.Meta.Page) != expectedTotalPages {
+		t.Errorf("Expected GetTotalPages to return %d, got %d", expectedTotalPages, getTotalPages(response.Meta.Page))
 	}
 }
 
 func TestListOnCallSchedulesPaginated_DefaultOptions(t *testing.T) {
 	// Mock response for first page
 	mockResponse := OnCallSchedulesResponse{
-		Data: []OnCallSchedule{
+		Data: []*OnCallSchedule{
 			{
 				ID:   "schedule-1",
 				Type: "oncall_schedule",
@@ -386,7 +322,7 @@ func TestListOnCallSchedulesPaginated_DefaultOptions(t *testing.T) {
 	}
 
 	// Call the function without options (should use default values)
-	response, paginationResult, err := paginatedClient.ListOnCallSchedulesPaginated(context.Background(), nil)
+	response, err := paginatedClient.ListOnCallSchedulesPaginated(context.Background(), nil)
 
 	// Verify results
 	if err != nil {
@@ -395,31 +331,74 @@ func TestListOnCallSchedulesPaginated_DefaultOptions(t *testing.T) {
 
 	if response == nil {
 		t.Error("Expected response to not be nil")
-	}
-
-	if paginationResult == nil {
-		t.Error("Expected paginationResult to not be nil")
+		return
 	}
 
 	// Verify that it is the last page
-	if !paginationResult.IsLastPage() {
+	if !isLastPage(response.Meta.Page) {
 		t.Error("Expected IsLastPage to return true for single page result")
 	}
 
-	if paginationResult.GetNextPageNumber() != -1 {
-		t.Errorf("Expected GetNextPageNumber to return -1 for last page, got %d", paginationResult.GetNextPageNumber())
+	if getNextPageNumber(response.Meta.Page) != -1 {
+		t.Errorf("Expected GetNextPageNumber to return -1 for last page, got %d", getNextPageNumber(response.Meta.Page))
 	}
 }
 
-// GetTotalPages calculates the total number of pages (helper for unit tests).
-func (pr *PaginationResult) GetTotalPages() int {
-	if pr.PageSize == 0 {
+// Helper functions to replace the removed PaginationResult methods.
+func hasNextPage(page struct {
+	Type        string `json:"type"`
+	Number      int    `json:"number"`
+	Size        int    `json:"size"`
+	Total       int    `json:"total"`
+	FirstNumber int    `json:"first_number"`
+	PrevNumber  *int   `json:"prev_number"`
+	NextNumber  *int   `json:"next_number"`
+	LastNumber  int    `json:"last_number"`
+}) bool {
+	return page.NextNumber != nil
+}
+
+func getNextPageNumber(page struct {
+	Type        string `json:"type"`
+	Number      int    `json:"number"`
+	Size        int    `json:"size"`
+	Total       int    `json:"total"`
+	FirstNumber int    `json:"first_number"`
+	PrevNumber  *int   `json:"prev_number"`
+	NextNumber  *int   `json:"next_number"`
+	LastNumber  int    `json:"last_number"`
+}) int {
+	if page.NextNumber != nil {
+		return *page.NextNumber
+	}
+	return -1
+}
+
+func isLastPage(page struct {
+	Type        string `json:"type"`
+	Number      int    `json:"number"`
+	Size        int    `json:"size"`
+	Total       int    `json:"total"`
+	FirstNumber int    `json:"first_number"`
+	PrevNumber  *int   `json:"prev_number"`
+	NextNumber  *int   `json:"next_number"`
+	LastNumber  int    `json:"last_number"`
+}) bool {
+	return page.NextNumber == nil
+}
+
+func getTotalPages(page struct {
+	Type        string `json:"type"`
+	Number      int    `json:"number"`
+	Size        int    `json:"size"`
+	Total       int    `json:"total"`
+	FirstNumber int    `json:"first_number"`
+	PrevNumber  *int   `json:"prev_number"`
+	NextNumber  *int   `json:"next_number"`
+	LastNumber  int    `json:"last_number"`
+}) int {
+	if page.Size == 0 {
 		return 0
 	}
-	return (pr.Total + pr.PageSize - 1) / pr.PageSize
-}
-
-// IsLastPage checks if it is the last page (helper for unit tests).
-func (pr *PaginationResult) IsLastPage() bool {
-	return pr.NextPage == nil
+	return (page.Total + page.Size - 1) / page.Size
 }

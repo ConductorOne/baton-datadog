@@ -12,6 +12,7 @@ import (
 
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 )
 
@@ -320,7 +321,7 @@ func TestClientFunctionsUseDoRequest(t *testing.T) {
 		// Reset mock call counter
 		mockHTTPClient.called = false
 
-		result, nextPageToken, err := client.ListOnCallSchedules(ctx)
+		result, nextPageToken, annos, err := client.ListOnCallSchedules(ctx)
 
 		assertNoError(t, err, "ListOnCallSchedules should not return error")
 		assertNotNil(t, result, "result should not be nil")
@@ -328,17 +329,19 @@ func TestClientFunctionsUseDoRequest(t *testing.T) {
 		// Note: nextPageToken might be empty string if no next page
 		assertTrue(t, len(result) >= 0, "result should be a valid slice") //nolint:gocritic // len() >= 0 is always true but used for validation
 		_ = nextPageToken                                                 // Use variable to avoid linter error
+		_ = annos                                                         // Use variable to avoid linter error
 	})
 
 	t.Run("GetScheduleOnCallUser uses doRequest", func(t *testing.T) {
 		// Reset mock call counter
 		mockHTTPClient.called = false
 
-		result, err := client.GetScheduleOnCallUser(ctx, "schedule-123")
+		result, annos, err := client.GetScheduleOnCallUser(ctx, "schedule-123")
 
 		assertNoError(t, err, "GetScheduleOnCallUser should not return error")
 		assertNotNil(t, result, "result should not be nil")
 		assertTrue(t, mockHTTPClient.called, "HTTP client should have been called")
+		_ = annos // Use variable to avoid linter error
 	})
 }
 
@@ -426,11 +429,11 @@ func (m *MockDatadogClient) doRequest(ctx context.Context, method, endpoint stri
 	return nil
 }
 
-func (m *MockDatadogClient) ListOnCallSchedules(ctx context.Context) ([]client.OnCallSchedule, string, error) {
+func (m *MockDatadogClient) ListOnCallSchedules(ctx context.Context) ([]*client.OnCallSchedule, string, annotations.Annotations, error) {
 	var response client.OnCallSchedulesResponse
 	err := m.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", nil, &response)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 
 	// Extract next page token from meta information
@@ -439,15 +442,15 @@ func (m *MockDatadogClient) ListOnCallSchedules(ctx context.Context) ([]client.O
 		nextPageToken = strconv.Itoa(*response.Meta.Page.NextNumber)
 	}
 
-	return response.Data, nextPageToken, nil
+	return response.Data, nextPageToken, nil, nil
 }
 
-func (m *MockDatadogClient) GetScheduleOnCallUser(ctx context.Context, scheduleID string) (*client.OnCallUserResponse, error) {
+func (m *MockDatadogClient) GetScheduleOnCallUser(ctx context.Context, scheduleID string) (*client.OnCallUserResponse, annotations.Annotations, error) {
 	endpoint := fmt.Sprintf("/api/v2/on-call/schedules/%s/on-call", scheduleID)
 	var response client.OnCallUserResponse
 	err := m.doRequest(ctx, http.MethodGet, endpoint, nil, &response)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &response, nil
+	return &response, nil, nil
 }

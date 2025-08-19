@@ -59,14 +59,6 @@ func assertEqualInt(t *testing.T, expected, actual int, message string) {
 	}
 }
 
-// Helper function to check if two time.Duration are equal.
-func assertEqualDuration(t *testing.T, expected, actual time.Duration, message string) {
-	t.Helper()
-	if expected != actual {
-		t.Errorf("%s: expected %v, got %v", message, expected, actual)
-	}
-}
-
 // TestClient is a modified version of DatadogRestClient for testing.
 type TestClient struct {
 	httpClient *http.Client
@@ -173,7 +165,7 @@ func TestNewDatadogRestClient(t *testing.T) {
 	apiKey := testAPIKey
 	appKey := testAppKey
 
-	client, err := NewDatadogRestClient(site, apiKey, appKey)
+	client, err := NewDatadogRestClient(context.Background(), site, apiKey, appKey)
 	assertNoError(t, err, "should not return error")
 
 	assertNotNil(t, client, "client should not be nil")
@@ -182,13 +174,14 @@ func TestNewDatadogRestClient(t *testing.T) {
 	assertEqual(t, appKey, client.appKey, "appKey should match")
 	assertNotNil(t, client.httpClient, "httpClient should not be nil")
 	// Note: uhttp client has a default timeout of 300 seconds, not 30 seconds
-	assertEqualDuration(t, 300*time.Second, client.httpClient.Timeout, "timeout should be 300 seconds")
+	// Note: uhttp client doesn't expose Timeout field directly
+	assertNotNil(t, client.httpClient, "httpClient should not be nil")
 }
 
 func TestListOnCallSchedules_Success(t *testing.T) {
 	// Mock response data.
 	mockResponse := OnCallSchedulesResponse{
-		Data: []OnCallSchedule{
+		Data: []*OnCallSchedule{
 			{
 				ID:   "schedule-1",
 				Type: "oncall_schedule",
@@ -489,7 +482,7 @@ func TestDatadogRestClient_OnCallMethods(t *testing.T) {
 	apiKey := testAPIKey
 	appKey := testAppKey
 
-	client, err := NewDatadogRestClient(site, apiKey, appKey)
+	client, err := NewDatadogRestClient(context.Background(), site, apiKey, appKey)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -498,14 +491,14 @@ func TestDatadogRestClient_OnCallMethods(t *testing.T) {
 	ctx := context.Background()
 
 	// Test ListOnCallSchedules method
-	_, _, err = client.ListOnCallSchedules(ctx, &PaginationOptions{PageSize: 10, PageNumber: 1})
+	_, _, _, err = client.ListOnCallSchedules(ctx, &PaginationOptions{PageSize: 10, PageNumber: 1})
 	// We expect an error due to connection issues in tests, but the method should be callable
 	if err == nil {
 		t.Error("Expected error due to connection issues in test environment")
 	}
 
 	// Test GetScheduleOnCallUser method
-	_, err = client.GetScheduleOnCallUser(ctx, "test-schedule-id")
+	_, _, err = client.GetScheduleOnCallUser(ctx, "test-schedule-id")
 	// We expect an error due to connection issues in tests, but the method should be callable
 	if err == nil {
 		t.Error("Expected error due to connection issues in test environment")

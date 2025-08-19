@@ -24,12 +24,12 @@ func WithPageSize(pageSize int) ReqOpt {
 	if pageSize <= 0 {
 		pageSize = PageSize // Default to the maximum allowed by Datadog API
 	}
-	return WithQueryParam("page[size]", strconv.Itoa(int(pageSize)))
+	return WithQueryParam("page[size]", strconv.Itoa(pageSize))
 }
 
 // WithPage adds a page number query parameter to the request.
 func WithPage(page int) ReqOpt {
-	return WithQueryParam("page[number]", strconv.Itoa(int(page)))
+	return WithQueryParam("page[number]", strconv.Itoa(page))
 }
 
 func nextPageToken(nextPage *int) (string, error) {
