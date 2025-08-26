@@ -126,7 +126,10 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 			if err == nil {
 				l.Info("Generating next page token", zap.Int64("next_page", nextPage))
 				// Update the bag with the next page
-				bag.Next(fmt.Sprintf("%d", nextPage))
+				if err := bag.Next(fmt.Sprintf("%d", nextPage)); err != nil {
+					l.Error("Failed to update pagination bag", zap.Error(err))
+					return nil, "", nil, fmt.Errorf("failed to update pagination bag: %w", err)
+				}
 				nextPageToken, err = bag.Marshal()
 				if err != nil {
 					l.Error("Failed to marshal next page token", zap.Error(err))
