@@ -38,5 +38,6 @@ func nextPageToken(nextPage *int) (string, error) {
 	}
 
 	// Create a simple token format: "page:<page_number>"
-	return fmt.Sprintf("page:%d", nextPage), nil
+	// The nextPage should be the actual page number from Datadog API
+	return fmt.Sprintf("page:%d", *nextPage), nil
 }
