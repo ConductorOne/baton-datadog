@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -64,45 +63,28 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 }
 
 // parsePageTokenFromString parses a simple pagination string to extract the page number.
-func parsePageTokenFromString(token string) (int64, error) {
-	if token == "" {
-		return 0, nil // Start from page 0, not page 1
+func parsePageTokenFromString(paginationToken string) (int64, error) {
+	if paginationToken == "" {
+		return 0, nil
 	}
 
 	// If token is already a page number, parse it directly
-	if pageNum, err := strconv.ParseInt(token, 10, 64); err == nil {
-		return pageNum, nil
+	pageNum, err := strconv.ParseInt(paginationToken, 10, 64)
+	if err != nil {
+		return 0, err
 	}
 
-	// If token has the "page:" prefix, extract the number
-	if strings.HasPrefix(token, "page:") {
-		pageStr := strings.TrimPrefix(token, "page:")
-		if pageNum, err := strconv.ParseInt(pageStr, 10, 64); err == nil {
-			return pageNum, nil
-		}
-	}
-
-	// Default to page 0 if we can't parse
-	return 0, nil
+	return pageNum, nil
 }
 
 // List returns all the on-call schedules from Datadog as resource objects.
 func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
-	// Parse the pagination token to get current page number
-	var pageNumber int64
-	var err error
-
-	inputToken := ""
-	if pToken != nil {
-		inputToken = pToken.Token
-	}
-
-	l.Debug("List called with token", zap.String("input_token", inputToken))
+	l.Debug("List called with token", zap.String("input_token", pToken.Token))
 
 	// Parse the simple pagination token directly
-	pageNumber, err = parsePageTokenFromString(inputToken)
+	pageNumber, err := parsePageTokenFromString(pToken.Token)
 	if err != nil {
 		l.Error("Failed to parse pagination token", zap.Error(err))
 		return nil, "", nil, fmt.Errorf("failed to parse pagination token: %w", err)
@@ -116,7 +98,7 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		PageNumber: int(pageNumber),
 	}
 
-	schedules, nextPageNumber, annos, err := s.wrapper.GetRestClient().ListOnCallSchedules(ctx, opts)
+	schedules, nextPageToken, annos, err := s.wrapper.GetRestClient().ListOnCallSchedules(ctx, opts)
 	if err != nil {
 		l.Error("Failed to list on-call schedules with pagination", zap.Error(err))
 		return nil, "", annos, fmt.Errorf("failed to list on-call schedules: %w", err)
@@ -136,14 +118,10 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		zap.Int64("page_number", pageNumber),
 		zap.Int("schedules_in_page", len(pageSchedules)),
 		zap.Int("total_schedules_in_response", len(schedules)),
-		zap.String("next_page_number", nextPageNumber),
-		zap.Bool("has_next_page", nextPageNumber != ""))
+		zap.String("next_page_number", nextPageToken),
+		zap.Bool("has_next_page", nextPageToken != ""))
 
-	// Generate next page token - return the complete pagination string
-	var nextPageToken string
-	if nextPageNumber != "" {
-		// Simply return the next page number as the token
-		nextPageToken = nextPageNumber
+	if nextPageToken != "" {
 		l.Debug("Generated next page token", zap.String("next_page_token", nextPageToken))
 	} else {
 		l.Debug("No next page available - this should be the last page")

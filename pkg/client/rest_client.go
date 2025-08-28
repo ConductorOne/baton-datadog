@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -19,8 +20,10 @@ const (
 	datadogAPIBaseURL       = "https://%s"
 	OnCallSchedulesEndpoint = "/api/v2/on-call/schedules"
 	OnCallUserEndpoint      = "/api/v2/on-call/schedules/%s/on-call"
-	// PageSize is the page size for pagination (maximum allowed by Datadog API: 100).
-	PageSize = 100
+
+	// PageSize is the page size for pagination.
+	// note: (docs stand that the maximum allowed by Datadog API is 100, but we can only get pages with 50 elements).
+	PageSize = 50
 )
 
 // PaginationOptions contains the options for pagination.
@@ -196,18 +199,13 @@ func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context, opts *Pagin
 		zap.Any("meta_page", schedulesResp.Meta.Page),
 		zap.Int("data_count", len(schedulesResp.Data)))
 
-	var token string
+	var nextPageNumber string
 	if schedulesResp.Meta.Page.NextNumber != nil {
-		var err error
-		token, err = nextPageToken(*schedulesResp.Meta.Page.NextNumber)
-		if err != nil {
-			l.Error("Failed to generate next page token", zap.Error(err))
-			return nil, "", nil, fmt.Errorf("failed to generate next page token: %w", err)
-		}
+		nextPageNumber = strconv.Itoa(*schedulesResp.Meta.Page.NextNumber)
 	}
 
-	l.Debug("Generated next page token", zap.String("next_page_token", token))
-	return schedulesResp.Data, token, annos, nil
+	l.Debug("Generated next page token", zap.String("next_page_token", nextPageNumber))
+	return schedulesResp.Data, nextPageNumber, annos, nil
 }
 
 // GetScheduleOnCallUser gets the user who is currently on-call for a specific schedule.
