@@ -63,7 +63,7 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 	return ret, nil
 }
 
-// parsePageTokenFromString parses a simple pagination string to extract the page number
+// parsePageTokenFromString parses a simple pagination string to extract the page number.
 func parsePageTokenFromString(token string) (int64, error) {
 	if token == "" {
 		return 0, nil // Start from page 0, not page 1
