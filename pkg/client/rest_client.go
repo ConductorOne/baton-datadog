@@ -196,14 +196,18 @@ func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context, opts *Pagin
 		zap.Any("meta_page", schedulesResp.Meta.Page),
 		zap.Int("data_count", len(schedulesResp.Data)))
 
-	nextPageToken, err := nextPageToken(schedulesResp.Meta.Page.NextNumber)
-	if err != nil {
-		l.Error("Failed to generate next page token", zap.Error(err))
-		return nil, "", nil, fmt.Errorf("failed to generate next page token: %w", err)
+	var token string
+	if schedulesResp.Meta.Page.NextNumber != nil {
+		var err error
+		token, err = nextPageToken(*schedulesResp.Meta.Page.NextNumber)
+		if err != nil {
+			l.Error("Failed to generate next page token", zap.Error(err))
+			return nil, "", nil, fmt.Errorf("failed to generate next page token: %w", err)
+		}
 	}
 
-	l.Info("Generated next page token", zap.String("next_page_token", nextPageToken))
-	return schedulesResp.Data, nextPageToken, annos, nil
+	l.Info("Generated next page token", zap.String("next_page_token", token))
+	return schedulesResp.Data, token, annos, nil
 }
 
 // GetScheduleOnCallUser gets the user who is currently on-call for a specific schedule.

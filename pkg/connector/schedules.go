@@ -63,31 +63,51 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 	return ret, nil
 }
 
+// parsePageTokenFromString parses a simple pagination string to extract the page number
+func parsePageTokenFromString(token string) (int64, error) {
+	if token == "" {
+		return 0, nil // Start from page 0, not page 1
+	}
+
+	// If token is already a page number, parse it directly
+	if pageNum, err := strconv.ParseInt(token, 10, 64); err == nil {
+		return pageNum, nil
+	}
+
+	// If token has the "page:" prefix, extract the number
+	if strings.HasPrefix(token, "page:") {
+		pageStr := strings.TrimPrefix(token, "page:")
+		return strconv.ParseInt(pageStr, 10, 64)
+	}
+
+	// Default to page 0 if we can't parse
+	return 0, nil
+}
+
 // List returns all the on-call schedules from Datadog as resource objects.
 func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
-	// Parse the pagination token to get current state
-	var (
-		pageNumber int64
-		err        error
-	)
+	// Parse the pagination token to get current page number
+	var pageNumber int64
+	var err error
 
 	inputToken := ""
 	if pToken != nil {
 		inputToken = pToken.Token
 	}
 
-	l.Info("List called with token", zap.String("input_token", inputToken))
+	l.Debug("List called with token", zap.String("input_token", inputToken))
 
-	bag, pageNumber, err := parsePageToken(inputToken, parentResourceID)
+	// Parse the simple pagination token directly
+	pageNumber, err = parsePageTokenFromString(inputToken)
 	if err != nil {
 		l.Error("Failed to parse pagination token", zap.Error(err))
 		return nil, "", nil, fmt.Errorf("failed to parse pagination token: %w", err)
 	}
 
 	// Get schedules for current page only
-	l.Info("Fetching page", zap.Int64("page_number", pageNumber), zap.Int64("page_size", client.PageSize))
+	l.Debug("Fetching page", zap.Int64("page_number", pageNumber), zap.Int64("page_size", client.PageSize))
 
 	opts := &client.PaginationOptions{
 		PageSize:   client.PageSize,
@@ -110,39 +130,27 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 		pageSchedules = append(pageSchedules, sr)
 	}
 
-	l.Info("Processed page",
+	l.Debug("Processed page",
 		zap.Int64("page_number", pageNumber),
 		zap.Int("schedules_in_page", len(pageSchedules)),
 		zap.Int("total_schedules_in_response", len(schedules)),
-		zap.String("next_page_number", nextPageNumber))
+		zap.String("next_page_number", nextPageNumber),
+		zap.Bool("has_next_page", nextPageNumber != ""))
 
-	// Generate next page token using the pagination bag
+	// Generate next page token - return the complete pagination string
 	var nextPageToken string
 	if nextPageNumber != "" {
-		// Parse the next page number from the simple token
-		if strings.HasPrefix(nextPageNumber, "page:") {
-			nextPageStr := strings.TrimPrefix(nextPageNumber, "page:")
-			nextPage, err := strconv.ParseInt(nextPageStr, 10, 64)
-			if err == nil {
-				l.Info("Generating next page token", zap.Int64("next_page", nextPage))
-				// Update the bag with the next page
-				if err := bag.Next(fmt.Sprintf("%d", nextPage)); err != nil {
-					l.Error("Failed to update pagination bag", zap.Error(err))
-					return nil, "", nil, fmt.Errorf("failed to update pagination bag: %w", err)
-				}
-				nextPageToken, err = bag.Marshal()
-				if err != nil {
-					l.Error("Failed to marshal next page token", zap.Error(err))
-					return nil, "", nil, fmt.Errorf("failed to marshal next page token: %w", err)
-				}
-				l.Info("Generated next page token", zap.String("next_page_token", nextPageToken))
-			} else {
-				l.Error("Failed to parse next page number", zap.String("next_page_number", nextPageNumber), zap.Error(err))
-			}
-		}
+		// Simply return the next page number as the token
+		nextPageToken = nextPageNumber
+		l.Debug("Generated next page token", zap.String("next_page_token", nextPageToken))
 	} else {
-		l.Info("No next page available")
+		l.Debug("No next page available - this should be the last page")
 	}
+
+	l.Debug("Returning page results",
+		zap.Int("schedules_returned", len(pageSchedules)),
+		zap.String("next_page_token", nextPageToken),
+		zap.Bool("has_more_pages", nextPageToken != ""))
 
 	// Return only the current page schedules with next page token
 	return pageSchedules, nextPageToken, annos, nil

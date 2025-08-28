@@ -32,12 +32,7 @@ func WithPage(page int) ReqOpt {
 	return WithQueryParam("page[number]", strconv.Itoa(page))
 }
 
-func nextPageToken(nextPage *int) (string, error) {
-	if nextPage == nil {
-		return "", nil
-	}
-
+func nextPageToken(nextPage int) (string, error) {
 	// Create a simple token format: "page:<page_number>"
-	// The nextPage should be the actual page number from Datadog API
-	return fmt.Sprintf("page:%d", *nextPage), nil
+	return fmt.Sprintf("page:%d", nextPage), nil
 }
