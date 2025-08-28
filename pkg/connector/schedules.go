@@ -77,7 +77,9 @@ func parsePageTokenFromString(token string) (int64, error) {
 	// If token has the "page:" prefix, extract the number
 	if strings.HasPrefix(token, "page:") {
 		pageStr := strings.TrimPrefix(token, "page:")
-		return strconv.ParseInt(pageStr, 10, 64)
+		if pageNum, err := strconv.ParseInt(pageStr, 10, 64); err == nil {
+			return pageNum, nil
+		}
 	}
 
 	// Default to page 0 if we can't parse
