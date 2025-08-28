@@ -14,12 +14,13 @@ import (
 )
 
 type Datadog struct {
-	client      *datadog.APIClient
-	wrapper     *client.DatadogClient
-	site        string
-	apiKey      string
-	appKey      string
-	syncSecrets bool
+	client        *datadog.APIClient
+	wrapper       *client.DatadogClient
+	site          string
+	apiKey        string
+	appKey        string
+	syncSecrets   bool
+	syncSchedules bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -28,12 +29,16 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newUserBuilder(d.wrapper),
 		newTeamBuilder(d.wrapper),
 		newRoleBuilder(d.wrapper),
-		newScheduleBuilder(d.wrapper),
 	}
 
 	if d.syncSecrets {
 		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(d.wrapper))
 	}
+
+	if d.syncSchedules {
+		resourceSyncers = append(resourceSyncers, newScheduleBuilder(d.wrapper))
+	}
+
 	return resourceSyncers
 }
 
@@ -73,7 +78,7 @@ func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error)
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, site, apiKey, appKey string, syncSecrets bool) (*Datadog, error) {
+func New(ctx context.Context, site, apiKey, appKey string, syncSecrets, syncSchedules bool) (*Datadog, error) {
 	// Validate input parameters
 	if site == "" {
 		return nil, fmt.Errorf("site cannot be empty")
@@ -106,11 +111,12 @@ func New(ctx context.Context, site, apiKey, appKey string, syncSecrets bool) (*D
 	wrapper := client.NewDatadogClient(restClient, officialClient, site, apiKey, appKey)
 
 	return &Datadog{
-		site:        site,
-		apiKey:      apiKey,
-		appKey:      appKey,
-		client:      officialClient,
-		wrapper:     wrapper,
-		syncSecrets: syncSecrets,
+		site:          site,
+		apiKey:        apiKey,
+		appKey:        appKey,
+		client:        officialClient,
+		wrapper:       wrapper,
+		syncSecrets:   syncSecrets,
+		syncSchedules: syncSchedules,
 	}, nil
 }

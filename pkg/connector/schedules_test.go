@@ -20,7 +20,7 @@ import (
 // Helper Functions for Testing
 // =============================================================================
 
-func assertNotNil(t *testing.T, value interface{}, message string) {
+func assertNotNil(t *testing.T, value any, message string) {
 	t.Helper()
 	if value == nil {
 		t.Errorf("%s: expected non-nil value", message)
@@ -62,7 +62,7 @@ func assertNotEmpty(t *testing.T, str string, message string) {
 	}
 }
 
-func assertNotEqual(t *testing.T, expected, actual interface{}, message string) {
+func assertNotEqual(t *testing.T, expected, actual any, message string) {
 	t.Helper()
 	if expected == actual {
 		t.Errorf("%s: expected different values, got %v and %v", message, expected, actual)
@@ -243,7 +243,7 @@ func TestClientDoRequest(t *testing.T) {
 
 	t.Run("doRequest GET without body", func(t *testing.T) {
 		var result map[string]interface{}
-		err := client.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", nil, &result)
+		err := client.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", &result)
 
 		assertNoError(t, err, "doRequest should not return error")
 		assertNotNil(t, result, "result should not be nil")
@@ -256,7 +256,7 @@ func TestClientDoRequest(t *testing.T) {
 
 	t.Run("doRequest GET with specific endpoint", func(t *testing.T) {
 		var result map[string]interface{}
-		err := client.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules/schedule-123/on-call", nil, &result)
+		err := client.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules/schedule-123/on-call", &result)
 
 		assertNoError(t, err, "doRequest should not return error")
 		assertNotNil(t, result, "result should not be nil")
@@ -270,7 +270,7 @@ func TestClientDoRequest(t *testing.T) {
 		}
 
 		var result map[string]interface{}
-		err := client.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", nil, &result)
+		err := client.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", &result)
 
 		assertError(t, err, "doRequest should return error for invalid JSON")
 	})
@@ -283,7 +283,7 @@ func TestClientDoRequest(t *testing.T) {
 		}
 
 		var result map[string]interface{}
-		err := client.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", nil, &result)
+		err := client.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", &result)
 
 		assertError(t, err, "doRequest should return error for HTTP error status")
 		assertContains(t, err.Error(), "500", "error should contain status code")
@@ -387,7 +387,7 @@ type MockDatadogClient struct {
 }
 
 // Implement the real client interface.
-func (m *MockDatadogClient) doRequest(ctx context.Context, method, endpoint string, body interface{}, result interface{}) error {
+func (m *MockDatadogClient) doRequest(ctx context.Context, method, endpoint string, result any) error {
 	// Simulate the doRequest logic but using the mock
 	baseURL := "https://" + m.site
 	apiURL := baseURL + endpoint
@@ -431,7 +431,7 @@ func (m *MockDatadogClient) doRequest(ctx context.Context, method, endpoint stri
 
 func (m *MockDatadogClient) ListOnCallSchedules(ctx context.Context) ([]*client.OnCallSchedule, string, annotations.Annotations, error) {
 	var response client.OnCallSchedulesResponse
-	err := m.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", nil, &response)
+	err := m.doRequest(ctx, http.MethodGet, "/api/v2/on-call/schedules", &response)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -448,7 +448,7 @@ func (m *MockDatadogClient) ListOnCallSchedules(ctx context.Context) ([]*client.
 func (m *MockDatadogClient) GetScheduleOnCallUser(ctx context.Context, scheduleID string) (*client.OnCallUserResponse, annotations.Annotations, error) {
 	endpoint := fmt.Sprintf("/api/v2/on-call/schedules/%s/on-call", scheduleID)
 	var response client.OnCallUserResponse
-	err := m.doRequest(ctx, http.MethodGet, endpoint, nil, &response)
+	err := m.doRequest(ctx, http.MethodGet, endpoint, &response)
 	if err != nil {
 		return nil, nil, err
 	}

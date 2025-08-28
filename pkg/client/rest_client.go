@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	datadogAPIBaseURL       = "https://%s"
+	datadogAPIBaseURL       = "https://api.%s"
 	OnCallSchedulesEndpoint = "/api/v2/on-call/schedules"
 	OnCallUserEndpoint      = "/api/v2/on-call/schedules/%s/on-call"
 

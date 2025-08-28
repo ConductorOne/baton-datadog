@@ -9,20 +9,32 @@ var (
 		"site",
 		field.WithDescription("Part of your Datadog website URL, e.g. datadoghq.com in https://app.datadoghq.com."),
 		field.WithRequired(true),
+		field.WithDisplayName("Site"),
 	)
 	ApiKey = field.StringField(
 		"api-key",
 		field.WithDescription("API key used to authenticate to Datadog API."),
 		field.WithRequired(true),
+		field.WithIsSecret(true),
+		field.WithDisplayName("API key"),
 	)
 	AppKey = field.StringField(
 		"app-key",
 		field.WithDescription("APP key used with API key to assign scopes for API access."),
 		field.WithRequired(true),
+		field.WithIsSecret(true),
+		field.WithDisplayName("Application key"),
 	)
 	SyncSecrets = field.BoolField(
 		"sync-secrets",
 		field.WithDescription("Whether to sync secrets or not"),
+		field.WithDisplayName("Sync secrets"),
+	)
+	SyncSchedules = field.BoolField(
+		"sync-schedules",
+		field.WithDescription("Whether to sync on-call schedules or not"),
+		field.WithDefaultValue(false),
+		field.WithDisplayName("Sync schedules"),
 	)
 
 	// FieldRelationships defines relationships between the fields listed in
@@ -38,6 +50,7 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	ApiKey,
 	AppKey,
 	SyncSecrets,
+	SyncSchedules,
 })
 
 // ValidateConfig is run after the configuration is loaded, and should return an

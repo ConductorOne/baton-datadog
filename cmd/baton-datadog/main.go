@@ -51,6 +51,7 @@ func getConnector(ctx context.Context, ddc *cfg.Datadog) (types.ConnectorServer,
 		ddc.ApiKey,
 		ddc.AppKey,
 		ddc.SyncSecrets,
+		ddc.SyncSchedules,
 	)
 
 	if err != nil {
