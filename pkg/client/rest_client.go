@@ -183,7 +183,7 @@ func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context, opts *Pagin
 	}
 
 	l := ctxzap.Extract(ctx)
-	l.Info("Fetching on-call schedules page", zap.Int("page_number", opts.PageNumber), zap.Int("page_size", opts.PageSize))
+	l.Debug("Fetching on-call schedules page", zap.Int("page_number", opts.PageNumber), zap.Int("page_size", opts.PageSize))
 
 	// Get the requested page.
 	schedulesResp, annos, err := c.fetchSchedulePage(ctx, opts.PageNumber, opts.PageSize)
@@ -192,7 +192,7 @@ func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context, opts *Pagin
 	}
 
 	// Log the full pagination metadata for debugging
-	l.Info("Datadog API pagination response",
+	l.Debug("Datadog API pagination response",
 		zap.Any("meta_page", schedulesResp.Meta.Page),
 		zap.Int("data_count", len(schedulesResp.Data)))
 
@@ -206,7 +206,7 @@ func (c *DatadogRestClient) ListOnCallSchedules(ctx context.Context, opts *Pagin
 		}
 	}
 
-	l.Info("Generated next page token", zap.String("next_page_token", token))
+	l.Debug("Generated next page token", zap.String("next_page_token", token))
 	return schedulesResp.Data, token, annos, nil
 }
 
