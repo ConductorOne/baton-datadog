@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -61,22 +62,29 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 	return ret, nil
 }
 
+// parsePageTokenFromString parses a simple pagination string to extract the page number.
+func parsePageTokenFromString(paginationToken string) (int64, error) {
+	if paginationToken == "" {
+		return 0, nil
+	}
+
+	// If token is already a page number, parse it directly
+	pageNum, err := strconv.ParseInt(paginationToken, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return pageNum, nil
+}
+
 // List returns all the on-call schedules from Datadog as resource objects.
 func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
-	// Simplified pagination handling
-	var (
-		pageNumber int64
-		err        error
-	)
+	l.Debug("List called with token", zap.String("input_token", pToken.Token))
 
-	inputToken := ""
-	if pToken != nil {
-		inputToken = pToken.Token
-	}
-
-	_, pageNumber, err = parsePageToken(inputToken, parentResourceID)
+	// Parse the simple pagination token directly
+	pageNumber, err := parsePageTokenFromString(pToken.Token)
 	if err != nil {
 		l.Error("Failed to parse pagination token", zap.Error(err))
 		return nil, "", nil, fmt.Errorf("failed to parse pagination token: %w", err)
@@ -109,7 +117,20 @@ func (s *scheduleBuilder) List(ctx context.Context, parentResourceID *v2.Resourc
 	l.Debug("Processed page",
 		zap.Int64("page_number", pageNumber),
 		zap.Int("schedules_in_page", len(pageSchedules)),
-		zap.Int("total_schedules_in_response", len(schedules)))
+		zap.Int("total_schedules_in_response", len(schedules)),
+		zap.String("next_page_number", nextPageToken),
+		zap.Bool("has_next_page", nextPageToken != ""))
+
+	if nextPageToken != "" {
+		l.Debug("Generated next page token", zap.String("next_page_token", nextPageToken))
+	} else {
+		l.Debug("No next page available - this should be the last page")
+	}
+
+	l.Debug("Returning page results",
+		zap.Int("schedules_returned", len(pageSchedules)),
+		zap.String("next_page_token", nextPageToken),
+		zap.Bool("has_more_pages", nextPageToken != ""))
 
 	// Return only the current page schedules with next page token
 	return pageSchedules, nextPageToken, annos, nil

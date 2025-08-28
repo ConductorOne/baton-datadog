@@ -279,7 +279,7 @@ func TestListOnCallSchedulesPaginated_DefaultOptions(t *testing.T) {
 			}{
 				Type:        "number_size",
 				Number:      0,
-				Size:        100,
+				Size:        50,
 				Total:       1,
 				FirstNumber: 0,
 				PrevNumber:  nil,
@@ -295,8 +295,8 @@ func TestListOnCallSchedulesPaginated_DefaultOptions(t *testing.T) {
 		pageSize := r.URL.Query().Get("page[size]")
 		pageNumber := r.URL.Query().Get("page[number]")
 
-		if pageSize != "100" {
-			t.Errorf("Expected default page[size] to be '100', got '%s'", pageSize)
+		if pageSize != "50" {
+			t.Errorf("Expected default page[size] to be '50', got '%s'", pageSize)
 		}
 		if pageNumber != "0" {
 			t.Errorf("Expected default page[number] to be '0', got '%s'", pageNumber)
