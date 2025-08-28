@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 )
@@ -30,9 +29,4 @@ func WithPageSize(pageSize int) ReqOpt {
 // WithPage adds a page number query parameter to the request.
 func WithPage(page int) ReqOpt {
 	return WithQueryParam("page[number]", strconv.Itoa(page))
-}
-
-func nextPageToken(nextPage int) (string, error) {
-	// Create a simple token format: "page:<page_number>"
-	return fmt.Sprintf("page:%d", nextPage), nil
 }
