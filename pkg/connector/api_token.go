@@ -11,6 +11,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
 
 type apiTokenBuilder struct {
@@ -50,6 +52,19 @@ func (o *apiTokenBuilder) List(
 	apiTokens := res.GetData()
 	ret := make([]*v2.Resource, 0, len(apiTokens))
 	for _, apiToken := range apiTokens {
+		// Check required fields before any dereferencing
+		if apiToken.Id == nil || apiToken.Attributes == nil ||
+			apiToken.Attributes.CreatedAt == nil || apiToken.Attributes.ModifiedAt == nil ||
+			apiToken.Relationships == nil || apiToken.Relationships.CreatedBy == nil {
+			l := ctxzap.Extract(ctx)
+			l.Warn("skipping API token with missing required fields",
+				zap.Bool("has_id", apiToken.Id != nil),
+				zap.Bool("has_attributes", apiToken.Attributes != nil),
+				zap.Bool("has_relationships", apiToken.Relationships != nil),
+			)
+			continue
+		}
+
 		userId := apiToken.Relationships.CreatedBy.Data.Id
 		timeFormat := time.RFC3339Nano
 		createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
@@ -69,8 +84,12 @@ func (o *apiTokenBuilder) List(
 			resource.WithSecretLastUsedAt(modifiedAt),
 			resource.WithSecretCreatedAt(createdAt),
 		}
+		name := ""
+		if apiToken.Attributes.Name != nil {
+			name = *apiToken.Attributes.Name
+		}
 		rv, err := resource.NewSecretResource(
-			*apiToken.Attributes.Name,
+			name,
 			apiTokenResourceType,
 			*apiToken.Id,
 			options,
