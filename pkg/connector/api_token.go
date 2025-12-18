@@ -53,13 +53,11 @@ func (o *apiTokenBuilder) List(
 	ret := make([]*v2.Resource, 0, len(apiTokens))
 	for _, apiToken := range apiTokens {
 		// Check required fields before any dereferencing
-		if apiToken.Id == nil || apiToken.Attributes == nil ||
-			apiToken.Attributes.CreatedAt == nil || apiToken.Attributes.ModifiedAt == nil ||
+		if apiToken.Id == nil ||
 			apiToken.Relationships == nil || apiToken.Relationships.CreatedBy == nil {
 			l := ctxzap.Extract(ctx)
 			l.Warn("skipping API token with missing required fields",
 				zap.Bool("has_id", apiToken.Id != nil),
-				zap.Bool("has_attributes", apiToken.Attributes != nil),
 				zap.Bool("has_relationships", apiToken.Relationships != nil),
 			)
 			continue
@@ -67,25 +65,30 @@ func (o *apiTokenBuilder) List(
 
 		userId := apiToken.Relationships.CreatedBy.Data.Id
 		timeFormat := time.RFC3339Nano
-		createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
-		if err != nil {
-			return nil, "", nil, err
-		}
-		modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
-		if err != nil {
-			return nil, "", nil, err
-		}
 		options := []resource.SecretTraitOption{
 			resource.WithSecretCreatedByID(&v2.ResourceId{
 				ResourceType:  userResourceType.Id,
 				Resource:      userId,
 				BatonResource: false,
 			}),
-			resource.WithSecretLastUsedAt(modifiedAt),
-			resource.WithSecretCreatedAt(createdAt),
+		}
+
+		if apiToken.Attributes != nil && apiToken.Attributes.CreatedAt != nil {
+			createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			options = append(options, resource.WithSecretCreatedAt(createdAt))
+		}
+		if apiToken.Attributes != nil && apiToken.Attributes.ModifiedAt != nil {
+			modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			options = append(options, resource.WithSecretLastUsedAt(modifiedAt))
 		}
 		name := *apiToken.Id
-		if apiToken.Attributes.Name != nil {
+		if apiToken.Attributes != nil && apiToken.Attributes.Name != nil {
 			name = *apiToken.Attributes.Name
 		}
 		rv, err := resource.NewSecretResource(
