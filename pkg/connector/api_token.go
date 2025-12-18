@@ -52,27 +52,25 @@ func (o *apiTokenBuilder) List(
 	apiTokens := res.GetData()
 	ret := make([]*v2.Resource, 0, len(apiTokens))
 	for _, apiToken := range apiTokens {
-		// Check required fields before any dereferencing
-		if apiToken.Id == nil ||
-			apiToken.Relationships == nil || apiToken.Relationships.CreatedBy == nil {
+		if apiToken.Id == nil {
 			l := ctxzap.Extract(ctx)
 			l.Warn("skipping API token with missing required fields",
 				zap.Bool("has_id", apiToken.Id != nil),
-				zap.Bool("has_relationships", apiToken.Relationships != nil),
 			)
 			continue
 		}
 
-		userId := apiToken.Relationships.CreatedBy.Data.Id
-		timeFormat := time.RFC3339Nano
-		options := []resource.SecretTraitOption{
-			resource.WithSecretCreatedByID(&v2.ResourceId{
+		options := []resource.SecretTraitOption{}
+		if apiToken.Relationships != nil && apiToken.Relationships.CreatedBy != nil {
+			userId := apiToken.Relationships.CreatedBy.Data.Id
+			options = append(options, resource.WithSecretCreatedByID(&v2.ResourceId{
 				ResourceType:  userResourceType.Id,
 				Resource:      userId,
 				BatonResource: false,
-			}),
+			}))
 		}
 
+		timeFormat := time.RFC3339Nano
 		if apiToken.Attributes != nil && apiToken.Attributes.CreatedAt != nil {
 			createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
 			if err != nil {
