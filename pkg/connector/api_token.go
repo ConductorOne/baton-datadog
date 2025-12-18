@@ -11,6 +11,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
 
 type apiTokenBuilder struct {
@@ -50,27 +52,45 @@ func (o *apiTokenBuilder) List(
 	apiTokens := res.GetData()
 	ret := make([]*v2.Resource, 0, len(apiTokens))
 	for _, apiToken := range apiTokens {
-		userId := apiToken.Relationships.CreatedBy.Data.Id
-		timeFormat := time.RFC3339Nano
-		createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
-		if err != nil {
-			return nil, "", nil, err
+		if apiToken.Id == nil {
+			l := ctxzap.Extract(ctx)
+			l.Warn("skipping API token with missing required fields",
+				zap.Bool("has_id", apiToken.Id != nil),
+			)
+			continue
 		}
-		modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
-		if err != nil {
-			return nil, "", nil, err
-		}
-		options := []resource.SecretTraitOption{
-			resource.WithSecretCreatedByID(&v2.ResourceId{
+
+		options := []resource.SecretTraitOption{}
+		if apiToken.Relationships != nil && apiToken.Relationships.CreatedBy != nil {
+			userId := apiToken.Relationships.CreatedBy.Data.Id
+			options = append(options, resource.WithSecretCreatedByID(&v2.ResourceId{
 				ResourceType:  userResourceType.Id,
 				Resource:      userId,
 				BatonResource: false,
-			}),
-			resource.WithSecretLastUsedAt(modifiedAt),
-			resource.WithSecretCreatedAt(createdAt),
+			}))
+		}
+
+		timeFormat := time.RFC3339Nano
+		if apiToken.Attributes != nil && apiToken.Attributes.CreatedAt != nil {
+			createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			options = append(options, resource.WithSecretCreatedAt(createdAt))
+		}
+		if apiToken.Attributes != nil && apiToken.Attributes.ModifiedAt != nil {
+			modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			options = append(options, resource.WithSecretLastUsedAt(modifiedAt))
+		}
+		name := *apiToken.Id
+		if apiToken.Attributes != nil && apiToken.Attributes.Name != nil {
+			name = *apiToken.Attributes.Name
 		}
 		rv, err := resource.NewSecretResource(
-			*apiToken.Attributes.Name,
+			name,
 			apiTokenResourceType,
 			*apiToken.Id,
 			options,
