@@ -84,7 +84,7 @@ func (o *apiTokenBuilder) List(
 			resource.WithSecretLastUsedAt(modifiedAt),
 			resource.WithSecretCreatedAt(createdAt),
 		}
-		name := ""
+		name := *apiToken.Id
 		if apiToken.Attributes.Name != nil {
 			name = *apiToken.Attributes.Name
 		}
