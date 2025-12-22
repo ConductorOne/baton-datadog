@@ -65,6 +65,20 @@ func (w *DatadogClient) withAuthContext(ctx context.Context) context.Context {
 	return ctx
 }
 
+// CreateUser creates a Datadog user using the official V2 API client and closes the HTTP response body.
+func (w *DatadogClient) CreateUser(ctx context.Context, req datadogV2.UserCreateRequest) (*datadogV2.UserResponse, error) {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewUsersApi(w.officialClient)
+	resp, httpRes, err := api.CreateUser(ctx, req)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 // ListUsers lists users using the REST client.
 func (w *DatadogClient) ListUsers(ctx context.Context, params *datadogV2.ListUsersOptionalParameters) (*datadogV2.UsersResponse, error) {
 	ctx = w.withAuthContext(ctx)
