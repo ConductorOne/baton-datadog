@@ -8,6 +8,7 @@ import (
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
@@ -22,6 +23,9 @@ type roleBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
 }
+
+var _ connectorbuilder.ResourceSyncer = &roleBuilder{}
+var _ connectorbuilder.ResourceProvisioner = &roleBuilder{}
 
 func (r *roleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return r.resourceType

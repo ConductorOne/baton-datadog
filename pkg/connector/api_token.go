@@ -9,6 +9,7 @@ import (
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -19,6 +20,8 @@ type apiTokenBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
 }
+
+var _ connectorbuilder.ResourceSyncer = &apiTokenBuilder{}
 
 func (o *apiTokenBuilder) Entitlements(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	// API Token secrets do not have entitlements
