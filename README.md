@@ -1,4 +1,4 @@
-# `baton-datadog` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-datadog.svg)](https://pkg.go.dev/github.com/conductorone/baton-datadog) ![main ci](https://github.com/conductorone/baton-datadog/actions/workflows/main.yaml/badge.svg)
+# `baton-datadog` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-datadog.svg)](https://pkg.go.dev/github.com/conductorone/baton-datadog) ![main ci](https://github.com/conductorone/baton-datadog/actions/workflows/ci.yaml/badge.svg)
 
 `baton-datadog` is a connector for Datadog built using the [Baton SDK](https://github.com/conductorone/baton-sdk). It communicates with the Datadog API to sync data about users, teams and roles in Datadog organization.
 Check out [Baton](https://github.com/conductorone/baton) to learn more about the project in general.
