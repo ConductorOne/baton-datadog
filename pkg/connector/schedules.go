@@ -7,6 +7,7 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
@@ -25,6 +26,8 @@ type scheduleBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
 }
+
+var _ connectorbuilder.ResourceSyncer = &scheduleBuilder{}
 
 // Create a new connector resource for a Datadog on-call schedule.
 func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {

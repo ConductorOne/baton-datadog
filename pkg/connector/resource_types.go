@@ -10,7 +10,7 @@ var (
 		Id:          "user",
 		DisplayName: "User",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
-		Annotations: annotationsForUserResourceType(),
+		Annotations: annotations.New(&v2.SkipEntitlementsAndGrants{}),
 	}
 	roleResourceType = &v2.ResourceType{
 		Id:          "role",
@@ -26,7 +26,7 @@ var (
 		Id:          "api-key",
 		DisplayName: "API Key",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
-		Annotations: annotationsForResourceType(true),
+		Annotations: annotations.New(&v2.SkipEntitlementsAndGrants{}),
 	}
 	scheduleResourceType = &v2.ResourceType{
 		Id:          "schedule",
@@ -34,13 +34,3 @@ var (
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_GROUP},
 	}
 )
-
-func annotationsForResourceType(skipEntitlementsAndGrants bool) annotations.Annotations {
-	annos := annotations.Annotations{}
-
-	if skipEntitlementsAndGrants {
-		annos.Update(&v2.SkipEntitlementsAndGrants{})
-	}
-
-	return annos
-}
