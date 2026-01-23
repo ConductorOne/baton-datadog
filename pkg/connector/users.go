@@ -3,11 +3,13 @@ package connector
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
@@ -115,4 +117,64 @@ func newUserBuilder(wrapper *client.DatadogClient) *userBuilder {
 		resourceType: userResourceType,
 		wrapper:      wrapper,
 	}
+}
+
+// CreateAccountCapabilityDetails declares the supported credential options for account creation.
+func (u *userBuilder) CreateAccountCapabilityDetails(ctx context.Context) (*v2.CredentialDetailsAccountProvisioning, annotations.Annotations, error) {
+	return &v2.CredentialDetailsAccountProvisioning{
+		SupportedCredentialOptions: []v2.CapabilityDetailCredentialOption{
+			v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_NO_PASSWORD,
+		},
+		PreferredCredentialOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_NO_PASSWORD,
+	}, nil, nil
+}
+
+// CreateAccount creates a Datadog user via the V2 Users API.
+func (u *userBuilder) CreateAccount(
+	ctx context.Context,
+	accountInfo *v2.AccountInfo,
+	credentialOptions *v2.CredentialOptions,
+) (
+	connectorbuilder.CreateAccountResponse,
+	[]*v2.PlaintextData,
+	annotations.Annotations,
+	error,
+) {
+	// Parse inputs
+	pMap := accountInfo.GetProfile().AsMap()
+	email, ok := pMap["email"].(string)
+	if !ok || strings.TrimSpace(email) == "" {
+		return nil, nil, nil, fmt.Errorf("email is required")
+	}
+	name, _ := pMap["name"].(string)
+	title, _ := pMap["title"].(string)
+
+	// Build create request
+	attrs := datadogV2.NewUserCreateAttributes(email)
+	if strings.TrimSpace(name) != "" {
+		attrs.SetName(name)
+	}
+	if strings.TrimSpace(title) != "" {
+		attrs.SetTitle(title)
+	}
+	data := datadogV2.NewUserCreateData(*attrs, datadogV2.USERSTYPE_USERS)
+	req := datadogV2.NewUserCreateRequest(*data)
+
+	// Create user
+	createdUserResp, err := u.wrapper.CreateUser(ctx, *req)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error creating Datadog user: %w", err)
+	}
+
+	createdUser := createdUserResp.GetData()
+
+	// Build Baton resource
+	res, err := userResource(&createdUser)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to build user resource: %w", err)
+	}
+
+	return &v2.CreateAccountResponse_SuccessResult{
+		Resource: res,
+	}, nil, nil, nil
 }

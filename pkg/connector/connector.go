@@ -47,6 +47,40 @@ func (d *Datadog) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 	return &v2.ConnectorMetadata{
 		DisplayName: "Baton Datadog Connector",
 		Description: "Connector syncing users, teams, and roles from Datadog.",
+		AccountCreationSchema: &v2.ConnectorAccountCreationSchema{
+			FieldMap: map[string]*v2.ConnectorAccountCreationSchema_Field{
+				"email": {
+					DisplayName: "Email",
+					Required:    true,
+					Description: "Email to create the Datadog user with.",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Placeholder: "Email",
+					Order:       1,
+				},
+				"name": {
+					DisplayName: "Full Name",
+					Required:    false,
+					Description: "Full name to set on the user profile (optional).",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Placeholder: "Full Name",
+					Order:       2,
+				},
+				"title": {
+					DisplayName: "Title",
+					Required:    false,
+					Description: "Job title for the user (optional).",
+					Field: &v2.ConnectorAccountCreationSchema_Field_StringField{
+						StringField: &v2.ConnectorAccountCreationSchema_StringField{},
+					},
+					Placeholder: "Title",
+					Order:       3,
+				},
+			},
+		},
 	}, nil
 }
 
