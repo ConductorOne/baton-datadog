@@ -9,6 +9,7 @@ type Datadog struct {
 	AppKey string `mapstructure:"app-key"`
 	SyncSecrets bool `mapstructure:"sync-secrets"`
 	SyncSchedules bool `mapstructure:"sync-schedules"`
+	BaseUrl string `mapstructure:"base-url"`
 }
 
 func (c *Datadog) findFieldByTag(tagValue string) (any, bool) {

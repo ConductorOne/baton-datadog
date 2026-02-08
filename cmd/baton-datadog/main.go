@@ -50,6 +50,7 @@ func getConnector(ctx context.Context, ddc *cfg.Datadog) (types.ConnectorServer,
 		ddc.Site,
 		ddc.ApiKey,
 		ddc.AppKey,
+		ddc.BaseUrl,
 		ddc.SyncSecrets,
 		ddc.SyncSchedules,
 	)

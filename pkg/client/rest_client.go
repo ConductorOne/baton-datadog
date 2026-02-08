@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	datadogAPIBaseURL       = "https://api.%s"
+	DefaultBaseURL          = "https://api.%s"
 	OnCallSchedulesEndpoint = "/api/v2/on-call/schedules"
 	OnCallUserEndpoint      = "/api/v2/on-call/schedules/%s/on-call"
 
@@ -66,7 +66,7 @@ func (d *datadogErrorResponse) Message() string {
 // that is not available in the official client library.
 type DatadogRestClient struct {
 	httpClient *uhttp.BaseHttpClient
-	site       string
+	baseURL    string
 	apiKey     string
 	appKey     string
 }
@@ -81,7 +81,8 @@ type DatadogClientInterface interface {
 var _ DatadogClientInterface = (*DatadogRestClient)(nil)
 
 // NewDatadogRestClient creates a new instance of the REST client.
-func NewDatadogRestClient(ctx context.Context, site string, apiKey string, appKey string) (*DatadogRestClient, error) {
+// If baseURL is empty, it will be constructed from site using DefaultBaseURL.
+func NewDatadogRestClient(ctx context.Context, site string, apiKey string, appKey string, baseURL string) (*DatadogRestClient, error) {
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
 		return nil, err
@@ -92,9 +93,15 @@ func NewDatadogRestClient(ctx context.Context, site string, apiKey string, appKe
 		return nil, err
 	}
 
+	// Use provided baseURL or construct from site
+	effectiveBaseURL := baseURL
+	if effectiveBaseURL == "" {
+		effectiveBaseURL = fmt.Sprintf(DefaultBaseURL, site)
+	}
+
 	return &DatadogRestClient{
 		httpClient: uhttpClient,
-		site:       site,
+		baseURL:    effectiveBaseURL,
 		apiKey:     apiKey,
 		appKey:     appKey,
 	}, nil
@@ -109,7 +116,7 @@ func (c *DatadogRestClient) doRequest(
 	result interface{},
 	opts ...ReqOpt,
 ) (annotations.Annotations, error) {
-	baseUrl, err := url.Parse(fmt.Sprintf(datadogAPIBaseURL, c.site))
+	baseUrl, err := url.Parse(c.baseURL)
 	if err != nil {
 		return nil, err
 	}

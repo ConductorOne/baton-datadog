@@ -19,6 +19,7 @@ type Datadog struct {
 	site          string
 	apiKey        string
 	appKey        string
+	baseURL       string
 	syncSecrets   bool
 	syncSchedules bool
 }
@@ -112,7 +113,7 @@ func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error)
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, site, apiKey, appKey string, syncSecrets, syncSchedules bool) (*Datadog, error) {
+func New(ctx context.Context, site, apiKey, appKey, baseURL string, syncSecrets, syncSchedules bool) (*Datadog, error) {
 	// Validate input parameters
 	if site == "" {
 		return nil, fmt.Errorf("site cannot be empty")
@@ -132,8 +133,17 @@ func New(ctx context.Context, site, apiKey, appKey string, syncSecrets, syncSche
 	conf := datadog.NewConfiguration()
 	conf.HTTPClient = httpClient
 
+	// If baseURL is provided, configure the official client to use it
+	if baseURL != "" {
+		conf.Servers = datadog.ServerConfigurations{
+			{
+				URL: baseURL,
+			},
+		}
+	}
+
 	// Create REST client for custom endpoints
-	restClient, err := client.NewDatadogRestClient(ctx, site, apiKey, appKey)
+	restClient, err := client.NewDatadogRestClient(ctx, site, apiKey, appKey, baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create REST client: %w", err)
 	}
@@ -148,6 +158,7 @@ func New(ctx context.Context, site, apiKey, appKey string, syncSecrets, syncSche
 		site:          site,
 		apiKey:        apiKey,
 		appKey:        appKey,
+		baseURL:       baseURL,
 		client:        officialClient,
 		wrapper:       wrapper,
 		syncSecrets:   syncSecrets,
