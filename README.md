@@ -1,4 +1,4 @@
-# `baton-datadog` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-datadog.svg)](https://pkg.go.dev/github.com/conductorone/baton-datadog) ![main ci](https://github.com/conductorone/baton-datadog/actions/workflows/ci.yaml/badge.svg)
+# `baton-datadog` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-datadog.svg)](https://pkg.go.dev/github.com/conductorone/baton-datadog) ![main ci](https://github.com/conductorone/baton-datadog/actions/workflows/ci.yaml/badge.svg) ![verify](https://github.com/conductorone/baton-datadog/actions/workflows/verify.yaml/badge.svg)
 
 `baton-datadog` is a connector for Datadog built using the [Baton SDK](https://github.com/conductorone/baton-sdk). It communicates with the Datadog API to sync data about users, teams and roles in Datadog organization.
 Check out [Baton](https://github.com/conductorone/baton) to learn more about the project in general.
@@ -8,8 +8,8 @@ Check out [Baton](https://github.com/conductorone/baton) to learn more about the
 ## Prerequisites
 
 - Access to the Datadog site.
-- API and Application key. To generate an API key go to Organization settings -> API keys -> New Key. To create an Application key go to Organization Settings -> Application Keys -> New Key. 
-- You can specify scopes for the Application keys, by default the app key has the same scopes and permissions as the user who created them. For this connector the requred scopes are: 
+- API and Application key. To generate an API key go to Organization settings -> API keys -> New Key. To create an Application key go to Organization Settings -> Application Keys -> New Key.
+- You can specify scopes for the Application keys, by default the app key has the same scopes and permissions as the user who created them. For this connector the requred scopes are:
   - Access Management
   - Teams
 - Datadog site. You can identify which site you are on by matching your Datadog website URL to the site URL in the table [here](https://docs.datadoghq.com/getting_started/site/#access-the-datadog-site).
