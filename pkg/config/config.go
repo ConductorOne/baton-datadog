@@ -40,6 +40,7 @@ var (
 		"base-url",
 		field.WithDescription("Override the Datadog API URL (for testing)"),
 		field.WithDisplayName("Base URL"),
+		field.WithHidden(true),
 	)
 
 	// FieldRelationships defines relationships between the fields listed in
