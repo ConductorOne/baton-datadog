@@ -165,7 +165,7 @@ func TestNewDatadogRestClient(t *testing.T) {
 	apiKey := testAPIKey
 	appKey := testAppKey
 
-	client, err := NewDatadogRestClient(context.Background(), site, apiKey, appKey)
+	client, err := NewDatadogRestClient(context.Background(), site, apiKey, appKey, "")
 	assertNoError(t, err, "should not return error")
 
 	assertNotNil(t, client, "client should not be nil")
@@ -482,7 +482,7 @@ func TestDatadogRestClient_OnCallMethods(t *testing.T) {
 	apiKey := testAPIKey
 	appKey := testAppKey
 
-	client, err := NewDatadogRestClient(context.Background(), site, apiKey, appKey)
+	client, err := NewDatadogRestClient(context.Background(), site, apiKey, appKey, "")
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
