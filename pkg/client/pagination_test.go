@@ -93,16 +93,16 @@ func TestListOnCallSchedulesPaginated_WithPagination(t *testing.T) {
 	mockResponse := OnCallSchedulesResponse{
 		Data: []*OnCallSchedule{
 			{
-				ID:   "schedule-1",
-				Type: "oncall_schedule",
+				ID:   testScheduleID,
+				Type: testOncallType,
 				Attributes: OnCallScheduleAttributes{
 					Name:     "Primary On-Call",
-					TimeZone: "UTC",
+					TimeZone: testTimezoneUTC,
 				},
 			},
 			{
 				ID:   "schedule-2",
-				Type: "oncall_schedule",
+				Type: testOncallType,
 				Attributes: OnCallScheduleAttributes{
 					Name:     "Secondary On-Call",
 					TimeZone: "America/New_York",
@@ -247,11 +247,11 @@ func TestListOnCallSchedulesPaginated_DefaultOptions(t *testing.T) {
 	mockResponse := OnCallSchedulesResponse{
 		Data: []*OnCallSchedule{
 			{
-				ID:   "schedule-1",
-				Type: "oncall_schedule",
+				ID:   testScheduleID,
+				Type: testOncallType,
 				Attributes: OnCallScheduleAttributes{
 					Name:     "Test Schedule",
-					TimeZone: "UTC",
+					TimeZone: testTimezoneUTC,
 				},
 			},
 		},

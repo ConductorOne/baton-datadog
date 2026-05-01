@@ -155,9 +155,11 @@ func (c *TestClient) GetScheduleOnCallUser(ctx context.Context, scheduleID strin
 
 // Constants for test data.
 const (
-	testScheduleID = "schedule-1"
-	testAPIKey     = "test-api-key"
-	testAppKey     = "test-app-key"
+	testScheduleID  = "schedule-1"
+	testAPIKey      = "test-api-key"
+	testAppKey      = "test-app-key"
+	testOncallType  = "oncall_schedule"
+	testTimezoneUTC = "UTC"
 )
 
 func TestNewDatadogRestClient(t *testing.T) {
@@ -169,7 +171,8 @@ func TestNewDatadogRestClient(t *testing.T) {
 	assertNoError(t, err, "should not return error")
 
 	assertNotNil(t, client, "client should not be nil")
-	assertEqual(t, site, client.site, "site should match")
+	expectedBaseURL := fmt.Sprintf(DefaultBaseURL, site)
+	assertEqual(t, expectedBaseURL, client.baseURL, "baseURL should match")
 	assertEqual(t, apiKey, client.apiKey, "apiKey should match")
 	assertEqual(t, appKey, client.appKey, "appKey should match")
 	assertNotNil(t, client.httpClient, "httpClient should not be nil")
@@ -183,16 +186,16 @@ func TestListOnCallSchedules_Success(t *testing.T) {
 	mockResponse := OnCallSchedulesResponse{
 		Data: []*OnCallSchedule{
 			{
-				ID:   "schedule-1",
-				Type: "oncall_schedule",
+				ID:   testScheduleID,
+				Type: testOncallType,
 				Attributes: OnCallScheduleAttributes{
 					Name:     "Primary On-Call",
-					TimeZone: "UTC",
+					TimeZone: testTimezoneUTC,
 				},
 			},
 			{
 				ID:   "schedule-2",
-				Type: "oncall_schedule",
+				Type: testOncallType,
 				Attributes: OnCallScheduleAttributes{
 					Name:     "Secondary On-Call",
 					TimeZone: "America/New_York",
@@ -265,7 +268,7 @@ func TestListOnCallSchedules_Success(t *testing.T) {
 	assertNoError(t, err, "should not return error")
 	assertNotNil(t, result, "result should not be nil")
 	assertEqualInt(t, 2, len(result.Data), "should have 2 schedules")
-	assertEqual(t, "schedule-1", result.Data[0].ID, "first schedule ID should match")
+	assertEqual(t, testScheduleID, result.Data[0].ID, "first schedule ID should match")
 	assertEqual(t, "Primary On-Call", result.Data[0].Attributes.Name, "first schedule name should match")
 	assertEqual(t, "schedule-2", result.Data[1].ID, "second schedule ID should match")
 	assertEqual(t, "Secondary On-Call", result.Data[1].Attributes.Name, "second schedule name should match")
