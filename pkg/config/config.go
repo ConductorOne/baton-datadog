@@ -36,6 +36,13 @@ var (
 		field.WithDefaultValue(false),
 		field.WithDisplayName("Sync schedules"),
 	)
+	BaseURL = field.StringField(
+		"base-url",
+		field.WithDescription("Override the Datadog API URL (for testing)"),
+		field.WithDisplayName("Base URL"),
+		field.WithHidden(true),
+		field.WithExportTarget(field.ExportTargetCLIOnly),
+	)
 
 	// FieldRelationships defines relationships between the fields listed in
 	// Config that can be automatically validated. For example, a
@@ -51,6 +58,7 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	AppKey,
 	SyncSecrets,
 	SyncSchedules,
+	BaseURL,
 })
 
 // ValidateConfig is run after the configuration is loaded, and should return an
