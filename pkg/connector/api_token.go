@@ -63,7 +63,10 @@ func (o *apiTokenBuilder) List(
 			continue
 		}
 
-		options := []resource.SecretTraitOption{}
+		options := []resource.SecretTraitOption{
+			resource.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
+			resource.WithSecretDetail("datadog.api_key"),
+		}
 		if apiToken.Relationships != nil && apiToken.Relationships.CreatedBy != nil {
 			userId := apiToken.Relationships.CreatedBy.Data.Id
 			options = append(options, resource.WithSecretCreatedByID(&v2.ResourceId{
