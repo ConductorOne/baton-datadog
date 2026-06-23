@@ -39,6 +39,17 @@
         "annotations": [
           {
             "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+          },
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
+            "permissions": [
+              {
+                "permission": "user_access_invite"
+              },
+              {
+                "permission": "user_access_manage"
+              }
+            ]
           }
         ]
       },
@@ -46,13 +57,23 @@
         "CAPABILITY_SYNC",
         "CAPABILITY_ACCOUNT_PROVISIONING"
       ],
-      "permissions": {}
+      "permissions": {
+        "permissions": [
+          {
+            "permission": "user_access_invite"
+          },
+          {
+            "permission": "user_access_manage"
+          }
+        ]
+      }
     }
   ],
   "connectorCapabilities": [
     "CAPABILITY_PROVISION",
     "CAPABILITY_SYNC",
-    "CAPABILITY_ACCOUNT_PROVISIONING"
+    "CAPABILITY_ACCOUNT_PROVISIONING",
+    "CAPABILITY_ACTIONS"
   ],
   "credentialDetails": {
     "capabilityAccountProvisioning": {

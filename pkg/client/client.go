@@ -267,3 +267,28 @@ func (w *DatadogClient) ValidateCredentials(ctx context.Context) (*datadogV1.Aut
 	}
 	return &resp, err
 }
+
+// UpdateUser updates a Datadog user. UserUpdateAttributes exposes name, email, and disabled.
+func (w *DatadogClient) UpdateUser(ctx context.Context, userId string, body datadogV2.UserUpdateRequest) (*datadogV2.UserResponse, error) {
+	ctx = w.withAuthContext(ctx)
+	usersApi := datadogV2.NewUsersApi(w.officialClient)
+	resp, httpRes, err := usersApi.UpdateUser(ctx, userId, body)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// DisableUser soft-disables a Datadog user. Datadog has no hard delete; this sets attributes.disabled = true.
+func (w *DatadogClient) DisableUser(ctx context.Context, userId string) error {
+	ctx = w.withAuthContext(ctx)
+	usersApi := datadogV2.NewUsersApi(w.officialClient)
+	httpRes, err := usersApi.DisableUser(ctx, userId)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	return err
+}

@@ -48,6 +48,15 @@ baton resources
 - Roles
 - Teams
 
+# Connector Capabilities
+
+- Sync users, roles, teams (and optionally on-call schedules and API keys)
+- Provision role and team membership (grant/revoke)
+- Create users (Datadog sends an invitation email)
+- Connector actions: `enable_user`, `disable_user`, `update_user` (display name and/or email)
+
+Datadog does not expose a permanent user delete; `disable_user` retains the account, and `enable_user` reverses it.
+
 # Contributing, Support and Issues
 
 We started Baton because we were tired of taking screenshots and manually building spreadsheets. We welcome contributions, and ideas, no matter how small -- our goal is to make identity and permissions sprawl less painful for everyone. If you have questions, problems, or ideas: Please open a Github Issue!

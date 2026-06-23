@@ -8,6 +8,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
@@ -21,6 +22,20 @@ type userBuilder struct {
 
 var _ connectorbuilder.ResourceSyncer = &userBuilder{}
 var _ connectorbuilder.AccountManager = &userBuilder{}
+var _ connectorbuilder.ResourceActionProvider = &userBuilder{}
+
+func (u *userBuilder) ResourceActions(ctx context.Context, registry actions.ActionRegistry) error {
+	if err := registry.Register(ctx, enableUserActionSchema, u.enableUser); err != nil {
+		return err
+	}
+	if err := registry.Register(ctx, disableUserActionSchema, u.disableUser); err != nil {
+		return err
+	}
+	if err := registry.Register(ctx, updateUserActionSchema, u.updateUser); err != nil {
+		return err
+	}
+	return nil
+}
 
 func (u *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return u.resourceType

@@ -5,12 +5,27 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 )
 
+// Datadog permission names from https://docs.datadoghq.com/account_management/rbac/permissions/
+func capabilityPermissions(perms ...string) *v2.CapabilityPermissions {
+	cp := &v2.CapabilityPermissions{}
+	for _, p := range perms {
+		cp.Permissions = append(cp.Permissions, &v2.CapabilityPermission{Permission: p})
+	}
+	return cp
+}
+
 var (
 	userResourceType = &v2.ResourceType{
 		Id:          "user",
 		DisplayName: "User",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
-		Annotations: annotations.New(&v2.SkipEntitlementsAndGrants{}),
+		Annotations: annotations.New(
+			&v2.SkipEntitlementsAndGrants{},
+			capabilityPermissions(
+				"user_access_invite",
+				"user_access_manage",
+			),
+		),
 	}
 	roleResourceType = &v2.ResourceType{
 		Id:          "role",
