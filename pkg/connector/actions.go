@@ -127,6 +127,14 @@ func (u *userBuilder) disableUser(ctx context.Context, args *structpb.Struct) (*
 		return nil, nil, err
 	}
 
+	user, err := u.wrapper.GetUser(ctx, userID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("datadog-connector: failed to look up user %s: %w", userID, err)
+	}
+	if user.GetData().Attributes.GetDisabled() {
+		return actions.NewReturnValues(true), nil, nil
+	}
+
 	if err := u.wrapper.DisableUser(ctx, userID); err != nil {
 		return nil, nil, fmt.Errorf("datadog-connector: failed to disable user %s: %w", userID, err)
 	}

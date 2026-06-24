@@ -28,6 +28,6 @@ jobs:
         uses: ConductorOne/github-workflows/actions/sync-test@v4
         with:
           connector: ./baton-datadog
-          baton-entitlement: 'role:32949318-6c01-11f1-94df-da7ad0900005:member'
-          baton-principal: 'a7765c65-e68c-4e8e-8c96-10f0c9794db2'
+          baton-entitlement: 'role:32af72b4-6c01-11f1-94df-da7ad0900005:member'
+          baton-principal: '41da61ff-ac62-48a3-832d-540bb01079d3'
           baton-principal-type: 'user'

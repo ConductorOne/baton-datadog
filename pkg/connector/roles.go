@@ -188,6 +188,9 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	_, err := r.wrapper.RemoveUserFromRole(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
+		if client.IsNotFound(err) {
+			return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+		}
 		return nil, fmt.Errorf("baton-datadog: failed to remove user from role: %w", err)
 	}
 

@@ -1,9 +1,22 @@
 package client
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
+
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
+
+// IsNotFound reports whether err wraps a Datadog SDK 404 response.
+func IsNotFound(err error) bool {
+	var apiErr datadog.GenericOpenAPIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return strings.HasPrefix(apiErr.ErrorMessage, "404 ")
+}
 
 // ReqOpt represents a request option that can be applied to an HTTP request.
 type ReqOpt func(*http.Request) *http.Request
