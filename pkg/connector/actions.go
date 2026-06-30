@@ -9,6 +9,8 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -27,9 +29,15 @@ var (
 			{
 				Name:        "user_id",
 				DisplayName: "User ID",
-				Description: "The Datadog user ID to enable.",
-				Field:       &config.Field_StringField{},
-				IsRequired:  true,
+				Description: "The Datadog user to enable.",
+				Field: &config.Field_ResourceIdField{
+					ResourceIdField: &config.ResourceIdField{
+						Rules: &config.ResourceIDRules{
+							AllowedResourceTypeIds: []string{userResourceType.Id},
+						},
+					},
+				},
+				IsRequired: true,
 			},
 		},
 		ReturnTypes: []*config.Field{
@@ -46,9 +54,15 @@ var (
 			{
 				Name:        "user_id",
 				DisplayName: "User ID",
-				Description: "The Datadog user ID to disable.",
-				Field:       &config.Field_StringField{},
-				IsRequired:  true,
+				Description: "The Datadog user to disable.",
+				Field: &config.Field_ResourceIdField{
+					ResourceIdField: &config.ResourceIdField{
+						Rules: &config.ResourceIDRules{
+							AllowedResourceTypeIds: []string{userResourceType.Id},
+						},
+					},
+				},
+				IsRequired: true,
 			},
 		},
 		ReturnTypes: []*config.Field{
@@ -65,9 +79,15 @@ var (
 			{
 				Name:        "user_id",
 				DisplayName: "User ID",
-				Description: "The Datadog user ID to update.",
-				Field:       &config.Field_StringField{},
-				IsRequired:  true,
+				Description: "The Datadog user to update.",
+				Field: &config.Field_ResourceIdField{
+					ResourceIdField: &config.ResourceIdField{
+						Rules: &config.ResourceIDRules{
+							AllowedResourceTypeIds: []string{userResourceType.Id},
+						},
+					},
+				},
+				IsRequired: true,
 			},
 			{
 				Name:        "name",
@@ -90,18 +110,14 @@ var (
 )
 
 func userIDFromArgs(args *structpb.Struct) (string, error) {
-	if args == nil || args.Fields == nil {
-		return "", fmt.Errorf("datadog-connector: arguments are required")
-	}
-	val, ok := args.Fields["user_id"]
+	rid, ok := actions.GetResourceIDArg(args, "user_id")
 	if !ok {
-		return "", fmt.Errorf("datadog-connector: missing required argument user_id")
+		return "", status.Error(codes.InvalidArgument, "baton-datadog: missing required argument user_id")
 	}
-	id := val.GetStringValue()
-	if id == "" {
-		return "", fmt.Errorf("datadog-connector: user_id cannot be empty")
+	if rid.GetResource() == "" {
+		return "", status.Error(codes.InvalidArgument, "baton-datadog: user_id cannot be empty")
 	}
-	return id, nil
+	return rid.GetResource(), nil
 }
 
 func (u *userBuilder) enableUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
@@ -116,7 +132,7 @@ func (u *userBuilder) enableUser(ctx context.Context, args *structpb.Struct) (*s
 	req := datadogV2.NewUserUpdateRequest(*data)
 
 	if _, err := u.wrapper.UpdateUser(ctx, userID, *req); err != nil {
-		return nil, nil, fmt.Errorf("datadog-connector: failed to enable user %s: %w", userID, err)
+		return nil, nil, fmt.Errorf("baton-datadog: failed to enable user %s: %w", userID, err)
 	}
 	return actions.NewReturnValues(true), nil, nil
 }
@@ -129,14 +145,14 @@ func (u *userBuilder) disableUser(ctx context.Context, args *structpb.Struct) (*
 
 	user, err := u.wrapper.GetUser(ctx, userID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("datadog-connector: failed to look up user %s: %w", userID, err)
+		return nil, nil, fmt.Errorf("baton-datadog: failed to look up user %s: %w", userID, err)
 	}
 	if user.GetData().Attributes.GetDisabled() {
 		return actions.NewReturnValues(true), nil, nil
 	}
 
 	if err := u.wrapper.DisableUser(ctx, userID); err != nil {
-		return nil, nil, fmt.Errorf("datadog-connector: failed to disable user %s: %w", userID, err)
+		return nil, nil, fmt.Errorf("baton-datadog: failed to disable user %s: %w", userID, err)
 	}
 	return actions.NewReturnValues(true), nil, nil
 }
@@ -147,10 +163,10 @@ func (u *userBuilder) updateUser(ctx context.Context, args *structpb.Struct) (*s
 		return nil, nil, err
 	}
 
-	name := args.Fields["name"].GetStringValue()
-	email := args.Fields["email"].GetStringValue()
+	name, _ := actions.GetStringArg(args, "name")
+	email, _ := actions.GetStringArg(args, "email")
 	if name == "" && email == "" {
-		return nil, nil, fmt.Errorf("datadog-connector: update_user requires at least one of name or email")
+		return nil, nil, status.Error(codes.InvalidArgument, "baton-datadog: update_user requires at least one of name or email")
 	}
 
 	attrs := datadogV2.NewUserUpdateAttributes()
@@ -164,7 +180,7 @@ func (u *userBuilder) updateUser(ctx context.Context, args *structpb.Struct) (*s
 	req := datadogV2.NewUserUpdateRequest(*data)
 
 	if _, err := u.wrapper.UpdateUser(ctx, userID, *req); err != nil {
-		return nil, nil, fmt.Errorf("datadog-connector: failed to update user %s: %w", userID, err)
+		return nil, nil, fmt.Errorf("baton-datadog: failed to update user %s: %w", userID, err)
 	}
 	return actions.NewReturnValues(true), nil, nil
 }
