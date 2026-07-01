@@ -113,7 +113,7 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if len(users.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("datadog-connector: failed to get token from page: %w", err)
+			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 

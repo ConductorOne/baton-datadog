@@ -31,21 +31,33 @@ var (
 		Id:          "role",
 		DisplayName: "Role",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_ROLE},
+		Annotations: annotations.New(
+			capabilityPermissions("user_access_manage"),
+		),
 	}
 	teamResourceType = &v2.ResourceType{
 		Id:          "team",
 		DisplayName: "Team",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_GROUP},
+		Annotations: annotations.New(
+			capabilityPermissions("user_access_manage"),
+		),
 	}
 	apiTokenResourceType = &v2.ResourceType{
 		Id:          "api-key",
 		DisplayName: "API Key",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
-		Annotations: annotations.New(&v2.SkipEntitlementsAndGrants{}),
+		Annotations: annotations.New(
+			&v2.SkipEntitlementsAndGrants{},
+			capabilityPermissions("api_keys_read"),
+		),
 	}
 	scheduleResourceType = &v2.ResourceType{
 		Id:          "schedule",
 		DisplayName: "Schedule",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_GROUP},
+		Annotations: annotations.New(
+			capabilityPermissions("on_call_read"),
+		),
 	}
 )

@@ -4,18 +4,16 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
-
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// IsNotFound reports whether err wraps a Datadog SDK 404 response.
+// ErrNotFound is joined onto errors returned from wrapper methods when the
+// Datadog API responds with HTTP 404. Callers use IsNotFound to detect this
+// without depending on the SDK error message format.
+var ErrNotFound = errors.New("baton-datadog: not found")
+
+// IsNotFound reports whether err was returned for a 404 response.
 func IsNotFound(err error) bool {
-	var apiErr datadog.GenericOpenAPIError
-	if !errors.As(err, &apiErr) {
-		return false
-	}
-	return strings.HasPrefix(apiErr.ErrorMessage, "404 ")
+	return errors.Is(err, ErrNotFound)
 }
 
 // ReqOpt represents a request option that can be applied to an HTTP request.

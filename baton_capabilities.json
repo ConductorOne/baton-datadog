@@ -7,13 +7,29 @@
         "displayName": "Role",
         "traits": [
           "TRAIT_ROLE"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
+            "permissions": [
+              {
+                "permission": "user_access_manage"
+              }
+            ]
+          }
         ]
       },
       "capabilities": [
         "CAPABILITY_SYNC",
         "CAPABILITY_PROVISION"
       ],
-      "permissions": {}
+      "permissions": {
+        "permissions": [
+          {
+            "permission": "user_access_manage"
+          }
+        ]
+      }
     },
     {
       "resourceType": {
@@ -21,13 +37,29 @@
         "displayName": "Team",
         "traits": [
           "TRAIT_GROUP"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
+            "permissions": [
+              {
+                "permission": "user_access_manage"
+              }
+            ]
+          }
         ]
       },
       "capabilities": [
         "CAPABILITY_SYNC",
         "CAPABILITY_PROVISION"
       ],
-      "permissions": {}
+      "permissions": {
+        "permissions": [
+          {
+            "permission": "user_access_manage"
+          }
+        ]
+      }
     },
     {
       "resourceType": {

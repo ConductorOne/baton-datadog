@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -210,6 +211,9 @@ func (w *DatadogClient) RemoveUserFromRole(ctx context.Context, roleId string, b
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
+		return &resp, errors.Join(ErrNotFound, err)
+	}
 	return &resp, err
 }
 
@@ -232,6 +236,9 @@ func (w *DatadogClient) GetUser(ctx context.Context, userId string) (*datadogV2.
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
+		return &user, errors.Join(ErrNotFound, err)
+	}
 	return &user, err
 }
 
@@ -253,6 +260,9 @@ func (w *DatadogClient) DeleteTeamMembership(ctx context.Context, teamId string,
 	httpRes, err := teamsApi.DeleteTeamMembership(ctx, teamId, userId)
 	if httpRes != nil {
 		defer httpRes.Body.Close()
+	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
+		return errors.Join(ErrNotFound, err)
 	}
 	return err
 }

@@ -85,7 +85,7 @@ func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if len(teams.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("datadog-connector: failed to get token from page: %w", err)
+			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
@@ -143,7 +143,7 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	if len(memberships.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("datadog-connector: failed to get token from page: %w", err)
+			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
