@@ -14,7 +14,7 @@ sidebarTitle: "Datadog"
 
 | Resource | Sync | Provision |
 | :--- | :--- | :--- |
-| Accounts | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | |
+| Accounts | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
 | Roles | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
 | Teams | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
 | Schedules | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>* | |
@@ -24,6 +24,16 @@ sidebarTitle: "Datadog"
 
 *Schedules are not synced by default, but you can opt into syncing them when configuring the connector.
 
+### Connector actions
+
+Connector actions are custom capabilities that extend C1 automations with app-specific operations. You can use connector actions in the [Perform connector action](/product/admin/automations-steps-reference#perform-connector-action) automation step.
+
+| Action name | Additional fields | Description |
+|-------------|-------------------|-------------|
+| enable_user | `user_id` (string, required) | Re-enables a previously disabled Datadog user. |
+| disable_user | `user_id` (string, required) | Disables a Datadog user. Datadog has no permanent delete, so the account is retained and can be re-enabled later. |
+| update_user | `user_id` (string, required), `name` (string, optional), `email` (string, optional) | Updates the user's display name and/or email. At least one optional field must be provided. |
+
 ## Gather Datadog credentials
 
 Configuring the connector requires you to pass in credentials generated in Datadog. Gather these credentials before you move on.
@@ -31,7 +41,7 @@ Configuring the connector requires you to pass in credentials generated in Datad
 <Warning>
 A user with the **Connector Administrator** or **Super Administrator** role in C1 and the **Datadog Admin** or **Datadog standard** role in Datadog must perform this task.
 
-If your user has a custom Datadog role, make sure it includes the **User App Keys** and **API Keys Read** permissions.
+If your user has a custom Datadog role, make sure it includes the **User App Keys** and **API Keys Read** permissions, plus **User Access Invite** and **User Access Manage** to create, update, enable, and disable users from C1.
 </Warning>
 
 ### Locate your Datadog site

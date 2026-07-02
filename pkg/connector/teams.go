@@ -85,7 +85,7 @@ func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if len(teams.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("datadog-connector: failed to get token from page: %w", err)
+			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
@@ -143,7 +143,7 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	if len(memberships.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("datadog-connector: failed to get token from page: %w", err)
+			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
@@ -208,6 +208,9 @@ func (t *teamBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	err := t.wrapper.DeleteTeamMembership(ctx, entitlement.Resource.Id.Resource, principal.Id.Resource)
 	if err != nil {
+		if client.IsNotFound(err) {
+			return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+		}
 		return nil, fmt.Errorf("error removing user from team: %w", err)
 	}
 

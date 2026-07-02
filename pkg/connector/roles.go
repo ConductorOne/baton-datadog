@@ -81,7 +81,7 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if len(roles.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("datadog-connector: failed to get token from page: %w", err)
+			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
@@ -131,7 +131,7 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	if len(users.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("datadog-connector: failed to get token from page: %w", err)
+			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
@@ -188,6 +188,9 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 
 	_, err := r.wrapper.RemoveUserFromRole(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
+		if client.IsNotFound(err) {
+			return annotations.New(&v2.GrantAlreadyRevoked{}), nil
+		}
 		return nil, fmt.Errorf("baton-datadog: failed to remove user from role: %w", err)
 	}
 

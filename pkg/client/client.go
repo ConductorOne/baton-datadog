@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -210,6 +211,9 @@ func (w *DatadogClient) RemoveUserFromRole(ctx context.Context, roleId string, b
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
+		return &resp, errors.Join(ErrNotFound, err)
+	}
 	return &resp, err
 }
 
@@ -231,6 +235,9 @@ func (w *DatadogClient) GetUser(ctx context.Context, userId string) (*datadogV2.
 	user, httpRes, err := usersApi.GetUser(ctx, userId)
 	if httpRes != nil {
 		defer httpRes.Body.Close()
+	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
+		return &user, errors.Join(ErrNotFound, err)
 	}
 	return &user, err
 }
@@ -254,6 +261,9 @@ func (w *DatadogClient) DeleteTeamMembership(ctx context.Context, teamId string,
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
+		return errors.Join(ErrNotFound, err)
+	}
 	return err
 }
 
@@ -266,4 +276,31 @@ func (w *DatadogClient) ValidateCredentials(ctx context.Context) (*datadogV1.Aut
 		defer httpRes.Body.Close()
 	}
 	return &resp, err
+}
+
+// UpdateUser updates a Datadog user. PATCH /api/v2/users/{user_id}. Requires the
+// user_access_manage permission. UserUpdateAttributes exposes name, email, and disabled.
+func (w *DatadogClient) UpdateUser(ctx context.Context, userId string, body datadogV2.UserUpdateRequest) (*datadogV2.UserResponse, error) {
+	ctx = w.withAuthContext(ctx)
+	usersApi := datadogV2.NewUsersApi(w.officialClient)
+	resp, httpRes, err := usersApi.UpdateUser(ctx, userId, body)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// DisableUser soft-disables a Datadog user. DELETE /api/v2/users/{user_id}. Requires the
+// user_access_manage permission. Datadog has no hard delete; this sets attributes.disabled = true.
+func (w *DatadogClient) DisableUser(ctx context.Context, userId string) error {
+	ctx = w.withAuthContext(ctx)
+	usersApi := datadogV2.NewUsersApi(w.officialClient)
+	httpRes, err := usersApi.DisableUser(ctx, userId)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	return err
 }
