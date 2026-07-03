@@ -9,7 +9,6 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -27,8 +26,8 @@ type teamBuilder struct {
 	wrapper      *client.DatadogClient
 }
 
-var _ connectorbuilder.ResourceSyncer = &teamBuilder{}
-var _ connectorbuilder.ResourceProvisioner = &teamBuilder{}
+var _ connectorbuilder.ResourceSyncerV2 = &teamBuilder{}
+var _ connectorbuilder.ResourceProvisionerLimited = &teamBuilder{}
 
 func (t *teamBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return t.resourceType
@@ -60,15 +59,15 @@ func teamResource(team *datadogV2.Team) (*v2.Resource, error) {
 }
 
 // List returns all the teams from the database as resource objects.
-func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
+func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	teams, err := t.wrapper.ListTeams(ctx, datadogV2.NewListTeamsOptionalParameters().WithPageNumber(page))
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("error listing teams: %w", err)
+		return nil, nil, fmt.Errorf("error listing teams: %w", err)
 	}
 
 	var rv []*v2.Resource
@@ -76,7 +75,7 @@ func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		teamCopy := team
 		tr, err := teamResource(&teamCopy)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("error creating team resource: %w", err)
+			return nil, nil, fmt.Errorf("error creating team resource: %w", err)
 		}
 		rv = append(rv, tr)
 	}
@@ -85,14 +84,14 @@ func (t *teamBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if len(teams.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
+			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
-	return rv, nextPageToken, nil, nil
+	return rv, &rs.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
-func (t *teamBuilder) Entitlements(ctx context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (t *teamBuilder) Entitlements(ctx context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
 	var rv []*v2.Entitlement
 	memberOptions := populateOptions(resource.DisplayName, memberRole)
 	memberEntitlement := ent.NewAssignmentEntitlement(resource, memberRole, memberOptions...)
@@ -102,18 +101,18 @@ func (t *teamBuilder) Entitlements(ctx context.Context, resource *v2.Resource, _
 
 	rv = append(rv, memberEntitlement, adminEntitlement)
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
-func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
+func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, opts rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	memberships, err := t.wrapper.GetTeamMemberships(ctx, resource.Id.Resource, datadogV2.NewGetTeamMembershipsOptionalParameters().WithPageNumber(page))
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	var rv []*v2.Grant
@@ -121,12 +120,12 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		userId := membership.Relationships.User.GetData().Id
 		res, err := t.wrapper.GetUser(ctx, userId)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("error getting user %s from team membership: %w", userId, err)
+			return nil, nil, fmt.Errorf("error getting user %s from team membership: %w", userId, err)
 		}
 		user := res.GetData()
 		ur, err := userResource(&user)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("error creating user resource for team %s: %w", resource.Id.Resource, err)
+			return nil, nil, fmt.Errorf("error creating user resource for team %s: %w", resource.Id.Resource, err)
 		}
 		gr := grant.NewGrant(resource, memberRole, ur.Id)
 		rv = append(rv, gr)
@@ -143,11 +142,11 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	if len(memberships.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
+			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
-	return rv, nextPageToken, nil, nil
+	return rv, &rs.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
 func (t *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {

@@ -59,7 +59,11 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	SyncSecrets,
 	SyncSchedules,
 	BaseURL,
-})
+},
+	field.WithConnectorDisplayName("Datadog"),
+	field.WithIconUrl("/static/app-icons/datadog.svg"),
+	field.WithHelpUrl("/docs/baton/datadog"),
+)
 
 // ValidateConfig is run after the configuration is loaded, and should return an
 // error if it isn't valid. Implementing this function is optional, it only

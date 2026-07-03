@@ -11,7 +11,6 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
 
@@ -20,8 +19,8 @@ type userBuilder struct {
 	wrapper      *client.DatadogClient
 }
 
-var _ connectorbuilder.ResourceSyncer = &userBuilder{}
-var _ connectorbuilder.AccountManager = &userBuilder{}
+var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
+var _ connectorbuilder.AccountManagerV2 = &userBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &userBuilder{}
 
 func (u *userBuilder) ResourceActions(ctx context.Context, registry actions.ActionRegistry) error {
@@ -88,15 +87,15 @@ func userResource(user *datadogV2.User) (*v2.Resource, error) {
 
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
-func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: u.resourceType.Id})
+func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: u.resourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	users, err := u.wrapper.ListUsers(ctx, datadogV2.NewListUsersOptionalParameters().WithPageNumber(page))
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("error listing users: %w", err)
+		return nil, nil, fmt.Errorf("error listing users: %w", err)
 	}
 
 	var rv []*v2.Resource
@@ -104,7 +103,7 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		userCopy := user
 		ur, err := userResource(&userCopy)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("error creating user resource: %w", err)
+			return nil, nil, fmt.Errorf("error creating user resource: %w", err)
 		}
 		rv = append(rv, ur)
 	}
@@ -113,21 +112,21 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if len(users.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
+			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
-	return rv, nextPageToken, nil, nil
+	return rv, &rs.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
 // Entitlements always returns an empty slice for users.
-func (u *userBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (u *userBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
+	return nil, nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
-func (u *userBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+func (u *userBuilder) Grants(ctx context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
+	return nil, nil, nil
 }
 
 func newUserBuilder(wrapper *client.DatadogClient) *userBuilder {

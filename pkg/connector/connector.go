@@ -6,12 +6,17 @@ import (
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/conductorone/baton-datadog/pkg/client"
+	cfg "github.com/conductorone/baton-datadog/pkg/config"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/cli"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
+
+// Compile-time check that Datadog implements the V2 connector interface.
+var _ connectorbuilder.ConnectorBuilderV2 = (*Datadog)(nil)
 
 type Datadog struct {
 	client        *datadog.APIClient
@@ -25,8 +30,8 @@ type Datadog struct {
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
-func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
-	resourceSyncers := []connectorbuilder.ResourceSyncer{
+func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
+	resourceSyncers := []connectorbuilder.ResourceSyncerV2{
 		newUserBuilder(d.wrapper),
 		newTeamBuilder(d.wrapper),
 		newRoleBuilder(d.wrapper),
@@ -112,22 +117,34 @@ func (d *Datadog) Validate(ctx context.Context) (annotations.Annotations, error)
 	return nil, nil
 }
 
-// New returns a new instance of the connector.
-func New(ctx context.Context, site, apiKey, appKey, baseURL string, syncSecrets, syncSchedules bool) (*Datadog, error) {
+// New returns a new instance of the connector. It matches the cli.NewConnector[*cfg.Datadog]
+// signature required by config.RunConnector for container/V2 deployment.
+func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error) {
+	if err := cfg.ValidateConfig(ddc); err != nil {
+		return nil, nil, err
+	}
+
+	site := ddc.Site
+	apiKey := ddc.ApiKey
+	appKey := ddc.AppKey
+	baseURL := ddc.BaseUrl
+	syncSecrets := ddc.SyncSecrets
+	syncSchedules := ddc.SyncSchedules
+
 	// Validate input parameters
 	if site == "" {
-		return nil, fmt.Errorf("site cannot be empty")
+		return nil, nil, fmt.Errorf("site cannot be empty")
 	}
 	if apiKey == "" {
-		return nil, fmt.Errorf("API key cannot be empty")
+		return nil, nil, fmt.Errorf("API key cannot be empty")
 	}
 	if appKey == "" {
-		return nil, fmt.Errorf("application key cannot be empty")
+		return nil, nil, fmt.Errorf("application key cannot be empty")
 	}
 
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+		return nil, nil, fmt.Errorf("failed to create HTTP client: %w", err)
 	}
 
 	conf := datadog.NewConfiguration()
@@ -145,7 +162,7 @@ func New(ctx context.Context, site, apiKey, appKey, baseURL string, syncSecrets,
 	// Create REST client for custom endpoints
 	restClient, err := client.NewDatadogRestClient(ctx, site, apiKey, appKey, baseURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create REST client: %w", err)
+		return nil, nil, fmt.Errorf("failed to create REST client: %w", err)
 	}
 
 	// Create the official client
@@ -163,5 +180,5 @@ func New(ctx context.Context, site, apiKey, appKey, baseURL string, syncSecrets,
 		wrapper:       wrapper,
 		syncSecrets:   syncSecrets,
 		syncSchedules: syncSchedules,
-	}, nil
+	}, nil, nil
 }
