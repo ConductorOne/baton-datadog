@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/conductorone/baton-datadog/pkg/client"
@@ -132,6 +133,13 @@ func New(ctx context.Context, site, apiKey, appKey, baseURL string, syncSecrets,
 
 	conf := datadog.NewConfiguration()
 	conf.HTTPClient = httpClient
+	conf.RetryConfiguration = datadog.RetryConfiguration{
+		EnableRetry:       true,
+		BackOffMultiplier: 2,
+		BackOffBase:       2,
+		HTTPRetryTimeout:  60 * time.Second,
+		MaxRetries:        3,
+	}
 
 	// If baseURL is provided, configure the official client to use it
 	if baseURL != "" {
