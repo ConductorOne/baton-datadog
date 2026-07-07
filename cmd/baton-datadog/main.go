@@ -20,6 +20,9 @@ func main() {
 		version,
 		cfg.Config,
 		connector.New,
-		connectorrunner.WithDefaultCapabilitiesConnectorBuilderV2(&connector.Datadog{}),
+		connectorrunner.WithDefaultCapabilitiesConnectorBuilderV2(&connector.Datadog{
+			SyncSecrets: true,
+			SyncSchedules: true,
+		}),
 	)
 }

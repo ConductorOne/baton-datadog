@@ -25,8 +25,8 @@ type Datadog struct {
 	apiKey        string
 	appKey        string
 	baseURL       string
-	syncSecrets   bool
-	syncSchedules bool
+	SyncSecrets   bool
+	SyncSchedules bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -37,11 +37,11 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		newRoleBuilder(d.wrapper),
 	}
 
-	if d.syncSecrets {
+	if d.SyncSecrets {
 		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(d.wrapper))
 	}
 
-	if d.syncSchedules {
+	if d.SyncSchedules {
 		resourceSyncers = append(resourceSyncers, newScheduleBuilder(d.wrapper))
 	}
 
@@ -178,7 +178,7 @@ func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connector
 		baseURL:       baseURL,
 		client:        officialClient,
 		wrapper:       wrapper,
-		syncSecrets:   syncSecrets,
-		syncSchedules: syncSchedules,
+		SyncSecrets:   syncSecrets,
+		SyncSchedules: syncSchedules,
 	}, nil, nil
 }
