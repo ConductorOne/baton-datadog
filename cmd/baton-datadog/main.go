@@ -25,16 +25,7 @@ func main() {
 		"baton-datadog",
 		getConnector,
 		cfg.Config,
-		// The capabilities command runs with no user config; give it placeholder
-		// creds so it can build a connector just to report metadata, otherwise the
-		// required credential flags make `connector capabilities` fail.
-		connectorrunner.WithDefaultCapabilitiesConnectorFactory(func(ctx context.Context) (types.ConnectorServer, error) {
-			return getConnector(ctx, &cfg.Datadog{
-				Site:   "capabilities",
-				ApiKey: "capabilities",
-				AppKey: "capabilities",
-			})
-		}),
+		connectorrunner.WithDefaultCapabilitiesConnectorBuilder(&connector.Datadog{}),
 	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
