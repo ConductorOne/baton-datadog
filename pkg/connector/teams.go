@@ -106,6 +106,8 @@ func (t *teamBuilder) Entitlements(ctx context.Context, resource *v2.Resource, _
 }
 
 func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -121,7 +123,11 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		userId := membership.Relationships.User.GetData().Id
 		res, err := t.wrapper.GetUser(ctx, userId)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("error getting user %s from team membership: %w", userId, err)
+			if client.IsNotFound(err) {
+				l.Debug("baton-datadog: skipping stale team membership: user not found", zap.String("team_id", resource.Id.Resource))
+				continue
+			}
+			return nil, "", nil, fmt.Errorf("baton-datadog: error getting user from team membership: %w", err)
 		}
 		user := res.GetData()
 		ur, err := userResource(&user)
