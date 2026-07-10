@@ -106,8 +106,6 @@ func (t *teamBuilder) Entitlements(ctx context.Context, resource *v2.Resource, _
 }
 
 func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	l := ctxzap.Extract(ctx)
-
 	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: t.resourceType.Id})
 	if err != nil {
 		return nil, "", nil, err
@@ -121,25 +119,16 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	var rv []*v2.Grant
 	for _, membership := range memberships.GetData() {
 		userId := membership.Relationships.User.GetData().Id
-		res, err := t.wrapper.GetUser(ctx, userId)
+		principalId, err := rs.NewResourceID(userResourceType, userId)
 		if err != nil {
-			if client.IsNotFound(err) {
-				l.Debug("baton-datadog: skipping stale team membership: user not found", zap.String("team_id", resource.Id.Resource))
-				continue
-			}
-			return nil, "", nil, fmt.Errorf("baton-datadog: error getting user from team membership: %w", err)
+			return nil, "", nil, fmt.Errorf("baton-datadog: error creating user resource id for team %s: %w", resource.Id.Resource, err)
 		}
-		user := res.GetData()
-		ur, err := userResource(&user)
-		if err != nil {
-			return nil, "", nil, fmt.Errorf("error creating user resource for team %s: %w", resource.Id.Resource, err)
-		}
-		gr := grant.NewGrant(resource, memberRole, ur.Id)
+		gr := grant.NewGrant(resource, memberRole, principalId)
 		rv = append(rv, gr)
 
 		if membership.HasAttributes() {
 			if membership.Attributes.GetRole() == adminRole {
-				gr = grant.NewGrant(resource, adminRole, ur.Id)
+				gr = grant.NewGrant(resource, adminRole, principalId)
 				rv = append(rv, gr)
 			}
 		}
