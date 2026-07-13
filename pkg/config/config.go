@@ -5,8 +5,16 @@ import (
 )
 
 var (
-	Site = field.StringField(
+	Site = field.SelectField(
 		"site",
+		[]string{
+			"datadoghq.com",
+			"us3.datadoghq.com",
+			"us5.datadoghq.com",
+			"datadoghq.eu",
+			"ddog-gov.com",
+			"ap1.datadoghq.com",
+		},
 		field.WithDescription("Part of your Datadog website URL, e.g. datadoghq.com in https://app.datadoghq.com."),
 		field.WithRequired(true),
 		field.WithDisplayName("Site"),
