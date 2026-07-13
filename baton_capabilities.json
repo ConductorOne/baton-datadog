@@ -3,6 +3,38 @@
   "resourceTypeCapabilities": [
     {
       "resourceType": {
+        "id": "api-key",
+        "displayName": "API Key",
+        "traits": [
+          "TRAIT_SECRET"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+          },
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
+            "permissions": [
+              {
+                "permission": "api_keys_read"
+              }
+            ]
+          }
+        ]
+      },
+      "capabilities": [
+        "CAPABILITY_SYNC"
+      ],
+      "permissions": {
+        "permissions": [
+          {
+            "permission": "api_keys_read"
+          }
+        ]
+      }
+    },
+    {
+      "resourceType": {
         "id": "role",
         "displayName": "Role",
         "traits": [
@@ -27,6 +59,35 @@
         "permissions": [
           {
             "permission": "user_access_manage"
+          }
+        ]
+      }
+    },
+    {
+      "resourceType": {
+        "id": "schedule",
+        "displayName": "Schedule",
+        "traits": [
+          "TRAIT_GROUP"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
+            "permissions": [
+              {
+                "permission": "on_call_read"
+              }
+            ]
+          }
+        ]
+      },
+      "capabilities": [
+        "CAPABILITY_SYNC"
+      ],
+      "permissions": {
+        "permissions": [
+          {
+            "permission": "on_call_read"
           }
         ]
       }
