@@ -75,7 +75,7 @@ func (w *DatadogClient) CreateUser(ctx context.Context, req datadogV2.UserCreate
 		defer httpRes.Body.Close()
 	}
 	if err != nil {
-		return nil, err
+		return nil, wrapOfficialClientError("create user", httpRes, err)
 	}
 	return &resp, nil
 }
@@ -98,7 +98,7 @@ func (w *DatadogClient) ListUsers(ctx context.Context, params *datadogV2.ListUse
 		defer httpRes.Body.Close()
 	}
 	if err != nil {
-		return nil, err
+		return nil, wrapOfficialClientError("list users", httpRes, err)
 	}
 	return &resp, nil
 }
@@ -128,7 +128,7 @@ func (w *DatadogClient) ListTeams(ctx context.Context, params *datadogV2.ListTea
 		defer httpRes.Body.Close()
 	}
 	if err != nil {
-		return nil, err
+		return nil, wrapOfficialClientError("list teams", httpRes, err)
 	}
 	return &resp, nil
 }
@@ -151,7 +151,7 @@ func (w *DatadogClient) ListRoles(ctx context.Context, params *datadogV2.ListRol
 		defer httpRes.Body.Close()
 	}
 	if err != nil {
-		return nil, err
+		return nil, wrapOfficialClientError("list roles", httpRes, err)
 	}
 	return &resp, nil
 }
@@ -174,7 +174,7 @@ func (w *DatadogClient) ListAPIKeys(ctx context.Context, params *datadogV2.ListA
 		defer httpRes.Body.Close()
 	}
 	if err != nil {
-		return nil, err
+		return nil, wrapOfficialClientError("list API keys", httpRes, err)
 	}
 	return &resp, nil
 }
@@ -189,7 +189,10 @@ func (w *DatadogClient) ListRoleUsers(ctx context.Context, roleId string, params
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
-	return &users, err
+	if err != nil {
+		return &users, wrapOfficialClientError("list role users", httpRes, err)
+	}
+	return &users, nil
 }
 
 // AddUserToRole adds a user to a role and automatically handles HTTP response body closing.
@@ -200,7 +203,10 @@ func (w *DatadogClient) AddUserToRole(ctx context.Context, roleId string, body d
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
-	return &resp, err
+	if err != nil {
+		return &resp, wrapOfficialClientError("add user to role", httpRes, err)
+	}
+	return &resp, nil
 }
 
 // RemoveUserFromRole removes a user from a role and automatically handles HTTP response body closing.
@@ -214,7 +220,10 @@ func (w *DatadogClient) RemoveUserFromRole(ctx context.Context, roleId string, b
 	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
 		return &resp, errors.Join(ErrNotFound, err)
 	}
-	return &resp, err
+	if err != nil {
+		return &resp, wrapOfficialClientError("remove user from role", httpRes, err)
+	}
+	return &resp, nil
 }
 
 // GetTeamMemberships gets team memberships and automatically handles HTTP response body closing.
@@ -225,7 +234,10 @@ func (w *DatadogClient) GetTeamMemberships(ctx context.Context, teamId string, p
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
-	return &memberships, err
+	if err != nil {
+		return &memberships, wrapOfficialClientError("get team memberships", httpRes, err)
+	}
+	return &memberships, nil
 }
 
 // GetUser gets a user by ID and automatically handles HTTP response body closing.
@@ -239,7 +251,10 @@ func (w *DatadogClient) GetUser(ctx context.Context, userId string) (*datadogV2.
 	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
 		return &user, errors.Join(ErrNotFound, err)
 	}
-	return &user, err
+	if err != nil {
+		return &user, wrapOfficialClientError("get user", httpRes, err)
+	}
+	return &user, nil
 }
 
 // CreateTeamMembership creates a team membership and automatically handles HTTP response body closing.
@@ -250,7 +265,10 @@ func (w *DatadogClient) CreateTeamMembership(ctx context.Context, teamId string,
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
-	return &resp, err
+	if err != nil {
+		return &resp, wrapOfficialClientError("create team membership", httpRes, err)
+	}
+	return &resp, nil
 }
 
 // DeleteTeamMembership deletes a team membership and automatically handles HTTP response body closing.
@@ -264,7 +282,10 @@ func (w *DatadogClient) DeleteTeamMembership(ctx context.Context, teamId string,
 	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusNotFound {
 		return errors.Join(ErrNotFound, err)
 	}
-	return err
+	if err != nil {
+		return wrapOfficialClientError("delete team membership", httpRes, err)
+	}
+	return nil
 }
 
 // ValidateCredentials validates API credentials and automatically handles HTTP response body closing.
@@ -275,7 +296,10 @@ func (w *DatadogClient) ValidateCredentials(ctx context.Context) (*datadogV1.Aut
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
-	return &resp, err
+	if err != nil {
+		return &resp, wrapOfficialClientError("validate credentials", httpRes, err)
+	}
+	return &resp, nil
 }
 
 // UpdateUser updates a Datadog user. PATCH /api/v2/users/{user_id}. Requires the
@@ -288,7 +312,7 @@ func (w *DatadogClient) UpdateUser(ctx context.Context, userId string, body data
 		defer httpRes.Body.Close()
 	}
 	if err != nil {
-		return nil, err
+		return nil, wrapOfficialClientError("update user", httpRes, err)
 	}
 	return &resp, nil
 }
@@ -302,5 +326,8 @@ func (w *DatadogClient) DisableUser(ctx context.Context, userId string) error {
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
-	return err
+	if err != nil {
+		return wrapOfficialClientError("disable user", httpRes, err)
+	}
+	return nil
 }
