@@ -118,21 +118,16 @@ func (t *teamBuilder) Grants(ctx context.Context, resource *v2.Resource, opts rs
 	var rv []*v2.Grant
 	for _, membership := range memberships.GetData() {
 		userId := membership.Relationships.User.GetData().Id
-		res, err := t.wrapper.GetUser(ctx, userId)
+		principalId, err := rs.NewResourceID(userResourceType, userId)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error getting user %s from team membership: %w", userId, err)
+			return nil, nil, fmt.Errorf("baton-datadog: error creating user resource id for team %s: %w", resource.Id.Resource, err)
 		}
-		user := res.GetData()
-		ur, err := userResource(&user)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error creating user resource for team %s: %w", resource.Id.Resource, err)
-		}
-		gr := grant.NewGrant(resource, memberRole, ur.Id)
+		gr := grant.NewGrant(resource, memberRole, principalId)
 		rv = append(rv, gr)
 
 		if membership.HasAttributes() {
 			if membership.Attributes.GetRole() == adminRole {
-				gr = grant.NewGrant(resource, adminRole, ur.Id)
+				gr = grant.NewGrant(resource, adminRole, principalId)
 				rv = append(rv, gr)
 			}
 		}
