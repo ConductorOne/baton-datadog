@@ -13,6 +13,7 @@ import (
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
+	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
 
 func testMembership(userID string, role datadogV2.UserTeamRole) datadogV2.UserTeam {
@@ -71,7 +72,7 @@ func TestTeamGrantsBuildFromMembershipUserID(t *testing.T) {
 	builder := newTeamBuilder(wrapper)
 
 	resource := &v2.Resource{Id: &v2.ResourceId{ResourceType: teamResourceType.Id, Resource: teamID}}
-	grants, _, _, err := builder.Grants(context.Background(), resource, &pagination.Token{})
+	grants, _, err := builder.Grants(context.Background(), resource, rs.SyncOpAttrs{PageToken: pagination.Token{}})
 	if err != nil {
 		t.Fatalf("Grants returned error, want nil: %v", err)
 	}

@@ -9,7 +9,6 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -24,8 +23,8 @@ type roleBuilder struct {
 	wrapper      *client.DatadogClient
 }
 
-var _ connectorbuilder.ResourceSyncer = &roleBuilder{}
-var _ connectorbuilder.ResourceProvisioner = &roleBuilder{}
+var _ connectorbuilder.ResourceSyncerV2 = &roleBuilder{}
+var _ connectorbuilder.ResourceProvisionerLimited = &roleBuilder{}
 
 func (r *roleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return r.resourceType
@@ -56,15 +55,15 @@ func roleResource(role *datadogV2.Role) (*v2.Resource, error) {
 }
 
 // List returns all the roles from the database as resource objects.
-func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: r.resourceType.Id})
+func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rs.SyncOpAttrs) ([]*v2.Resource, *rs.SyncOpResults, error) {
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: r.resourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	roles, err := r.wrapper.ListRoles(ctx, datadogV2.NewListRolesOptionalParameters().WithPageNumber(page))
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	var rv []*v2.Resource
@@ -72,7 +71,7 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		roleCopy := role
 		tr, err := roleResource(&roleCopy)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		rv = append(rv, tr)
 	}
@@ -81,14 +80,14 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	if len(roles.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
+			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
-	return rv, nextPageToken, nil, nil
+	return rv, &rs.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
-func (r *roleBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (r *roleBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ rs.SyncOpAttrs) ([]*v2.Entitlement, *rs.SyncOpResults, error) {
 	var rv []*v2.Entitlement
 	assignmentOptions := []ent.EntitlementOption{
 		ent.WithGrantableTo(userResourceType),
@@ -102,18 +101,18 @@ func (r *roleBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *
 		assignmentOptions...,
 	))
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
-func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: userResourceType.Id})
+func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, opts rs.SyncOpAttrs) ([]*v2.Grant, *rs.SyncOpResults, error) {
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: userResourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	users, err := r.wrapper.ListRoleUsers(ctx, resource.Id.Resource, datadogV2.NewListRoleUsersOptionalParameters().WithPageNumber(page))
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("error listing users for role %s: %w", resource.DisplayName, err)
+		return nil, nil, fmt.Errorf("error listing users for role %s: %w", resource.DisplayName, err)
 	}
 
 	var rv []*v2.Grant
@@ -121,7 +120,7 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 		userCopy := user
 		ur, err := userResource(&userCopy)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)
+			return nil, nil, fmt.Errorf("error creating user resource for role %s: %w", resource.Id.Resource, err)
 		}
 		gr := grant.NewGrant(resource, roleMembership, ur.Id)
 		rv = append(rv, gr)
@@ -131,18 +130,18 @@ func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken 
 	if len(users.GetData()) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
+			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
-	return rv, nextPageToken, nil, nil
+	return rv, &rs.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
 func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 
 	if principal.Id.ResourceType != userResourceType.Id {
-		l.Warn(
+		l.Debug(
 			"baton-datadog: only users can be granted role membership",
 			zap.String("principal_type", principal.Id.ResourceType),
 			zap.String("principal_id", principal.Id.Resource),
@@ -171,7 +170,7 @@ func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.
 	entitlement := grant.Entitlement
 
 	if principal.Id.ResourceType != userResourceType.Id {
-		l.Warn(
+		l.Debug(
 			"baton-datadog: only users can have role membership revoked",
 			zap.String("principal_type", principal.Id.ResourceType),
 			zap.String("principal_id", principal.Id.Resource),

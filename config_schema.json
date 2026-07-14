@@ -99,6 +99,14 @@
       "isRequired": true,
       "stringField": {
         "rules": {
+          "in": [
+            "datadoghq.com",
+            "us3.datadoghq.com",
+            "us5.datadoghq.com",
+            "datadoghq.eu",
+            "ddog-gov.com",
+            "ap1.datadoghq.com"
+          ],
           "isRequired": true
         }
       }
@@ -139,5 +147,8 @@
       "description": "Whether to sync on-call schedules or not",
       "boolField": {}
     }
-  ]
+  ],
+  "displayName": "Datadog",
+  "helpUrl": "/docs/baton/datadog",
+  "iconUrl": "/static/app-icons/datadog.svg"
 }

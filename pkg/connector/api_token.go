@@ -8,9 +8,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -21,16 +19,16 @@ type apiTokenBuilder struct {
 	wrapper      *client.DatadogClient
 }
 
-var _ connectorbuilder.ResourceSyncer = &apiTokenBuilder{}
+var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
 
-func (o *apiTokenBuilder) Entitlements(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (o *apiTokenBuilder) Entitlements(_ context.Context, _ *v2.Resource, _ resource.SyncOpAttrs) ([]*v2.Entitlement, *resource.SyncOpResults, error) {
 	// API Token secrets do not have entitlements
-	return nil, "", nil, nil
+	return nil, nil, nil
 }
 
-func (o *apiTokenBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+func (o *apiTokenBuilder) Grants(_ context.Context, _ *v2.Resource, _ resource.SyncOpAttrs) ([]*v2.Grant, *resource.SyncOpResults, error) {
 	// API Token secrets do not have grants
-	return nil, "", nil, nil
+	return nil, nil, nil
 }
 
 func (o *apiTokenBuilder) ResourceType(_ context.Context) *v2.ResourceType {
@@ -40,16 +38,16 @@ func (o *apiTokenBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 func (o *apiTokenBuilder) List(
 	ctx context.Context,
 	resourceID *v2.ResourceId,
-	pToken *pagination.Token,
-) ([]*v2.Resource, string, annotations.Annotations, error) {
-	bag, page, err := parsePageToken(pToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
+	opts resource.SyncOpAttrs,
+) ([]*v2.Resource, *resource.SyncOpResults, error) {
+	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	res, err := o.wrapper.ListAPIKeys(ctx, datadogV2.NewListAPIKeysOptionalParameters().WithPageNumber(page))
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("error listing api tokens: %w", err)
+		return nil, nil, fmt.Errorf("error listing api tokens: %w", err)
 	}
 
 	apiTokens := res.GetData()
@@ -80,14 +78,14 @@ func (o *apiTokenBuilder) List(
 		if apiToken.Attributes != nil && apiToken.Attributes.CreatedAt != nil {
 			createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
 			if err != nil {
-				return nil, "", nil, err
+				return nil, nil, err
 			}
 			options = append(options, resource.WithSecretCreatedAt(createdAt))
 		}
 		if apiToken.Attributes != nil && apiToken.Attributes.ModifiedAt != nil {
 			modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
 			if err != nil {
-				return nil, "", nil, err
+				return nil, nil, err
 			}
 			options = append(options, resource.WithSecretLastUsedAt(modifiedAt))
 		}
@@ -102,7 +100,7 @@ func (o *apiTokenBuilder) List(
 			options,
 		)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		ret = append(ret, rv)
 	}
@@ -111,11 +109,11 @@ func (o *apiTokenBuilder) List(
 	if len(apiTokens) != 0 {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
+			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
 		}
 	}
 
-	return ret, nextPageToken, nil, nil
+	return ret, &resource.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
 func newApiTokenBuilder(wrapper *client.DatadogClient) *apiTokenBuilder {
