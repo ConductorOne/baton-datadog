@@ -31,14 +31,8 @@ var (
 				Name:        "user_id",
 				DisplayName: "User ID",
 				Description: "The Datadog user to enable.",
-				Field: &config.Field_ResourceIdField{
-					ResourceIdField: &config.ResourceIdField{
-						Rules: &config.ResourceIDRules{
-							AllowedResourceTypeIds: []string{userResourceType.Id},
-						},
-					},
-				},
-				IsRequired: true,
+				Field:       &config.Field_StringField{},
+				IsRequired:  true,
 			},
 		},
 		ReturnTypes: []*config.Field{
@@ -56,14 +50,8 @@ var (
 				Name:        "user_id",
 				DisplayName: "User ID",
 				Description: "The Datadog user to disable.",
-				Field: &config.Field_ResourceIdField{
-					ResourceIdField: &config.ResourceIdField{
-						Rules: &config.ResourceIDRules{
-							AllowedResourceTypeIds: []string{userResourceType.Id},
-						},
-					},
-				},
-				IsRequired: true,
+				Field:       &config.Field_StringField{},
+				IsRequired:  true,
 			},
 		},
 		ReturnTypes: []*config.Field{
@@ -111,6 +99,17 @@ var (
 )
 
 func userIDFromArgs(args *structpb.Struct) (string, error) {
+	userID, ok := actions.GetStringArg(args, "user_id")
+	if !ok {
+		return "", status.Error(codes.InvalidArgument, "baton-datadog: missing required argument user_id")
+	}
+	if userID == "" {
+		return "", status.Error(codes.InvalidArgument, "baton-datadog: user_id cannot be empty")
+	}
+	return userID, nil
+}
+
+func userIDFromResourceIDArg(args *structpb.Struct) (string, error) {
 	rid, ok := actions.GetResourceIDArg(args, "user_id")
 	if !ok {
 		return "", status.Error(codes.InvalidArgument, "baton-datadog: missing required argument user_id")
@@ -162,7 +161,7 @@ func (u *userBuilder) disableUser(ctx context.Context, args *structpb.Struct) (*
 }
 
 func (u *userBuilder) updateUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
-	userID, err := userIDFromArgs(args)
+	userID, err := userIDFromResourceIDArg(args)
 	if err != nil {
 		return nil, nil, err
 	}
