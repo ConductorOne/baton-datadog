@@ -18,6 +18,9 @@ import (
 // Compile-time check that Datadog implements the V2 connector interface.
 var _ connectorbuilder.ConnectorBuilderV2 = (*Datadog)(nil)
 
+// Compile-time check that Datadog registers global (non-resource-scoped) actions.
+var _ connectorbuilder.GlobalActionProvider = (*Datadog)(nil)
+
 type Datadog struct {
 	client        *datadog.APIClient
 	wrapper       *client.DatadogClient

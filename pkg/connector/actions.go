@@ -98,6 +98,23 @@ var (
 	}
 )
 
+// GlobalActions registers enable_user and disable_user as global (non-resource-scoped)
+// connector actions. C1's account-lifecycle pipeline looks the ACCOUNT_ENABLE /
+// ACCOUNT_DISABLE action schemas up as global (resource_type_id=""), so registering them
+// here — rather than resource-scoped via userBuilder.ResourceActions — is what makes them
+// reachable through the "Account lifecycle action" step. This matches how
+// baton-aws-cognito / baton-atlassian / baton-active-directory register the same actions.
+func (d *Datadog) GlobalActions(ctx context.Context, registry actions.ActionRegistry) error {
+	u := newUserBuilder(d.wrapper)
+	if err := registry.Register(ctx, enableUserActionSchema, u.enableUser); err != nil {
+		return fmt.Errorf("baton-datadog: failed to register enable_user action: %w", err)
+	}
+	if err := registry.Register(ctx, disableUserActionSchema, u.disableUser); err != nil {
+		return fmt.Errorf("baton-datadog: failed to register disable_user action: %w", err)
+	}
+	return nil
+}
+
 func userIDFromArgs(args *structpb.Struct) (string, error) {
 	userID, ok := actions.GetStringArg(args, "user_id")
 	if !ok {

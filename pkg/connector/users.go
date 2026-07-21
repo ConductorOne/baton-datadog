@@ -23,13 +23,12 @@ var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
 var _ connectorbuilder.AccountManagerV2 = &userBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &userBuilder{}
 
+// ResourceActions registers user-scoped actions. Only update_user lives here: it is
+// reached through the generic "Perform connector action" step (which supplies a resource
+// id), so resource-scoped registration is correct for it. enable_user / disable_user are
+// registered globally in Datadog.GlobalActions instead, because C1's account-lifecycle
+// pipeline resolves those schemas as global (resource_type_id="").
 func (u *userBuilder) ResourceActions(ctx context.Context, registry actions.ActionRegistry) error {
-	if err := registry.Register(ctx, enableUserActionSchema, u.enableUser); err != nil {
-		return err
-	}
-	if err := registry.Register(ctx, disableUserActionSchema, u.disableUser); err != nil {
-		return err
-	}
 	if err := registry.Register(ctx, updateUserActionSchema, u.updateUser); err != nil {
 		return err
 	}
