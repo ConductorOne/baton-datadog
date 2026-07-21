@@ -52,19 +52,19 @@ func userResource(user *datadogV2.User) (*v2.Resource, error) {
 	accountType := v2.UserTrait_ACCOUNT_TYPE_HUMAN
 	rawStatus := user.Attributes.GetStatus()
 
-	var status v2.UserTrait_Status_Status
+	var status v2.Status_ResourceStatus
 	switch rawStatus {
 	case "Active":
-		status = v2.UserTrait_Status_STATUS_ENABLED
+		status = v2.Status_RESOURCE_STATUS_ENABLED
 	case "Disabled":
-		status = v2.UserTrait_Status_STATUS_DISABLED
+		status = v2.Status_RESOURCE_STATUS_DISABLED
 	case "Pending":
 		// Pending users have been invited but haven't accepted yet, so they
 		// don't have active access to Datadog. Keep the raw status as detail
 		// so reviewers can tell them apart from actively disabled users.
-		status = v2.UserTrait_Status_STATUS_DISABLED
+		status = v2.Status_RESOURCE_STATUS_DISABLED
 	default:
-		status = v2.UserTrait_Status_STATUS_UNSPECIFIED
+		status = v2.Status_RESOURCE_STATUS_UNSPECIFIED
 	}
 
 	if user.Attributes.GetServiceAccount() {
@@ -72,9 +72,7 @@ func userResource(user *datadogV2.User) (*v2.Resource, error) {
 	}
 
 	userTraitOptions := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
 		rs.WithEmail(user.Attributes.GetEmail(), true),
-		rs.WithDetailedStatus(status, rawStatus),
 		rs.WithAccountType(accountType),
 	}
 
@@ -83,6 +81,8 @@ func userResource(user *datadogV2.User) (*v2.Resource, error) {
 		userResourceType,
 		user.GetId(),
 		userTraitOptions,
+		rs.WithResourceProfile(profile),
+		rs.WithResourceStatus(status, rawStatus),
 	)
 	if err != nil {
 		return nil, err

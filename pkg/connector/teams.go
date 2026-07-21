@@ -41,15 +41,12 @@ func teamResource(team *datadogV2.Team) (*v2.Resource, error) {
 		"team_id":          team.GetId(),
 	}
 
-	teamTraitOptions := []rs.GroupTraitOption{
-		rs.WithGroupProfile(profile),
-	}
-
 	ret, err := rs.NewGroupResource(
 		team.Attributes.GetName(),
 		teamResourceType,
 		team.GetId(),
-		teamTraitOptions,
+		nil,
+		rs.WithResourceProfile(profile),
 	)
 	if err != nil {
 		return nil, err

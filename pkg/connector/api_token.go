@@ -74,13 +74,14 @@ func (o *apiTokenBuilder) List(
 			}))
 		}
 
+		var resourceOptions []resource.ResourceOption
 		timeFormat := time.RFC3339Nano
 		if apiToken.Attributes != nil && apiToken.Attributes.CreatedAt != nil {
 			createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
 			if err != nil {
 				return nil, nil, err
 			}
-			options = append(options, resource.WithSecretCreatedAt(createdAt))
+			resourceOptions = append(resourceOptions, resource.WithResourceCreatedAt(createdAt))
 		}
 		if apiToken.Attributes != nil && apiToken.Attributes.ModifiedAt != nil {
 			modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
@@ -98,6 +99,7 @@ func (o *apiTokenBuilder) List(
 			apiTokenResourceType,
 			*apiToken.Id,
 			options,
+			resourceOptions...,
 		)
 		if err != nil {
 			return nil, nil, err
