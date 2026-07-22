@@ -37,15 +37,12 @@ func roleResource(role *datadogV2.Role) (*v2.Resource, error) {
 		"role_id":   role.GetId(),
 	}
 
-	roleTraitOptions := []rs.RoleTraitOption{
-		rs.WithRoleProfile(profile),
-	}
-
 	ret, err := rs.NewRoleResource(
 		role.Attributes.GetName(),
 		roleResourceType,
 		role.GetId(),
-		roleTraitOptions,
+		nil,
+		rs.WithResourceProfile(profile),
 	)
 	if err != nil {
 		return nil, err

@@ -98,6 +98,22 @@ var (
 	}
 )
 
+// GlobalActions registers enable_user and disable_user as global (non-resource-scoped)
+// connector actions. C1's account-lifecycle pipeline looks the ACCOUNT_ENABLE /
+// ACCOUNT_DISABLE action schemas up as global (resource_type_id=""), so registering them
+// here — rather than resource-scoped via userBuilder.ResourceActions — is what makes them
+// reachable through the "Account lifecycle action" step. This matches how
+// baton-aws-cognito / baton-atlassian / baton-active-directory register the same actions.
+func (d *Datadog) GlobalActions(ctx context.Context, registry actions.ActionRegistry) error {
+	if err := registry.Register(ctx, enableUserActionSchema, d.enableUser); err != nil {
+		return fmt.Errorf("baton-datadog: failed to register enable_user action: %w", err)
+	}
+	if err := registry.Register(ctx, disableUserActionSchema, d.disableUser); err != nil {
+		return fmt.Errorf("baton-datadog: failed to register disable_user action: %w", err)
+	}
+	return nil
+}
+
 func userIDFromArgs(args *structpb.Struct) (string, error) {
 	userID, ok := actions.GetStringArg(args, "user_id")
 	if !ok {
@@ -120,7 +136,7 @@ func userIDFromResourceIDArg(args *structpb.Struct) (string, error) {
 	return rid.GetResource(), nil
 }
 
-func (u *userBuilder) enableUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
+func (d *Datadog) enableUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
 	userID, err := userIDFromArgs(args)
 	if err != nil {
 		return nil, nil, err
@@ -131,19 +147,19 @@ func (u *userBuilder) enableUser(ctx context.Context, args *structpb.Struct) (*s
 	data := datadogV2.NewUserUpdateData(*attrs, userID, datadogV2.USERSTYPE_USERS)
 	req := datadogV2.NewUserUpdateRequest(*data)
 
-	if _, err := u.wrapper.UpdateUser(ctx, userID, *req); err != nil {
+	if _, err := d.wrapper.UpdateUser(ctx, userID, *req); err != nil {
 		return nil, nil, fmt.Errorf("baton-datadog: failed to enable user %s: %w", userID, err)
 	}
 	return actions.NewReturnValues(true), nil, nil
 }
 
-func (u *userBuilder) disableUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
+func (d *Datadog) disableUser(ctx context.Context, args *structpb.Struct) (*structpb.Struct, annotations.Annotations, error) {
 	userID, err := userIDFromArgs(args)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	user, err := u.wrapper.GetUser(ctx, userID)
+	user, err := d.wrapper.GetUser(ctx, userID)
 	if err != nil {
 		if client.IsNotFound(err) {
 			return actions.NewReturnValues(true), nil, nil
@@ -154,7 +170,7 @@ func (u *userBuilder) disableUser(ctx context.Context, args *structpb.Struct) (*
 		return actions.NewReturnValues(true), nil, nil
 	}
 
-	if err := u.wrapper.DisableUser(ctx, userID); err != nil {
+	if err := d.wrapper.DisableUser(ctx, userID); err != nil {
 		return nil, nil, fmt.Errorf("baton-datadog: failed to disable user %s: %w", userID, err)
 	}
 	return actions.NewReturnValues(true), nil, nil

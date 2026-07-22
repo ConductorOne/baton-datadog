@@ -40,10 +40,6 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 		"schedule_timezone": schedule.Attributes.TimeZone,
 	}
 
-	scheduleTraitOptions := []rs.GroupTraitOption{
-		rs.WithGroupProfile(profile),
-	}
-
 	// Use a better display name - if name is empty, use ID
 	displayName := schedule.Attributes.Name
 	if displayName == "" {
@@ -54,7 +50,8 @@ func scheduleResource(schedule *client.OnCallSchedule) (*v2.Resource, error) {
 		displayName,
 		scheduleResourceType,
 		schedule.ID,
-		scheduleTraitOptions,
+		nil,
+		rs.WithResourceProfile(profile),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create group resource: %w", err)
