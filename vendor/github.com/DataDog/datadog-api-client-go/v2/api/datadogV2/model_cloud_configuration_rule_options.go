@@ -14,7 +14,6 @@ import (
 type CloudConfigurationRuleOptions struct {
 	// Options for cloud_configuration rules.
 	// Fields `resourceType` and `regoRule` are mandatory when managing custom `cloud_configuration` rules.
-	//
 	ComplianceRuleOptions CloudConfigurationComplianceRuleOptions `json:"complianceRuleOptions"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -88,7 +87,7 @@ func (o *CloudConfigurationRuleOptions) UnmarshalJSON(bytes []byte) (err error) 
 		return fmt.Errorf("required field complianceRuleOptions missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"complianceRuleOptions"})
 	} else {
 		return err

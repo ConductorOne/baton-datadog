@@ -12,7 +12,7 @@ import (
 
 // ObservabilityPipelineSensitiveDataScannerProcessorActionPartialRedactOptions Controls how partial redaction is applied, including character count and direction.
 type ObservabilityPipelineSensitiveDataScannerProcessorActionPartialRedactOptions struct {
-	// The `ObservabilityPipelineSensitiveDataScannerProcessorActionPartialRedactOptions` `characters`.
+	// Number of characters to leave visible from the start or end of the matched value; the rest are redacted.
 	Characters int64 `json:"characters"`
 	// Indicates whether to redact characters from the first or last part of the matched value.
 	Direction ObservabilityPipelineSensitiveDataScannerProcessorActionPartialRedactOptionsDirection `json:"direction"`
@@ -117,7 +117,7 @@ func (o *ObservabilityPipelineSensitiveDataScannerProcessorActionPartialRedactOp
 		return fmt.Errorf("required field direction missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"characters", "direction"})
 	} else {
 		return err

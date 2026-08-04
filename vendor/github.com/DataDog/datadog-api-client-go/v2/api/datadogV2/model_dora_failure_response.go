@@ -10,9 +10,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// DORAFailureResponse Response after receiving a DORA failure event.
+// DORAFailureResponse Response after receiving a DORA incident event.
 type DORAFailureResponse struct {
-	// Response after receiving a DORA failure event.
+	// Response after receiving a DORA incident event.
 	Data DORAFailureResponseData `json:"data"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -86,7 +86,7 @@ func (o *DORAFailureResponse) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field data missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err

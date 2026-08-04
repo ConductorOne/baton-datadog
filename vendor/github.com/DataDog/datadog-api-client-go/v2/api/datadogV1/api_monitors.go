@@ -37,12 +37,19 @@ func (a *MonitorsApi) CheckCanDeleteMonitor(ctx _context.Context, monitorIds []i
 	localVarQueryParams.Add("monitor_ids", datadog.ParameterToString(monitorIds, "csv"))
 	localVarHeaderParams["Accept"] = "application/json"
 
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -124,6 +131,7 @@ func (a *MonitorsApi) CheckCanDeleteMonitor(ctx _context.Context, monitorIds []i
 // - database-monitoring: `database-monitoring alert`
 // - network-performance: `network-performance alert`
 // - cloud cost: `cost alert`
+// - network-path: `network-path alert`
 //
 // **Notes**:
 // - Synthetic monitors are created through the Synthetics API. See the [Synthetics API](https://docs.datadoghq.com/api/latest/synthetics/) documentation for more information.
@@ -142,6 +150,10 @@ func (a *MonitorsApi) CheckCanDeleteMonitor(ctx _context.Context, monitorIds []i
 // - `key`: a 'key' in key:value tag syntax; defines a separate alert for each tag in the group (multi-alert)
 // - `operator`: <, <=, >, >=, ==, or !=
 // - `#`: an integer or decimal number used to set the threshold
+//
+// To use a dynamic threshold on a metric monitor with a formula query, replace `#` with the `threshold` keyword
+// (for example, `... > threshold`) and provide the threshold as a query via `critical_query` on `options.thresholds`.
+// This feature is in preview.
 //
 // If you are using the `_change_` or `_pct_change_` time aggregator, instead use `change_aggr(time_aggr(time_window),
 // timeshift):space_aggr:metric{tags} [by {key}] operator #` with:
@@ -317,6 +329,18 @@ func (a *MonitorsApi) CheckCanDeleteMonitor(ctx _context.Context, monitorIds []i
 //   - for `forecast` supports `>`
 //
 // - `#` an integer or decimal number used to set the threshold.
+//
+// **Network Path Alert Query**
+//
+// Example: `network-path(query).index(index_name).rollup(rollup_method[, measure]).last(time_window) operator #`
+//
+// - `query` The search query - following the [Log search syntax](https://docs.datadoghq.com/logs/search_syntax/).
+// - `index_name` The data type to monitor on - supports `netpath-path` and `netpath-hop`.
+// - `rollup_method` The stats roll-up method - supports `count`, `avg`, and `cardinality`.
+// - `measure` For `avg` and cardinality `rollup_method` - specify the measure or the facet name you want to use.
+// - `time_window` #m (between 1 and 2880), #h (between 1 and 48).
+// - `operator` `<`, `<=`, `>`, `>=`, `==`, or `!=`.
+// - `#` an integer or decimal number used to set the threshold.
 func (a *MonitorsApi) CreateMonitor(ctx _context.Context, body Monitor) (Monitor, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -339,12 +363,19 @@ func (a *MonitorsApi) CreateMonitor(ctx _context.Context, body Monitor) (Monitor
 
 	// body params
 	localVarPostBody = &body
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -438,12 +469,19 @@ func (a *MonitorsApi) DeleteMonitor(ctx _context.Context, monitorId int64, o ...
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -491,6 +529,7 @@ func (a *MonitorsApi) DeleteMonitor(ctx _context.Context, monitorId int64, o ...
 type GetMonitorOptionalParameters struct {
 	GroupStates   *string
 	WithDowntimes *bool
+	WithAssets    *bool
 }
 
 // NewGetMonitorOptionalParameters creates an empty struct for parameters.
@@ -508,6 +547,12 @@ func (r *GetMonitorOptionalParameters) WithGroupStates(groupStates string) *GetM
 // WithWithDowntimes sets the corresponding parameter name and returns the struct.
 func (r *GetMonitorOptionalParameters) WithWithDowntimes(withDowntimes bool) *GetMonitorOptionalParameters {
 	r.WithDowntimes = &withDowntimes
+	return r
+}
+
+// WithWithAssets sets the corresponding parameter name and returns the struct.
+func (r *GetMonitorOptionalParameters) WithWithAssets(withAssets bool) *GetMonitorOptionalParameters {
+	r.WithAssets = &withAssets
 	return r
 }
 
@@ -545,14 +590,24 @@ func (a *MonitorsApi) GetMonitor(ctx _context.Context, monitorId int64, o ...Get
 	if optionalParams.WithDowntimes != nil {
 		localVarQueryParams.Add("with_downtimes", datadog.ParameterToString(*optionalParams.WithDowntimes, ""))
 	}
+	if optionalParams.WithAssets != nil {
+		localVarQueryParams.Add("with_assets", datadog.ParameterToString(*optionalParams.WithAssets, ""))
+	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -715,12 +770,19 @@ func (a *MonitorsApi) ListMonitors(ctx _context.Context, o ...ListMonitorsOption
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -887,12 +949,19 @@ func (a *MonitorsApi) SearchMonitorGroups(ctx _context.Context, o ...SearchMonit
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -1015,12 +1084,19 @@ func (a *MonitorsApi) SearchMonitors(ctx _context.Context, o ...SearchMonitorsOp
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -1089,12 +1165,19 @@ func (a *MonitorsApi) UpdateMonitor(ctx _context.Context, monitorId int64, body 
 
 	// body params
 	localVarPostBody = &body
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -1140,6 +1223,8 @@ func (a *MonitorsApi) UpdateMonitor(ctx _context.Context, monitorId int64, body 
 
 // ValidateExistingMonitor Validate an existing monitor.
 // Validate the monitor provided in the request.
+//
+// **Note**: Log monitors require an unscoped App Key and `logs_read_data` permission.
 func (a *MonitorsApi) ValidateExistingMonitor(ctx _context.Context, monitorId int64, body Monitor) (interface{}, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -1163,12 +1248,19 @@ func (a *MonitorsApi) ValidateExistingMonitor(ctx _context.Context, monitorId in
 
 	// body params
 	localVarPostBody = &body
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -1215,7 +1307,7 @@ func (a *MonitorsApi) ValidateExistingMonitor(ctx _context.Context, monitorId in
 // ValidateMonitor Validate a monitor.
 // Validate the monitor provided in the request.
 //
-// **Note**: Log monitors require an unscoped App Key.
+// **Note**: Log monitors require an unscoped App Key and `logs_read_data` permission.
 func (a *MonitorsApi) ValidateMonitor(ctx _context.Context, body Monitor) (interface{}, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -1238,12 +1330,19 @@ func (a *MonitorsApi) ValidateMonitor(ctx _context.Context, body Monitor) (inter
 
 	// body params
 	localVarPostBody = &body
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err

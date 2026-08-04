@@ -62,7 +62,7 @@ var (
 	updateUserActionSchema = &v2.BatonActionSchema{
 		Name:        ActionUpdateUser,
 		DisplayName: "Update User",
-		Description: "Updates a Datadog user's profile. At least one of name or email must be provided.",
+		Description: "Updates a Datadog user's profile. At least one of name, email or title must be provided.",
 		Arguments: []*config.Field{
 			{
 				Name:        "user_id",
@@ -87,6 +87,12 @@ var (
 				Name:        "email",
 				DisplayName: "Email",
 				Description: "New email address for the user.",
+				Field:       &config.Field_StringField{},
+			},
+			{
+				Name:        "title",
+				DisplayName: "Title",
+				Description: "New job title for the user.",
 				Field:       &config.Field_StringField{},
 			},
 		},
@@ -180,8 +186,9 @@ func (u *userBuilder) updateUser(ctx context.Context, args *structpb.Struct) (*s
 
 	name, _ := actions.GetStringArg(args, "name")
 	email, _ := actions.GetStringArg(args, "email")
-	if name == "" && email == "" {
-		return nil, nil, status.Error(codes.InvalidArgument, "baton-datadog: update_user requires at least one of name or email")
+	title, _ := actions.GetStringArg(args, "title")
+	if name == "" && email == "" && title == "" {
+		return nil, nil, status.Error(codes.InvalidArgument, "baton-datadog: update_user requires at least one of name, email or title")
 	}
 
 	attrs := datadogV2.NewUserUpdateAttributes()
@@ -190,6 +197,9 @@ func (u *userBuilder) updateUser(ctx context.Context, args *structpb.Struct) (*s
 	}
 	if email != "" {
 		attrs.SetEmail(email)
+	}
+	if title != "" {
+		attrs.SetTitle(title)
 	}
 	data := datadogV2.NewUserUpdateData(*attrs, userID, datadogV2.USERSTYPE_USERS)
 	req := datadogV2.NewUserUpdateRequest(*data)

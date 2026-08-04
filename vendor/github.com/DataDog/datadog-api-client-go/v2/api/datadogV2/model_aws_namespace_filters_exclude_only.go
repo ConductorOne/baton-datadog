@@ -10,11 +10,15 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// AWSNamespaceFiltersExcludeOnly Exclude only these namespaces from metrics collection. Defaults to `["AWS/SQS", "AWS/ElasticMapReduce"]`.
-// `AWS/SQS` and `AWS/ElasticMapReduce` are excluded by default to reduce your AWS CloudWatch costs from `GetMetricData` API calls.
+// AWSNamespaceFiltersExcludeOnly Exclude only these namespaces from metrics collection.
+// Defaults to `["AWS/SQS", "AWS/ElasticMapReduce", "AWS/Usage"]`.
+// `AWS/SQS`, `AWS/ElasticMapReduce`, and `AWS/Usage` are excluded by default
+// to reduce your AWS CloudWatch costs from `GetMetricData` API calls.
 type AWSNamespaceFiltersExcludeOnly struct {
-	// Exclude only these namespaces from metrics collection. Defaults to `["AWS/SQS", "AWS/ElasticMapReduce"]`.
-	// `AWS/SQS` and `AWS/ElasticMapReduce` are excluded by default to reduce your AWS CloudWatch costs from `GetMetricData` API calls.
+	// Exclude only these namespaces from metrics collection.
+	// Defaults to `["AWS/SQS", "AWS/ElasticMapReduce", "AWS/Usage"]`.
+	// `AWS/SQS`, `AWS/ElasticMapReduce`, and `AWS/Usage` are excluded by default
+	// to reduce your AWS CloudWatch costs from `GetMetricData` API calls.
 	ExcludeOnly []string `json:"exclude_only"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -88,7 +92,7 @@ func (o *AWSNamespaceFiltersExcludeOnly) UnmarshalJSON(bytes []byte) (err error)
 		return fmt.Errorf("required field exclude_only missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"exclude_only"})
 	} else {
 		return err

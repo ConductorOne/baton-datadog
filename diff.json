@@ -1,0 +1,61 @@
+{
+    "resources": {
+        "modified": [
+            {
+                "id": {
+                    "resourceType": "user",
+                    "resource": "1d3a63bf-f096-4373-8d99-de1afc73992d"
+                },
+                "annotations": [
+                    {
+                        "@type": "type.googleapis.com/c1.connector.v2.UserTrait",
+                        "emails": [
+                            {
+                                "address": "carolina.roncaglia@conductorone.com",
+                                "isPrimary": true
+                            }
+                        ],
+                        "status": {},
+                        "profile": {
+                            "first_name": "",
+                            "last_name": "",
+                            "login": "carolina.roncaglia@conductorone.com",
+                            "user_id": "1d3a63bf-f096-4373-8d99-de1afc73992d"
+                        },
+                        "accountType": "ACCOUNT_TYPE_HUMAN"
+                    }
+                ]
+            },
+            {
+                "id": {
+                    "resourceType": "user",
+                    "resource": "8f4606b3-f4a4-45ed-8c63-04bf40cd0689"
+                },
+                "displayName": "Luisina Santos",
+                "annotations": [
+                    {
+                        "@type": "type.googleapis.com/c1.connector.v2.UserTrait",
+                        "emails": [
+                            {
+                                "address": "luisina.santos@conductorone.com",
+                                "isPrimary": true
+                            }
+                        ],
+                        "status": {
+                            "status": "STATUS_ENABLED"
+                        },
+                        "profile": {
+                            "first_name": "Luisina",
+                            "last_name": "Santos",
+                            "login": "luisina.santos@conductorone.com",
+                            "user_id": "8f4606b3-f4a4-45ed-8c63-04bf40cd0689"
+                        },
+                        "accountType": "ACCOUNT_TYPE_HUMAN"
+                    }
+                ]
+            }
+        ]
+    },
+    "entitlements": {},
+    "grants": {}
+}

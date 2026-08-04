@@ -23,12 +23,16 @@ type RuleAttributes struct {
 	Description *string `json:"description,omitempty"`
 	// If enabled, the rule is calculated as part of the score.
 	Enabled *bool `json:"enabled,omitempty"`
+	// The maturity level of the rule (1, 2, or 3).
+	Level *int32 `json:"level,omitempty"`
 	// Time of the last rule outcome modification.
 	ModifiedAt *time.Time `json:"modified_at,omitempty"`
 	// Name of the rule.
 	Name *string `json:"name,omitempty"`
 	// Owner of the rule.
 	Owner *string `json:"owner,omitempty"`
+	// A query to filter which entities this rule applies to.
+	ScopeQuery *string `json:"scope_query,omitempty"`
 	// The scorecard name to which this rule must belong.
 	ScorecardName *string `json:"scorecard_name,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
@@ -196,6 +200,34 @@ func (o *RuleAttributes) SetEnabled(v bool) {
 	o.Enabled = &v
 }
 
+// GetLevel returns the Level field value if set, zero value otherwise.
+func (o *RuleAttributes) GetLevel() int32 {
+	if o == nil || o.Level == nil {
+		var ret int32
+		return ret
+	}
+	return *o.Level
+}
+
+// GetLevelOk returns a tuple with the Level field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *RuleAttributes) GetLevelOk() (*int32, bool) {
+	if o == nil || o.Level == nil {
+		return nil, false
+	}
+	return o.Level, true
+}
+
+// HasLevel returns a boolean if a field has been set.
+func (o *RuleAttributes) HasLevel() bool {
+	return o != nil && o.Level != nil
+}
+
+// SetLevel gets a reference to the given int32 and assigns it to the Level field.
+func (o *RuleAttributes) SetLevel(v int32) {
+	o.Level = &v
+}
+
 // GetModifiedAt returns the ModifiedAt field value if set, zero value otherwise.
 func (o *RuleAttributes) GetModifiedAt() time.Time {
 	if o == nil || o.ModifiedAt == nil {
@@ -280,6 +312,34 @@ func (o *RuleAttributes) SetOwner(v string) {
 	o.Owner = &v
 }
 
+// GetScopeQuery returns the ScopeQuery field value if set, zero value otherwise.
+func (o *RuleAttributes) GetScopeQuery() string {
+	if o == nil || o.ScopeQuery == nil {
+		var ret string
+		return ret
+	}
+	return *o.ScopeQuery
+}
+
+// GetScopeQueryOk returns a tuple with the ScopeQuery field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *RuleAttributes) GetScopeQueryOk() (*string, bool) {
+	if o == nil || o.ScopeQuery == nil {
+		return nil, false
+	}
+	return o.ScopeQuery, true
+}
+
+// HasScopeQuery returns a boolean if a field has been set.
+func (o *RuleAttributes) HasScopeQuery() bool {
+	return o != nil && o.ScopeQuery != nil
+}
+
+// SetScopeQuery gets a reference to the given string and assigns it to the ScopeQuery field.
+func (o *RuleAttributes) SetScopeQuery(v string) {
+	o.ScopeQuery = &v
+}
+
 // GetScorecardName returns the ScorecardName field value if set, zero value otherwise.
 func (o *RuleAttributes) GetScorecardName() string {
 	if o == nil || o.ScorecardName == nil {
@@ -333,6 +393,9 @@ func (o RuleAttributes) MarshalJSON() ([]byte, error) {
 	if o.Enabled != nil {
 		toSerialize["enabled"] = o.Enabled
 	}
+	if o.Level != nil {
+		toSerialize["level"] = o.Level
+	}
 	if o.ModifiedAt != nil {
 		if o.ModifiedAt.Nanosecond() == 0 {
 			toSerialize["modified_at"] = o.ModifiedAt.Format("2006-01-02T15:04:05Z07:00")
@@ -345,6 +408,9 @@ func (o RuleAttributes) MarshalJSON() ([]byte, error) {
 	}
 	if o.Owner != nil {
 		toSerialize["owner"] = o.Owner
+	}
+	if o.ScopeQuery != nil {
+		toSerialize["scope_query"] = o.ScopeQuery
 	}
 	if o.ScorecardName != nil {
 		toSerialize["scorecard_name"] = o.ScorecardName
@@ -364,17 +430,19 @@ func (o *RuleAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		Custom        *bool      `json:"custom,omitempty"`
 		Description   *string    `json:"description,omitempty"`
 		Enabled       *bool      `json:"enabled,omitempty"`
+		Level         *int32     `json:"level,omitempty"`
 		ModifiedAt    *time.Time `json:"modified_at,omitempty"`
 		Name          *string    `json:"name,omitempty"`
 		Owner         *string    `json:"owner,omitempty"`
+		ScopeQuery    *string    `json:"scope_query,omitempty"`
 		ScorecardName *string    `json:"scorecard_name,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"category", "created_at", "custom", "description", "enabled", "modified_at", "name", "owner", "scorecard_name"})
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"category", "created_at", "custom", "description", "enabled", "level", "modified_at", "name", "owner", "scope_query", "scorecard_name"})
 	} else {
 		return err
 	}
@@ -383,9 +451,11 @@ func (o *RuleAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	o.Custom = all.Custom
 	o.Description = all.Description
 	o.Enabled = all.Enabled
+	o.Level = all.Level
 	o.ModifiedAt = all.ModifiedAt
 	o.Name = all.Name
 	o.Owner = all.Owner
+	o.ScopeQuery = all.ScopeQuery
 	o.ScorecardName = all.ScorecardName
 
 	if len(additionalProperties) > 0 {

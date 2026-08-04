@@ -16,11 +16,11 @@ type DORADeploymentRequestAttributes struct {
 	CustomTags datadog.NullableList[string] `json:"custom_tags,omitempty"`
 	// Environment name to where the service was deployed.
 	Env *string `json:"env,omitempty"`
-	// Unix timestamp when the deployment finished. It must be in nanoseconds, milliseconds, or seconds, and it should not be older than 1 hour.
+	// Unix timestamp when the deployment finished. It must be in nanoseconds, milliseconds, or seconds.
 	FinishedAt int64 `json:"finished_at"`
 	// Git info for DORA Metrics events.
 	Git *DORAGitInfo `json:"git,omitempty"`
-	// Deployment ID.
+	// Deployment ID. Must be 16-128 characters and contain only alphanumeric characters, hyphens, underscores, periods, and colons (a-z, A-Z, 0-9, -, _, ., :).
 	Id *string `json:"id,omitempty"`
 	// Service name.
 	Service string `json:"service"`
@@ -363,7 +363,7 @@ func (o *DORADeploymentRequestAttributes) UnmarshalJSON(bytes []byte) (err error
 		return fmt.Errorf("required field started_at missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"custom_tags", "env", "finished_at", "git", "id", "service", "started_at", "team", "version"})
 	} else {
 		return err

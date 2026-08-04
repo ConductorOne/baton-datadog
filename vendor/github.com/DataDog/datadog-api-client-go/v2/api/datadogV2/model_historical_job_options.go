@@ -10,6 +10,8 @@ import (
 
 // HistoricalJobOptions Job options.
 type HistoricalJobOptions struct {
+	// Options on anomaly detection method.
+	AnomalyDetectionOptions *SecurityMonitoringRuleAnomalyDetectionOptions `json:"anomalyDetectionOptions,omitempty"`
 	// The detection method.
 	DetectionMethod *SecurityMonitoringRuleDetectionMethod `json:"detectionMethod,omitempty"`
 	// A time window is specified to match when at least one of the cases matches true. This is a sliding window
@@ -25,6 +27,8 @@ type HistoricalJobOptions struct {
 	MaxSignalDuration *SecurityMonitoringRuleMaxSignalDuration `json:"maxSignalDuration,omitempty"`
 	// Options on new value detection method.
 	NewValueOptions *SecurityMonitoringRuleNewValueOptions `json:"newValueOptions,omitempty"`
+	// Options on sequence detection method.
+	SequenceDetectionOptions *SecurityMonitoringRuleSequenceDetectionOptions `json:"sequenceDetectionOptions,omitempty"`
 	// Options on third party detection method.
 	ThirdPartyRuleOptions *SecurityMonitoringRuleThirdPartyOptions `json:"thirdPartyRuleOptions,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
@@ -47,6 +51,34 @@ func NewHistoricalJobOptions() *HistoricalJobOptions {
 func NewHistoricalJobOptionsWithDefaults() *HistoricalJobOptions {
 	this := HistoricalJobOptions{}
 	return &this
+}
+
+// GetAnomalyDetectionOptions returns the AnomalyDetectionOptions field value if set, zero value otherwise.
+func (o *HistoricalJobOptions) GetAnomalyDetectionOptions() SecurityMonitoringRuleAnomalyDetectionOptions {
+	if o == nil || o.AnomalyDetectionOptions == nil {
+		var ret SecurityMonitoringRuleAnomalyDetectionOptions
+		return ret
+	}
+	return *o.AnomalyDetectionOptions
+}
+
+// GetAnomalyDetectionOptionsOk returns a tuple with the AnomalyDetectionOptions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *HistoricalJobOptions) GetAnomalyDetectionOptionsOk() (*SecurityMonitoringRuleAnomalyDetectionOptions, bool) {
+	if o == nil || o.AnomalyDetectionOptions == nil {
+		return nil, false
+	}
+	return o.AnomalyDetectionOptions, true
+}
+
+// HasAnomalyDetectionOptions returns a boolean if a field has been set.
+func (o *HistoricalJobOptions) HasAnomalyDetectionOptions() bool {
+	return o != nil && o.AnomalyDetectionOptions != nil
+}
+
+// SetAnomalyDetectionOptions gets a reference to the given SecurityMonitoringRuleAnomalyDetectionOptions and assigns it to the AnomalyDetectionOptions field.
+func (o *HistoricalJobOptions) SetAnomalyDetectionOptions(v SecurityMonitoringRuleAnomalyDetectionOptions) {
+	o.AnomalyDetectionOptions = &v
 }
 
 // GetDetectionMethod returns the DetectionMethod field value if set, zero value otherwise.
@@ -217,6 +249,34 @@ func (o *HistoricalJobOptions) SetNewValueOptions(v SecurityMonitoringRuleNewVal
 	o.NewValueOptions = &v
 }
 
+// GetSequenceDetectionOptions returns the SequenceDetectionOptions field value if set, zero value otherwise.
+func (o *HistoricalJobOptions) GetSequenceDetectionOptions() SecurityMonitoringRuleSequenceDetectionOptions {
+	if o == nil || o.SequenceDetectionOptions == nil {
+		var ret SecurityMonitoringRuleSequenceDetectionOptions
+		return ret
+	}
+	return *o.SequenceDetectionOptions
+}
+
+// GetSequenceDetectionOptionsOk returns a tuple with the SequenceDetectionOptions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *HistoricalJobOptions) GetSequenceDetectionOptionsOk() (*SecurityMonitoringRuleSequenceDetectionOptions, bool) {
+	if o == nil || o.SequenceDetectionOptions == nil {
+		return nil, false
+	}
+	return o.SequenceDetectionOptions, true
+}
+
+// HasSequenceDetectionOptions returns a boolean if a field has been set.
+func (o *HistoricalJobOptions) HasSequenceDetectionOptions() bool {
+	return o != nil && o.SequenceDetectionOptions != nil
+}
+
+// SetSequenceDetectionOptions gets a reference to the given SecurityMonitoringRuleSequenceDetectionOptions and assigns it to the SequenceDetectionOptions field.
+func (o *HistoricalJobOptions) SetSequenceDetectionOptions(v SecurityMonitoringRuleSequenceDetectionOptions) {
+	o.SequenceDetectionOptions = &v
+}
+
 // GetThirdPartyRuleOptions returns the ThirdPartyRuleOptions field value if set, zero value otherwise.
 func (o *HistoricalJobOptions) GetThirdPartyRuleOptions() SecurityMonitoringRuleThirdPartyOptions {
 	if o == nil || o.ThirdPartyRuleOptions == nil {
@@ -251,6 +311,9 @@ func (o HistoricalJobOptions) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
+	if o.AnomalyDetectionOptions != nil {
+		toSerialize["anomalyDetectionOptions"] = o.AnomalyDetectionOptions
+	}
 	if o.DetectionMethod != nil {
 		toSerialize["detectionMethod"] = o.DetectionMethod
 	}
@@ -269,6 +332,9 @@ func (o HistoricalJobOptions) MarshalJSON() ([]byte, error) {
 	if o.NewValueOptions != nil {
 		toSerialize["newValueOptions"] = o.NewValueOptions
 	}
+	if o.SequenceDetectionOptions != nil {
+		toSerialize["sequenceDetectionOptions"] = o.SequenceDetectionOptions
+	}
 	if o.ThirdPartyRuleOptions != nil {
 		toSerialize["thirdPartyRuleOptions"] = o.ThirdPartyRuleOptions
 	}
@@ -282,25 +348,31 @@ func (o HistoricalJobOptions) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *HistoricalJobOptions) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		DetectionMethod         *SecurityMonitoringRuleDetectionMethod         `json:"detectionMethod,omitempty"`
-		EvaluationWindow        *SecurityMonitoringRuleEvaluationWindow        `json:"evaluationWindow,omitempty"`
-		ImpossibleTravelOptions *SecurityMonitoringRuleImpossibleTravelOptions `json:"impossibleTravelOptions,omitempty"`
-		KeepAlive               *SecurityMonitoringRuleKeepAlive               `json:"keepAlive,omitempty"`
-		MaxSignalDuration       *SecurityMonitoringRuleMaxSignalDuration       `json:"maxSignalDuration,omitempty"`
-		NewValueOptions         *SecurityMonitoringRuleNewValueOptions         `json:"newValueOptions,omitempty"`
-		ThirdPartyRuleOptions   *SecurityMonitoringRuleThirdPartyOptions       `json:"thirdPartyRuleOptions,omitempty"`
+		AnomalyDetectionOptions  *SecurityMonitoringRuleAnomalyDetectionOptions  `json:"anomalyDetectionOptions,omitempty"`
+		DetectionMethod          *SecurityMonitoringRuleDetectionMethod          `json:"detectionMethod,omitempty"`
+		EvaluationWindow         *SecurityMonitoringRuleEvaluationWindow         `json:"evaluationWindow,omitempty"`
+		ImpossibleTravelOptions  *SecurityMonitoringRuleImpossibleTravelOptions  `json:"impossibleTravelOptions,omitempty"`
+		KeepAlive                *SecurityMonitoringRuleKeepAlive                `json:"keepAlive,omitempty"`
+		MaxSignalDuration        *SecurityMonitoringRuleMaxSignalDuration        `json:"maxSignalDuration,omitempty"`
+		NewValueOptions          *SecurityMonitoringRuleNewValueOptions          `json:"newValueOptions,omitempty"`
+		SequenceDetectionOptions *SecurityMonitoringRuleSequenceDetectionOptions `json:"sequenceDetectionOptions,omitempty"`
+		ThirdPartyRuleOptions    *SecurityMonitoringRuleThirdPartyOptions        `json:"thirdPartyRuleOptions,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"detectionMethod", "evaluationWindow", "impossibleTravelOptions", "keepAlive", "maxSignalDuration", "newValueOptions", "thirdPartyRuleOptions"})
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"anomalyDetectionOptions", "detectionMethod", "evaluationWindow", "impossibleTravelOptions", "keepAlive", "maxSignalDuration", "newValueOptions", "sequenceDetectionOptions", "thirdPartyRuleOptions"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
+	if all.AnomalyDetectionOptions != nil && all.AnomalyDetectionOptions.UnparsedObject != nil && o.UnparsedObject == nil {
+		hasInvalidField = true
+	}
+	o.AnomalyDetectionOptions = all.AnomalyDetectionOptions
 	if all.DetectionMethod != nil && !all.DetectionMethod.IsValid() {
 		hasInvalidField = true
 	} else {
@@ -329,6 +401,10 @@ func (o *HistoricalJobOptions) UnmarshalJSON(bytes []byte) (err error) {
 		hasInvalidField = true
 	}
 	o.NewValueOptions = all.NewValueOptions
+	if all.SequenceDetectionOptions != nil && all.SequenceDetectionOptions.UnparsedObject != nil && o.UnparsedObject == nil {
+		hasInvalidField = true
+	}
+	o.SequenceDetectionOptions = all.SequenceDetectionOptions
 	if all.ThirdPartyRuleOptions != nil && all.ThirdPartyRuleOptions.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true
 	}

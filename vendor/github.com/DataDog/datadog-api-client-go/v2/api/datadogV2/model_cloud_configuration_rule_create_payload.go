@@ -13,7 +13,6 @@ import (
 // CloudConfigurationRuleCreatePayload Create a new cloud configuration rule.
 type CloudConfigurationRuleCreatePayload struct {
 	// Description of generated findings and signals (severity and channels to be notified in case of a signal). Must contain exactly one item.
-	//
 	Cases []CloudConfigurationRuleCaseCreate `json:"cases"`
 	// How to generate compliance signals. Useful for cloud_configuration rules only.
 	ComplianceSignalOptions CloudConfigurationRuleComplianceSignalOptions `json:"complianceSignalOptions"`
@@ -344,7 +343,7 @@ func (o *CloudConfigurationRuleCreatePayload) UnmarshalJSON(bytes []byte) (err e
 		return fmt.Errorf("required field options missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"cases", "complianceSignalOptions", "filters", "isEnabled", "message", "name", "options", "tags", "type"})
 	} else {
 		return err

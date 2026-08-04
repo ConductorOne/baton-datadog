@@ -31,7 +31,6 @@ type MonthlyUsageAttributionBody struct {
 	// Datetime of the most recent update to the usage values.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 	// Fields in Usage Summary by tag(s).
-	// The following values have been **deprecated**: `estimated_indexed_spans_usage`, `estimated_indexed_spans_percentage`, `estimated_ingested_spans_usage`, `estimated_ingested_spans_percentage`.
 	Values *MonthlyUsageAttributionValues `json:"values,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -341,7 +340,7 @@ func (o *MonthlyUsageAttributionBody) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"month", "org_name", "public_id", "region", "tag_config_source", "tags", "updated_at", "values"})
 	} else {
 		return err

@@ -32,7 +32,7 @@ Connector actions are custom capabilities that extend C1 automations with app-sp
 |-------------|-------------------|-------------|
 | enable_user | `user_id` (string, required) | Re-enables a previously disabled Datadog user. |
 | disable_user | `user_id` (string, required) | Disables a Datadog user. Datadog has no permanent delete, so the account is retained and can be re-enabled later. |
-| update_user | `user_id` (string, required), `name` (string, optional), `email` (string, optional) | Updates the user's display name and/or email. At least one optional field must be provided. |
+| update_user | `user_id` (string, required), `name` (string, optional), `email` (string, optional), `title` (string, optional) | Updates the user's display name, email and/or job title. At least one optional field must be provided. |
 
 ## Gather Datadog credentials
 

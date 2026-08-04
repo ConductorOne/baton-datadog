@@ -40,12 +40,19 @@ func (a *LogsApi) AggregateLogs(ctx _context.Context, body LogsAggregateRequest)
 
 	// body params
 	localVarPostBody = &body
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -150,12 +157,19 @@ func (a *LogsApi) ListLogs(ctx _context.Context, o ...ListLogsOptionalParameters
 	if optionalParams.Body != nil {
 		localVarPostBody = &optionalParams.Body
 	}
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -240,7 +254,7 @@ func (a *LogsApi) ListLogsWithPagination(ctx _context.Context, o ...ListLogsOpti
 					return
 				}
 			}
-			if len(results) < int(pageSize_) {
+			if len(results) == 0 {
 				break
 			}
 			cursorMeta, ok := resp.GetMetaOk()
@@ -392,12 +406,19 @@ func (a *LogsApi) ListLogsGet(ctx _context.Context, o ...ListLogsGetOptionalPara
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	datadog.SetAuthKeys(
-		ctx,
-		&localVarHeaderParams,
-		[2]string{"apiKeyAuth", "DD-API-KEY"},
-		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-	)
+	if a.Client.Cfg.DelegatedTokenConfig != nil {
+		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
+		if err != nil {
+			return localVarReturnValue, nil, err
+		}
+	} else {
+		datadog.SetAuthKeys(
+			ctx,
+			&localVarHeaderParams,
+			[2]string{"apiKeyAuth", "DD-API-KEY"},
+			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+		)
+	}
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -476,7 +497,7 @@ func (a *LogsApi) ListLogsGetWithPagination(ctx _context.Context, o ...ListLogsG
 					return
 				}
 			}
-			if len(results) < int(pageSize_) {
+			if len(results) == 0 {
 				break
 			}
 			cursorMeta, ok := resp.GetMetaOk()
@@ -590,6 +611,7 @@ func (a *LogsApi) SubmitLog(ctx _context.Context, body []HTTPLogItem, o ...Submi
 		&localVarHeaderParams,
 		[2]string{"apiKeyAuth", "DD-API-KEY"},
 	)
+
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err

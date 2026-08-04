@@ -10,11 +10,11 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// ProjectRelationshipData Relationship to project object
+// ProjectRelationshipData Relationship to project object.
 type ProjectRelationshipData struct {
-	// A unique identifier that represents the project
+	// A unique identifier that represents the project.
 	Id string `json:"id"`
-	// Project resource type
+	// Project resource type.
 	Type ProjectResourceType `json:"type"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -119,7 +119,7 @@ func (o *ProjectRelationshipData) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"id", "type"})
 	} else {
 		return err

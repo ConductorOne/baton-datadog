@@ -13,12 +13,10 @@ import (
 type CloudConfigurationComplianceRuleOptions struct {
 	// Whether the rule is a complex one.
 	// Must be set to true if `regoRule.resourceTypes` contains more than one item. Defaults to false.
-	//
 	ComplexRule *bool `json:"complexRule,omitempty"`
 	// Rule details.
 	RegoRule *CloudConfigurationRegoRule `json:"regoRule,omitempty"`
 	// Main resource type to be checked by the rule. It should be specified again in `regoRule.resourceTypes`.
-	//
 	ResourceType *string `json:"resourceType,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -159,7 +157,7 @@ func (o *CloudConfigurationComplianceRuleOptions) UnmarshalJSON(bytes []byte) (e
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"complexRule", "regoRule", "resourceType"})
 	} else {
 		return err
