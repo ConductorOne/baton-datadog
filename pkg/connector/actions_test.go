@@ -2,10 +2,15 @@ package connector
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // schemaByName indexes action schemas by their action name.
@@ -82,5 +87,35 @@ func TestLifecycleActionsAreGlobal(t *testing.T) {
 	}
 	if _, ok := userByName[ActionDisableUser]; ok {
 		t.Errorf("%q should not be registered as a user-scoped action", ActionDisableUser)
+	}
+}
+
+// TestDisableUserNotFoundFails verifies that a GetUser 404 during disable_user
+// propagates as an error rather than reporting success, matching enable_user's
+// behavior for the same input. See CXH-2184: previously any 404 from GetUser
+// (not only a truly-deleted user) short-circuited to success:true without ever
+// issuing the DELETE that performs the soft-disable.
+func TestDisableUserNotFoundFails(t *testing.T) {
+	const userID = "deadbeef-0000-4000-8000-000000000000"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer server.Close()
+
+	cfg := datadog.NewConfiguration()
+	cfg.Servers = datadog.ServerConfigurations{{URL: server.URL}}
+	wrapper := client.NewDatadogClient(nil, datadog.NewAPIClient(cfg), "example.com", "api-key", "app-key")
+	d := &Datadog{wrapper: wrapper}
+
+	args, err := structpb.NewStruct(map[string]interface{}{"user_id": userID})
+	if err != nil {
+		t.Fatalf("failed to build args: %v", err)
+	}
+
+	_, _, err = d.disableUser(context.Background(), args)
+	if err == nil {
+		t.Fatal("disableUser returned nil error for a 404 GetUser response, want an error")
 	}
 }

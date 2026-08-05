@@ -9,7 +9,6 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-datadog/pkg/client"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -161,9 +160,6 @@ func (d *Datadog) disableUser(ctx context.Context, args *structpb.Struct) (*stru
 
 	user, err := d.wrapper.GetUser(ctx, userID)
 	if err != nil {
-		if client.IsNotFound(err) {
-			return actions.NewReturnValues(true), nil, nil
-		}
 		return nil, nil, fmt.Errorf("baton-datadog: failed to look up user %s: %w", userID, err)
 	}
 	if user.GetData().Attributes.GetDisabled() {
