@@ -15,3 +15,7 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 dist/
+
+# Stray baton diff/sync output — never commit real tenant data.
+diff.json
+*.diff.json
