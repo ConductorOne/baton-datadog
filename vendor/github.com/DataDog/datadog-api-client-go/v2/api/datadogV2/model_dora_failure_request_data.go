@@ -12,7 +12,7 @@ import (
 
 // DORAFailureRequestData The JSON:API data.
 type DORAFailureRequestData struct {
-	// Attributes to create a DORA failure event.
+	// Attributes to create a DORA incident event.
 	Attributes DORAFailureRequestAttributes `json:"attributes"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -86,7 +86,7 @@ func (o *DORAFailureRequestData) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field attributes missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"attributes"})
 	} else {
 		return err

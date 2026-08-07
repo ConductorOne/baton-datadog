@@ -8,7 +8,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// ShiftDataRelationships The definition of `ShiftDataRelationships` object.
+// ShiftDataRelationships Relationships for an on-call shift.
 type ShiftDataRelationships struct {
 	// Defines the relationship between a shift and the user who is working that shift.
 	User *ShiftDataRelationshipsUser `json:"user,omitempty"`
@@ -87,7 +87,7 @@ func (o *ShiftDataRelationships) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"user"})
 	} else {
 		return err

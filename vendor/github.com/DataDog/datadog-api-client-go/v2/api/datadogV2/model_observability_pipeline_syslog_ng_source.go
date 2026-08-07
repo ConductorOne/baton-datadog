@@ -11,13 +11,17 @@ import (
 )
 
 // ObservabilityPipelineSyslogNgSource The `syslog_ng` source listens for logs over TCP or UDP from a `syslog-ng` server using the syslog protocol.
+//
+// **Supported pipeline types:** logs
 type ObservabilityPipelineSyslogNgSource struct {
-	// The unique identifier for this component. Used to reference this component in other parts of the pipeline (e.g., as input to downstream components).
+	// Name of the environment variable or secret that holds the listen address for the syslog-ng receiver.
+	AddressKey *string `json:"address_key,omitempty"`
+	// The unique identifier for this component. Used in other parts of the pipeline to reference this component (for example, as the `input` to downstream components).
 	Id string `json:"id"`
 	// Protocol used by the syslog source to receive messages.
 	Mode ObservabilityPipelineSyslogSourceMode `json:"mode"`
-	// Configuration for enabling TLS encryption between the pipeline component and external services.
-	Tls *ObservabilityPipelineTls `json:"tls,omitempty"`
+	// Configuration for enabling TLS encryption between the pipeline component and external connecting clients.
+	Tls *ObservabilityPipelineMtlsServerTls `json:"tls,omitempty"`
 	// The source type. The value should always be `syslog_ng`.
 	Type ObservabilityPipelineSyslogNgSourceType `json:"type"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
@@ -45,6 +49,34 @@ func NewObservabilityPipelineSyslogNgSourceWithDefaults() *ObservabilityPipeline
 	var typeVar ObservabilityPipelineSyslogNgSourceType = OBSERVABILITYPIPELINESYSLOGNGSOURCETYPE_SYSLOG_NG
 	this.Type = typeVar
 	return &this
+}
+
+// GetAddressKey returns the AddressKey field value if set, zero value otherwise.
+func (o *ObservabilityPipelineSyslogNgSource) GetAddressKey() string {
+	if o == nil || o.AddressKey == nil {
+		var ret string
+		return ret
+	}
+	return *o.AddressKey
+}
+
+// GetAddressKeyOk returns a tuple with the AddressKey field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ObservabilityPipelineSyslogNgSource) GetAddressKeyOk() (*string, bool) {
+	if o == nil || o.AddressKey == nil {
+		return nil, false
+	}
+	return o.AddressKey, true
+}
+
+// HasAddressKey returns a boolean if a field has been set.
+func (o *ObservabilityPipelineSyslogNgSource) HasAddressKey() bool {
+	return o != nil && o.AddressKey != nil
+}
+
+// SetAddressKey gets a reference to the given string and assigns it to the AddressKey field.
+func (o *ObservabilityPipelineSyslogNgSource) SetAddressKey(v string) {
+	o.AddressKey = &v
 }
 
 // GetId returns the Id field value.
@@ -94,9 +126,9 @@ func (o *ObservabilityPipelineSyslogNgSource) SetMode(v ObservabilityPipelineSys
 }
 
 // GetTls returns the Tls field value if set, zero value otherwise.
-func (o *ObservabilityPipelineSyslogNgSource) GetTls() ObservabilityPipelineTls {
+func (o *ObservabilityPipelineSyslogNgSource) GetTls() ObservabilityPipelineMtlsServerTls {
 	if o == nil || o.Tls == nil {
-		var ret ObservabilityPipelineTls
+		var ret ObservabilityPipelineMtlsServerTls
 		return ret
 	}
 	return *o.Tls
@@ -104,7 +136,7 @@ func (o *ObservabilityPipelineSyslogNgSource) GetTls() ObservabilityPipelineTls 
 
 // GetTlsOk returns a tuple with the Tls field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineSyslogNgSource) GetTlsOk() (*ObservabilityPipelineTls, bool) {
+func (o *ObservabilityPipelineSyslogNgSource) GetTlsOk() (*ObservabilityPipelineMtlsServerTls, bool) {
 	if o == nil || o.Tls == nil {
 		return nil, false
 	}
@@ -116,8 +148,8 @@ func (o *ObservabilityPipelineSyslogNgSource) HasTls() bool {
 	return o != nil && o.Tls != nil
 }
 
-// SetTls gets a reference to the given ObservabilityPipelineTls and assigns it to the Tls field.
-func (o *ObservabilityPipelineSyslogNgSource) SetTls(v ObservabilityPipelineTls) {
+// SetTls gets a reference to the given ObservabilityPipelineMtlsServerTls and assigns it to the Tls field.
+func (o *ObservabilityPipelineSyslogNgSource) SetTls(v ObservabilityPipelineMtlsServerTls) {
 	o.Tls = &v
 }
 
@@ -150,6 +182,9 @@ func (o ObservabilityPipelineSyslogNgSource) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
+	if o.AddressKey != nil {
+		toSerialize["address_key"] = o.AddressKey
+	}
 	toSerialize["id"] = o.Id
 	toSerialize["mode"] = o.Mode
 	if o.Tls != nil {
@@ -166,10 +201,11 @@ func (o ObservabilityPipelineSyslogNgSource) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *ObservabilityPipelineSyslogNgSource) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Id   *string                                  `json:"id"`
-		Mode *ObservabilityPipelineSyslogSourceMode   `json:"mode"`
-		Tls  *ObservabilityPipelineTls                `json:"tls,omitempty"`
-		Type *ObservabilityPipelineSyslogNgSourceType `json:"type"`
+		AddressKey *string                                  `json:"address_key,omitempty"`
+		Id         *string                                  `json:"id"`
+		Mode       *ObservabilityPipelineSyslogSourceMode   `json:"mode"`
+		Tls        *ObservabilityPipelineMtlsServerTls      `json:"tls,omitempty"`
+		Type       *ObservabilityPipelineSyslogNgSourceType `json:"type"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -184,13 +220,14 @@ func (o *ObservabilityPipelineSyslogNgSource) UnmarshalJSON(bytes []byte) (err e
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"id", "mode", "tls", "type"})
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"address_key", "id", "mode", "tls", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
+	o.AddressKey = all.AddressKey
 	o.Id = *all.Id
 	if !all.Mode.IsValid() {
 		hasInvalidField = true

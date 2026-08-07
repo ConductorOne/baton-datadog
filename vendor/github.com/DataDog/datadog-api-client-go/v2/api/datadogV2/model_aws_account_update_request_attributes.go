@@ -19,7 +19,8 @@ type AWSAccountUpdateRequestAttributes struct {
 	// AWS Account ID.
 	AwsAccountId string `json:"aws_account_id"`
 	// AWS partition your AWS account is scoped to. Defaults to `aws`.
-	// See [Partitions](https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/partitions.html) in the AWS documentation for more information.
+	// See [Partitions](https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/partitions.html)
+	// in the AWS documentation for more information.
 	AwsPartition *AWSAccountPartition `json:"aws_partition,omitempty"`
 	// AWS Regions to collect data from. Defaults to `include_all`.
 	AwsRegions *AWSRegions `json:"aws_regions,omitempty"`
@@ -370,7 +371,7 @@ func (o *AWSAccountUpdateRequestAttributes) UnmarshalJSON(bytes []byte) (err err
 		return fmt.Errorf("required field aws_account_id missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"account_tags", "auth_config", "aws_account_id", "aws_partition", "aws_regions", "logs_config", "metrics_config", "resources_config", "traces_config"})
 	} else {
 		return err

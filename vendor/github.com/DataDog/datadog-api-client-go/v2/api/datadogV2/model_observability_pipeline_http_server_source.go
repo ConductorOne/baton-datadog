@@ -11,17 +11,31 @@ import (
 )
 
 // ObservabilityPipelineHttpServerSource The `http_server` source collects logs over HTTP POST from external services.
+//
+// **Supported pipeline types:** logs
 type ObservabilityPipelineHttpServerSource struct {
+	// Name of the environment variable or secret that holds the listen address for the HTTP server.
+	AddressKey *string `json:"address_key,omitempty"`
 	// HTTP authentication method.
 	AuthStrategy ObservabilityPipelineHttpServerSourceAuthStrategy `json:"auth_strategy"`
+	// Name of the environment variable or secret that holds a custom header value (used with custom auth strategies).
+	CustomKey *string `json:"custom_key,omitempty"`
 	// The decoding format used to interpret incoming logs.
 	Decoding ObservabilityPipelineDecoding `json:"decoding"`
 	// Unique ID for the HTTP server source.
 	Id string `json:"id"`
-	// Configuration for enabling TLS encryption between the pipeline component and external services.
-	Tls *ObservabilityPipelineTls `json:"tls,omitempty"`
+	// Name of the environment variable or secret that holds the password (used when `auth_strategy` is `plain`).
+	PasswordKey *string `json:"password_key,omitempty"`
+	// Configuration for enabling TLS encryption between the pipeline component and external connecting clients.
+	Tls *ObservabilityPipelineMtlsServerTls `json:"tls,omitempty"`
 	// The source type. The value should always be `http_server`.
 	Type ObservabilityPipelineHttpServerSourceType `json:"type"`
+	// Name of the environment variable or secret that holds the username (used when `auth_strategy` is `plain`).
+	UsernameKey *string `json:"username_key,omitempty"`
+	// A list of tokens that are accepted for authenticating incoming HTTP requests. When set,
+	// the source rejects any request whose token does not match an enabled entry in this list.
+	// Cannot be combined with the `plain` auth strategy.
+	ValidTokens []ObservabilityPipelineHttpServerSourceValidToken `json:"valid_tokens,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -50,6 +64,34 @@ func NewObservabilityPipelineHttpServerSourceWithDefaults() *ObservabilityPipeli
 	return &this
 }
 
+// GetAddressKey returns the AddressKey field value if set, zero value otherwise.
+func (o *ObservabilityPipelineHttpServerSource) GetAddressKey() string {
+	if o == nil || o.AddressKey == nil {
+		var ret string
+		return ret
+	}
+	return *o.AddressKey
+}
+
+// GetAddressKeyOk returns a tuple with the AddressKey field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ObservabilityPipelineHttpServerSource) GetAddressKeyOk() (*string, bool) {
+	if o == nil || o.AddressKey == nil {
+		return nil, false
+	}
+	return o.AddressKey, true
+}
+
+// HasAddressKey returns a boolean if a field has been set.
+func (o *ObservabilityPipelineHttpServerSource) HasAddressKey() bool {
+	return o != nil && o.AddressKey != nil
+}
+
+// SetAddressKey gets a reference to the given string and assigns it to the AddressKey field.
+func (o *ObservabilityPipelineHttpServerSource) SetAddressKey(v string) {
+	o.AddressKey = &v
+}
+
 // GetAuthStrategy returns the AuthStrategy field value.
 func (o *ObservabilityPipelineHttpServerSource) GetAuthStrategy() ObservabilityPipelineHttpServerSourceAuthStrategy {
 	if o == nil {
@@ -71,6 +113,34 @@ func (o *ObservabilityPipelineHttpServerSource) GetAuthStrategyOk() (*Observabil
 // SetAuthStrategy sets field value.
 func (o *ObservabilityPipelineHttpServerSource) SetAuthStrategy(v ObservabilityPipelineHttpServerSourceAuthStrategy) {
 	o.AuthStrategy = v
+}
+
+// GetCustomKey returns the CustomKey field value if set, zero value otherwise.
+func (o *ObservabilityPipelineHttpServerSource) GetCustomKey() string {
+	if o == nil || o.CustomKey == nil {
+		var ret string
+		return ret
+	}
+	return *o.CustomKey
+}
+
+// GetCustomKeyOk returns a tuple with the CustomKey field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ObservabilityPipelineHttpServerSource) GetCustomKeyOk() (*string, bool) {
+	if o == nil || o.CustomKey == nil {
+		return nil, false
+	}
+	return o.CustomKey, true
+}
+
+// HasCustomKey returns a boolean if a field has been set.
+func (o *ObservabilityPipelineHttpServerSource) HasCustomKey() bool {
+	return o != nil && o.CustomKey != nil
+}
+
+// SetCustomKey gets a reference to the given string and assigns it to the CustomKey field.
+func (o *ObservabilityPipelineHttpServerSource) SetCustomKey(v string) {
+	o.CustomKey = &v
 }
 
 // GetDecoding returns the Decoding field value.
@@ -119,10 +189,38 @@ func (o *ObservabilityPipelineHttpServerSource) SetId(v string) {
 	o.Id = v
 }
 
+// GetPasswordKey returns the PasswordKey field value if set, zero value otherwise.
+func (o *ObservabilityPipelineHttpServerSource) GetPasswordKey() string {
+	if o == nil || o.PasswordKey == nil {
+		var ret string
+		return ret
+	}
+	return *o.PasswordKey
+}
+
+// GetPasswordKeyOk returns a tuple with the PasswordKey field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ObservabilityPipelineHttpServerSource) GetPasswordKeyOk() (*string, bool) {
+	if o == nil || o.PasswordKey == nil {
+		return nil, false
+	}
+	return o.PasswordKey, true
+}
+
+// HasPasswordKey returns a boolean if a field has been set.
+func (o *ObservabilityPipelineHttpServerSource) HasPasswordKey() bool {
+	return o != nil && o.PasswordKey != nil
+}
+
+// SetPasswordKey gets a reference to the given string and assigns it to the PasswordKey field.
+func (o *ObservabilityPipelineHttpServerSource) SetPasswordKey(v string) {
+	o.PasswordKey = &v
+}
+
 // GetTls returns the Tls field value if set, zero value otherwise.
-func (o *ObservabilityPipelineHttpServerSource) GetTls() ObservabilityPipelineTls {
+func (o *ObservabilityPipelineHttpServerSource) GetTls() ObservabilityPipelineMtlsServerTls {
 	if o == nil || o.Tls == nil {
-		var ret ObservabilityPipelineTls
+		var ret ObservabilityPipelineMtlsServerTls
 		return ret
 	}
 	return *o.Tls
@@ -130,7 +228,7 @@ func (o *ObservabilityPipelineHttpServerSource) GetTls() ObservabilityPipelineTl
 
 // GetTlsOk returns a tuple with the Tls field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineHttpServerSource) GetTlsOk() (*ObservabilityPipelineTls, bool) {
+func (o *ObservabilityPipelineHttpServerSource) GetTlsOk() (*ObservabilityPipelineMtlsServerTls, bool) {
 	if o == nil || o.Tls == nil {
 		return nil, false
 	}
@@ -142,8 +240,8 @@ func (o *ObservabilityPipelineHttpServerSource) HasTls() bool {
 	return o != nil && o.Tls != nil
 }
 
-// SetTls gets a reference to the given ObservabilityPipelineTls and assigns it to the Tls field.
-func (o *ObservabilityPipelineHttpServerSource) SetTls(v ObservabilityPipelineTls) {
+// SetTls gets a reference to the given ObservabilityPipelineMtlsServerTls and assigns it to the Tls field.
+func (o *ObservabilityPipelineHttpServerSource) SetTls(v ObservabilityPipelineMtlsServerTls) {
 	o.Tls = &v
 }
 
@@ -170,19 +268,90 @@ func (o *ObservabilityPipelineHttpServerSource) SetType(v ObservabilityPipelineH
 	o.Type = v
 }
 
+// GetUsernameKey returns the UsernameKey field value if set, zero value otherwise.
+func (o *ObservabilityPipelineHttpServerSource) GetUsernameKey() string {
+	if o == nil || o.UsernameKey == nil {
+		var ret string
+		return ret
+	}
+	return *o.UsernameKey
+}
+
+// GetUsernameKeyOk returns a tuple with the UsernameKey field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ObservabilityPipelineHttpServerSource) GetUsernameKeyOk() (*string, bool) {
+	if o == nil || o.UsernameKey == nil {
+		return nil, false
+	}
+	return o.UsernameKey, true
+}
+
+// HasUsernameKey returns a boolean if a field has been set.
+func (o *ObservabilityPipelineHttpServerSource) HasUsernameKey() bool {
+	return o != nil && o.UsernameKey != nil
+}
+
+// SetUsernameKey gets a reference to the given string and assigns it to the UsernameKey field.
+func (o *ObservabilityPipelineHttpServerSource) SetUsernameKey(v string) {
+	o.UsernameKey = &v
+}
+
+// GetValidTokens returns the ValidTokens field value if set, zero value otherwise.
+func (o *ObservabilityPipelineHttpServerSource) GetValidTokens() []ObservabilityPipelineHttpServerSourceValidToken {
+	if o == nil || o.ValidTokens == nil {
+		var ret []ObservabilityPipelineHttpServerSourceValidToken
+		return ret
+	}
+	return o.ValidTokens
+}
+
+// GetValidTokensOk returns a tuple with the ValidTokens field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ObservabilityPipelineHttpServerSource) GetValidTokensOk() (*[]ObservabilityPipelineHttpServerSourceValidToken, bool) {
+	if o == nil || o.ValidTokens == nil {
+		return nil, false
+	}
+	return &o.ValidTokens, true
+}
+
+// HasValidTokens returns a boolean if a field has been set.
+func (o *ObservabilityPipelineHttpServerSource) HasValidTokens() bool {
+	return o != nil && o.ValidTokens != nil
+}
+
+// SetValidTokens gets a reference to the given []ObservabilityPipelineHttpServerSourceValidToken and assigns it to the ValidTokens field.
+func (o *ObservabilityPipelineHttpServerSource) SetValidTokens(v []ObservabilityPipelineHttpServerSourceValidToken) {
+	o.ValidTokens = v
+}
+
 // MarshalJSON serializes the struct using spec logic.
 func (o ObservabilityPipelineHttpServerSource) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
+	if o.AddressKey != nil {
+		toSerialize["address_key"] = o.AddressKey
+	}
 	toSerialize["auth_strategy"] = o.AuthStrategy
+	if o.CustomKey != nil {
+		toSerialize["custom_key"] = o.CustomKey
+	}
 	toSerialize["decoding"] = o.Decoding
 	toSerialize["id"] = o.Id
+	if o.PasswordKey != nil {
+		toSerialize["password_key"] = o.PasswordKey
+	}
 	if o.Tls != nil {
 		toSerialize["tls"] = o.Tls
 	}
 	toSerialize["type"] = o.Type
+	if o.UsernameKey != nil {
+		toSerialize["username_key"] = o.UsernameKey
+	}
+	if o.ValidTokens != nil {
+		toSerialize["valid_tokens"] = o.ValidTokens
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -193,11 +362,16 @@ func (o ObservabilityPipelineHttpServerSource) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *ObservabilityPipelineHttpServerSource) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
+		AddressKey   *string                                            `json:"address_key,omitempty"`
 		AuthStrategy *ObservabilityPipelineHttpServerSourceAuthStrategy `json:"auth_strategy"`
+		CustomKey    *string                                            `json:"custom_key,omitempty"`
 		Decoding     *ObservabilityPipelineDecoding                     `json:"decoding"`
 		Id           *string                                            `json:"id"`
-		Tls          *ObservabilityPipelineTls                          `json:"tls,omitempty"`
+		PasswordKey  *string                                            `json:"password_key,omitempty"`
+		Tls          *ObservabilityPipelineMtlsServerTls                `json:"tls,omitempty"`
 		Type         *ObservabilityPipelineHttpServerSourceType         `json:"type"`
+		UsernameKey  *string                                            `json:"username_key,omitempty"`
+		ValidTokens  []ObservabilityPipelineHttpServerSourceValidToken  `json:"valid_tokens,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -215,24 +389,27 @@ func (o *ObservabilityPipelineHttpServerSource) UnmarshalJSON(bytes []byte) (err
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"auth_strategy", "decoding", "id", "tls", "type"})
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"address_key", "auth_strategy", "custom_key", "decoding", "id", "password_key", "tls", "type", "username_key", "valid_tokens"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
+	o.AddressKey = all.AddressKey
 	if !all.AuthStrategy.IsValid() {
 		hasInvalidField = true
 	} else {
 		o.AuthStrategy = *all.AuthStrategy
 	}
+	o.CustomKey = all.CustomKey
 	if !all.Decoding.IsValid() {
 		hasInvalidField = true
 	} else {
 		o.Decoding = *all.Decoding
 	}
 	o.Id = *all.Id
+	o.PasswordKey = all.PasswordKey
 	if all.Tls != nil && all.Tls.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true
 	}
@@ -242,6 +419,8 @@ func (o *ObservabilityPipelineHttpServerSource) UnmarshalJSON(bytes []byte) (err
 	} else {
 		o.Type = *all.Type
 	}
+	o.UsernameKey = all.UsernameKey
+	o.ValidTokens = all.ValidTokens
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

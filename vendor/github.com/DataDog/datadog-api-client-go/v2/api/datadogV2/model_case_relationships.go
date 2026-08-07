@@ -16,7 +16,7 @@ type CaseRelationships struct {
 	CreatedBy NullableNullableUserRelationship `json:"created_by,omitempty"`
 	// Relationship to user.
 	ModifiedBy NullableNullableUserRelationship `json:"modified_by,omitempty"`
-	// Relationship to project
+	// Relationship to project.
 	Project *ProjectRelationship `json:"project,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -222,7 +222,7 @@ func (o *CaseRelationships) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"assignee", "created_by", "modified_by", "project"})
 	} else {
 		return err

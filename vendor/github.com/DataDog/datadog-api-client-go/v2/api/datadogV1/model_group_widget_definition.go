@@ -10,9 +10,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// GroupWidgetDefinition The groups widget allows you to keep similar graphs together on your timeboard. Each group has a custom header, can hold one to many graphs, and is collapsible.
+// GroupWidgetDefinition The group widget allows you to keep similar graphs together on your dashboard. Each group has a custom header, can hold one to many graphs, and is collapsible.
 type GroupWidgetDefinition struct {
-	// Background color of the group title.
+	// Background color of the widget. Supported values are `white`, `blue`, `purple`, `pink`, `orange`, `yellow`, `green`, `gray`, `vivid_blue`, `vivid_purple`, `vivid_pink`, `vivid_orange`, `vivid_yellow`, `vivid_green`, and `transparent`.
 	BackgroundColor *string `json:"background_color,omitempty"`
 	// URL of image to display as a banner for the group.
 	BannerImg *string `json:"banner_img,omitempty"`
@@ -324,7 +324,7 @@ func (o *GroupWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field widgets missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"background_color", "banner_img", "layout_type", "show_title", "title", "title_align", "type", "widgets"})
 	} else {
 		return err

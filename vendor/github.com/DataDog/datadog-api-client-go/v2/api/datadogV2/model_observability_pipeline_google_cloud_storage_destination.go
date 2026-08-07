@@ -11,15 +11,18 @@ import (
 )
 
 // ObservabilityPipelineGoogleCloudStorageDestination The `google_cloud_storage` destination stores logs in a Google Cloud Storage (GCS) bucket.
-// It requires a bucket name, GCP authentication, and metadata fields.
+// It requires a bucket name, Google Cloud authentication, and metadata fields.
+//
+// **Supported pipeline types:** logs
 type ObservabilityPipelineGoogleCloudStorageDestination struct {
 	// Access control list setting for objects written to the bucket.
-	Acl ObservabilityPipelineGoogleCloudStorageDestinationAcl `json:"acl"`
-	// GCP credentials used to authenticate with Google Cloud Storage.
-	//
-	Auth ObservabilityPipelineGcpAuth `json:"auth"`
+	Acl *ObservabilityPipelineGoogleCloudStorageDestinationAcl `json:"acl,omitempty"`
+	// Google Cloud credentials used to authenticate with Google Cloud Storage.
+	Auth *ObservabilityPipelineGcpAuth `json:"auth,omitempty"`
 	// Name of the GCS bucket.
 	Bucket string `json:"bucket"`
+	// Configuration for buffer settings on destination components.
+	Buffer *ObservabilityPipelineBufferOptions `json:"buffer,omitempty"`
 	// Unique identifier for the destination component.
 	Id string `json:"id"`
 	// A list of component IDs whose output is used as the `input` for this component.
@@ -41,10 +44,8 @@ type ObservabilityPipelineGoogleCloudStorageDestination struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewObservabilityPipelineGoogleCloudStorageDestination(acl ObservabilityPipelineGoogleCloudStorageDestinationAcl, auth ObservabilityPipelineGcpAuth, bucket string, id string, inputs []string, storageClass ObservabilityPipelineGoogleCloudStorageDestinationStorageClass, typeVar ObservabilityPipelineGoogleCloudStorageDestinationType) *ObservabilityPipelineGoogleCloudStorageDestination {
+func NewObservabilityPipelineGoogleCloudStorageDestination(bucket string, id string, inputs []string, storageClass ObservabilityPipelineGoogleCloudStorageDestinationStorageClass, typeVar ObservabilityPipelineGoogleCloudStorageDestinationType) *ObservabilityPipelineGoogleCloudStorageDestination {
 	this := ObservabilityPipelineGoogleCloudStorageDestination{}
-	this.Acl = acl
-	this.Auth = auth
 	this.Bucket = bucket
 	this.Id = id
 	this.Inputs = inputs
@@ -63,50 +64,60 @@ func NewObservabilityPipelineGoogleCloudStorageDestinationWithDefaults() *Observ
 	return &this
 }
 
-// GetAcl returns the Acl field value.
+// GetAcl returns the Acl field value if set, zero value otherwise.
 func (o *ObservabilityPipelineGoogleCloudStorageDestination) GetAcl() ObservabilityPipelineGoogleCloudStorageDestinationAcl {
-	if o == nil {
+	if o == nil || o.Acl == nil {
 		var ret ObservabilityPipelineGoogleCloudStorageDestinationAcl
 		return ret
 	}
-	return o.Acl
+	return *o.Acl
 }
 
-// GetAclOk returns a tuple with the Acl field value
+// GetAclOk returns a tuple with the Acl field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *ObservabilityPipelineGoogleCloudStorageDestination) GetAclOk() (*ObservabilityPipelineGoogleCloudStorageDestinationAcl, bool) {
-	if o == nil {
+	if o == nil || o.Acl == nil {
 		return nil, false
 	}
-	return &o.Acl, true
+	return o.Acl, true
 }
 
-// SetAcl sets field value.
+// HasAcl returns a boolean if a field has been set.
+func (o *ObservabilityPipelineGoogleCloudStorageDestination) HasAcl() bool {
+	return o != nil && o.Acl != nil
+}
+
+// SetAcl gets a reference to the given ObservabilityPipelineGoogleCloudStorageDestinationAcl and assigns it to the Acl field.
 func (o *ObservabilityPipelineGoogleCloudStorageDestination) SetAcl(v ObservabilityPipelineGoogleCloudStorageDestinationAcl) {
-	o.Acl = v
+	o.Acl = &v
 }
 
-// GetAuth returns the Auth field value.
+// GetAuth returns the Auth field value if set, zero value otherwise.
 func (o *ObservabilityPipelineGoogleCloudStorageDestination) GetAuth() ObservabilityPipelineGcpAuth {
-	if o == nil {
+	if o == nil || o.Auth == nil {
 		var ret ObservabilityPipelineGcpAuth
 		return ret
 	}
-	return o.Auth
+	return *o.Auth
 }
 
-// GetAuthOk returns a tuple with the Auth field value
+// GetAuthOk returns a tuple with the Auth field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *ObservabilityPipelineGoogleCloudStorageDestination) GetAuthOk() (*ObservabilityPipelineGcpAuth, bool) {
-	if o == nil {
+	if o == nil || o.Auth == nil {
 		return nil, false
 	}
-	return &o.Auth, true
+	return o.Auth, true
 }
 
-// SetAuth sets field value.
+// HasAuth returns a boolean if a field has been set.
+func (o *ObservabilityPipelineGoogleCloudStorageDestination) HasAuth() bool {
+	return o != nil && o.Auth != nil
+}
+
+// SetAuth gets a reference to the given ObservabilityPipelineGcpAuth and assigns it to the Auth field.
 func (o *ObservabilityPipelineGoogleCloudStorageDestination) SetAuth(v ObservabilityPipelineGcpAuth) {
-	o.Auth = v
+	o.Auth = &v
 }
 
 // GetBucket returns the Bucket field value.
@@ -130,6 +141,34 @@ func (o *ObservabilityPipelineGoogleCloudStorageDestination) GetBucketOk() (*str
 // SetBucket sets field value.
 func (o *ObservabilityPipelineGoogleCloudStorageDestination) SetBucket(v string) {
 	o.Bucket = v
+}
+
+// GetBuffer returns the Buffer field value if set, zero value otherwise.
+func (o *ObservabilityPipelineGoogleCloudStorageDestination) GetBuffer() ObservabilityPipelineBufferOptions {
+	if o == nil || o.Buffer == nil {
+		var ret ObservabilityPipelineBufferOptions
+		return ret
+	}
+	return *o.Buffer
+}
+
+// GetBufferOk returns a tuple with the Buffer field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ObservabilityPipelineGoogleCloudStorageDestination) GetBufferOk() (*ObservabilityPipelineBufferOptions, bool) {
+	if o == nil || o.Buffer == nil {
+		return nil, false
+	}
+	return o.Buffer, true
+}
+
+// HasBuffer returns a boolean if a field has been set.
+func (o *ObservabilityPipelineGoogleCloudStorageDestination) HasBuffer() bool {
+	return o != nil && o.Buffer != nil
+}
+
+// SetBuffer gets a reference to the given ObservabilityPipelineBufferOptions and assigns it to the Buffer field.
+func (o *ObservabilityPipelineGoogleCloudStorageDestination) SetBuffer(v ObservabilityPipelineBufferOptions) {
+	o.Buffer = &v
 }
 
 // GetId returns the Id field value.
@@ -286,9 +325,16 @@ func (o ObservabilityPipelineGoogleCloudStorageDestination) MarshalJSON() ([]byt
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	toSerialize["acl"] = o.Acl
-	toSerialize["auth"] = o.Auth
+	if o.Acl != nil {
+		toSerialize["acl"] = o.Acl
+	}
+	if o.Auth != nil {
+		toSerialize["auth"] = o.Auth
+	}
 	toSerialize["bucket"] = o.Bucket
+	if o.Buffer != nil {
+		toSerialize["buffer"] = o.Buffer
+	}
 	toSerialize["id"] = o.Id
 	toSerialize["inputs"] = o.Inputs
 	if o.KeyPrefix != nil {
@@ -309,9 +355,10 @@ func (o ObservabilityPipelineGoogleCloudStorageDestination) MarshalJSON() ([]byt
 // UnmarshalJSON deserializes the given payload.
 func (o *ObservabilityPipelineGoogleCloudStorageDestination) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Acl          *ObservabilityPipelineGoogleCloudStorageDestinationAcl          `json:"acl"`
-		Auth         *ObservabilityPipelineGcpAuth                                   `json:"auth"`
+		Acl          *ObservabilityPipelineGoogleCloudStorageDestinationAcl          `json:"acl,omitempty"`
+		Auth         *ObservabilityPipelineGcpAuth                                   `json:"auth,omitempty"`
 		Bucket       *string                                                         `json:"bucket"`
+		Buffer       *ObservabilityPipelineBufferOptions                             `json:"buffer,omitempty"`
 		Id           *string                                                         `json:"id"`
 		Inputs       *[]string                                                       `json:"inputs"`
 		KeyPrefix    *string                                                         `json:"key_prefix,omitempty"`
@@ -321,12 +368,6 @@ func (o *ObservabilityPipelineGoogleCloudStorageDestination) UnmarshalJSON(bytes
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
-	}
-	if all.Acl == nil {
-		return fmt.Errorf("required field acl missing")
-	}
-	if all.Auth == nil {
-		return fmt.Errorf("required field auth missing")
 	}
 	if all.Bucket == nil {
 		return fmt.Errorf("required field bucket missing")
@@ -344,23 +385,24 @@ func (o *ObservabilityPipelineGoogleCloudStorageDestination) UnmarshalJSON(bytes
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"acl", "auth", "bucket", "id", "inputs", "key_prefix", "metadata", "storage_class", "type"})
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"acl", "auth", "bucket", "buffer", "id", "inputs", "key_prefix", "metadata", "storage_class", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	if !all.Acl.IsValid() {
+	if all.Acl != nil && !all.Acl.IsValid() {
 		hasInvalidField = true
 	} else {
-		o.Acl = *all.Acl
+		o.Acl = all.Acl
 	}
-	if all.Auth.UnparsedObject != nil && o.UnparsedObject == nil {
+	if all.Auth != nil && all.Auth.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true
 	}
-	o.Auth = *all.Auth
+	o.Auth = all.Auth
 	o.Bucket = *all.Bucket
+	o.Buffer = all.Buffer
 	o.Id = *all.Id
 	o.Inputs = *all.Inputs
 	o.KeyPrefix = all.KeyPrefix

@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// ScheduleTarget Represents a schedule target for an escalation policy step, including its ID and resource type.
+// ScheduleTarget Represents a schedule target for an escalation policy step, including its ID and resource type. This is a shortcut for a configured schedule target with position set to 'current'.
 type ScheduleTarget struct {
 	// Specifies the unique identifier of the schedule resource.
 	Id string `json:"id"`
@@ -119,7 +119,7 @@ func (o *ScheduleTarget) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"id", "type"})
 	} else {
 		return err

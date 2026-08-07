@@ -8,9 +8,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// Shift The definition of `Shift` object.
+// Shift An on-call shift with its associated data and relationships.
 type Shift struct {
-	// The definition of `ShiftData` object.
+	// Data for an on-call shift.
 	Data *ShiftData `json:"data,omitempty"`
 	// The `Shift` `included`.
 	Included []ShiftIncluded `json:"included,omitempty"`
@@ -121,7 +121,7 @@ func (o *Shift) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data", "included"})
 	} else {
 		return err

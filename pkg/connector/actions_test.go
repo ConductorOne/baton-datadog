@@ -2,6 +2,8 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +12,8 @@ import (
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -117,5 +121,101 @@ func TestDisableUserNotFoundFails(t *testing.T) {
 	_, _, err = d.disableUser(context.Background(), args)
 	if err == nil {
 		t.Fatal("disableUser returned nil error for a 404 GetUser response, want an error")
+	}
+}
+
+// TestUpdateUserSchemaExposesTitle verifies the update_user schema declares the optional
+// title argument alongside name and email. See CXH-2187.
+func TestUpdateUserSchemaExposesTitle(t *testing.T) {
+	byName := make(map[string]bool, len(updateUserActionSchema.GetArguments()))
+	for _, arg := range updateUserActionSchema.GetArguments() {
+		byName[arg.GetName()] = true
+	}
+	for _, name := range []string{"user_id", "name", "email", "title"} {
+		if !byName[name] {
+			t.Errorf("update_user schema is missing argument %q", name)
+		}
+	}
+}
+
+// updateUserArgs builds the action arguments for updateUser, with user_id shaped as the
+// resource-ID struct GetResourceIDArg expects.
+func updateUserArgs(t *testing.T, userID string, optional map[string]string) *structpb.Struct {
+	t.Helper()
+
+	fields := map[string]any{
+		"user_id": map[string]any{
+			"resource_type_id": userResourceType.Id,
+			"resource_id":      userID,
+		},
+	}
+	for k, v := range optional {
+		fields[k] = v
+	}
+
+	args, err := structpb.NewStruct(fields)
+	if err != nil {
+		t.Fatalf("build args: %v", err)
+	}
+	return args
+}
+
+// TestUpdateUserSendsTitle verifies a title-only update_user call PATCHes the user with
+// attributes.title, so a job title can be changed after account creation. See CXH-2187.
+func TestUpdateUserSendsTitle(t *testing.T) {
+	const (
+		userID = "user-1"
+		title  = "Staff Engineer"
+	)
+
+	var body []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch || r.URL.Path != "/api/v2/users/"+userID {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		var err error
+		if body, err = io.ReadAll(r.Body); err != nil {
+			t.Errorf("read request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"` + userID + `","type":"users","attributes":{}}}`))
+	}))
+	defer server.Close()
+
+	cfg := datadog.NewConfiguration()
+	cfg.Servers = datadog.ServerConfigurations{{URL: server.URL}}
+	wrapper := client.NewDatadogClient(nil, datadog.NewAPIClient(cfg), "example.com", "api-key", "app-key")
+	builder := newUserBuilder(wrapper)
+
+	if _, _, err := builder.updateUser(context.Background(), updateUserArgs(t, userID, map[string]string{"title": title})); err != nil {
+		t.Fatalf("updateUser returned error, want nil: %v", err)
+	}
+
+	var sent struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("unmarshal request body %q: %v", body, err)
+	}
+	if got := sent.Data.Attributes["title"]; got != title {
+		t.Errorf("attributes.title = %v, want %q", got, title)
+	}
+}
+
+// TestUpdateUserRequiresOneField verifies update_user still rejects a call that supplies
+// no updatable attribute, now that title is one of them.
+func TestUpdateUserRequiresOneField(t *testing.T) {
+	builder := newUserBuilder(nil)
+
+	_, _, err := builder.updateUser(context.Background(), updateUserArgs(t, "user-1", nil))
+	if err == nil {
+		t.Fatal("updateUser returned nil error, want InvalidArgument")
+	}
+	if code := status.Code(err); code != codes.InvalidArgument {
+		t.Errorf("updateUser error code = %s, want %s", code, codes.InvalidArgument)
 	}
 }

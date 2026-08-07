@@ -8,9 +8,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// MetricAllTags Object for a single metric's indexed tags.
+// MetricAllTags Object for a single metric's indexed and ingested tags.
 type MetricAllTags struct {
-	// Object containing the definition of a metric's tags.
+	// Object containing the definition of a metric's indexed and ingested tags.
 	Attributes *MetricAllTagsAttributes `json:"attributes,omitempty"`
 	// The metric name for this resource.
 	Id *string `json:"id,omitempty"`
@@ -159,7 +159,7 @@ func (o *MetricAllTags) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"attributes", "id", "type"})
 	} else {
 		return err

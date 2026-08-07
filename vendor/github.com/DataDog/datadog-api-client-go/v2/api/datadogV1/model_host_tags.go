@@ -8,11 +8,11 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// HostTags Set of tags to associate with your host.
+// HostTags Host name and an array of its tags
 type HostTags struct {
 	// Your host name.
 	Host *string `json:"host,omitempty"`
-	// A list of tags to apply to the host.
+	// A list of tags associated with a host.
 	Tags []string `json:"tags,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -121,7 +121,7 @@ func (o *HostTags) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"host", "tags"})
 	} else {
 		return err

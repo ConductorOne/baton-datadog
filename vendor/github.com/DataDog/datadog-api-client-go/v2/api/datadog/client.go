@@ -34,6 +34,9 @@ var (
 	jsonCheck            = regexp.MustCompile(`(?i:(?:application|text)/(?:vnd\.[^;]+\+)?json)`)
 	xmlCheck             = regexp.MustCompile(`(?i:(?:application|text)/xml)`)
 	rateLimitResetHeader = "X-Ratelimit-Reset"
+	authorizationHeader  = "Authorization"
+	bearerTokenFormat    = "Bearer %s"
+	appKeyAuthType       = "appKeyAuth"
 )
 
 // APIClient manages communication with the Datadog API V2 Collection API v1.0.
@@ -52,6 +55,34 @@ type FormFile struct {
 // Service holds APIClient
 type Service struct {
 	Client *APIClient
+}
+
+// UseDelegatedTokenAuth sets the Authorization header with a delegated token if available in the context.
+func UseDelegatedTokenAuth(ctx context.Context, headerParams *map[string]string, delegatedTokenConfig *DelegatedTokenConfig) error {
+	if ctx != nil {
+		if delegatedTokenCreds, ok := ctx.Value(ContextDelegatedToken).(*DelegatedTokenCredentials); ok {
+			if delegatedTokenCreds.DelegatedToken == "" || time.Now().After(delegatedTokenCreds.Expiration) {
+				newCreds, err := CallDelegatedTokenAuthenticate(ctx, delegatedTokenConfig)
+				if err != nil {
+					log.Printf("Failed to retrieve delegated token: %v", err)
+					// Reset the token if authentication failed
+					delegatedTokenCreds.DelegatedToken = ""
+					return err
+				}
+				delegatedTokenCreds.DelegatedToken = newCreds.DelegatedToken
+				delegatedTokenCreds.DelegatedProof = newCreds.DelegatedProof
+				delegatedTokenCreds.OrgUUID = newCreds.OrgUUID
+				delegatedTokenCreds.Expiration = newCreds.Expiration
+			}
+			// If authentication succeeded use delegated token auth
+			if delegatedTokenCreds.DelegatedToken != "" {
+				(*headerParams)[authorizationHeader] = fmt.Sprintf(bearerTokenFormat, delegatedTokenCreds.DelegatedToken)
+			}
+		} else {
+			return errors.New("DelegatedTokenCredentials not found in context")
+		}
+	}
+	return nil
 }
 
 // SetAuthKeys sets the appropriate values in the headers parameter.
@@ -142,13 +173,23 @@ func (c *APIClient) CallAPI(request *http.Request) (*http.Response, error) {
 			if err != nil {
 				return nil, err
 			}
-			// Strip any api keys from the response being logged
-			keys, ok := newRequest.Context().Value(ContextAPIKeys).(map[string]APIKey)
-			if keys != nil && ok {
+			// Strip any credential values from the request being logged.
+			// ContextAPIKeys carries the DD-API-KEY / DD-APPLICATION-KEY values;
+			// ContextAccessToken carries bearer tokens (PATs, delegated tokens).
+			var secretsToRedact []string
+			if keys, ok := newRequest.Context().Value(ContextAPIKeys).(map[string]APIKey); ok && keys != nil {
 				for _, apiKey := range keys {
-					valueRegex := regexp.MustCompile(fmt.Sprintf("(?m)%s", apiKey.Key))
-					dump = valueRegex.ReplaceAll(dump, []byte("REDACTED"))
+					if apiKey.Key != "" {
+						secretsToRedact = append(secretsToRedact, apiKey.Key)
+					}
 				}
+			}
+			if token, ok := newRequest.Context().Value(ContextAccessToken).(string); ok && token != "" {
+				secretsToRedact = append(secretsToRedact, token)
+			}
+			for _, secret := range secretsToRedact {
+				valueRegex := regexp.MustCompile(fmt.Sprintf("(?m)%s", regexp.QuoteMeta(secret)))
+				dump = valueRegex.ReplaceAll(dump, []byte("REDACTED"))
 			}
 			log.Printf("\n%s\n", string(dump))
 		}
@@ -206,8 +247,10 @@ func (c *APIClient) shouldRetryRequest(response *http.Response, retryCount int) 
 	if err != nil || response.StatusCode == 429 || response.StatusCode >= 500 {
 		// Calculate the retry val (base * multiplier^retryCount)
 		retryVal := c.Cfg.RetryConfiguration.BackOffBase * math.Pow(c.Cfg.RetryConfiguration.BackOffMultiplier, float64(retryCount))
-		// retry duration shouldn't exceed default timeout period
-		retryVal = math.Min(float64(c.Cfg.HTTPClient.Timeout/time.Second), retryVal)
+		// retry duration shouldn't exceed the configured timeout period (skip cap when Timeout==0, which means no timeout)
+		if c.Cfg.HTTPClient.Timeout > 0 {
+			retryVal = math.Min(float64(c.Cfg.HTTPClient.Timeout/time.Second), retryVal)
+		}
 		retryDuration := time.Duration(retryVal) * time.Second
 		return &retryDuration, true
 	}
@@ -442,6 +485,32 @@ func (c *APIClient) Decode(v interface{}, b []byte, contentType string) (err err
 		return err
 	}
 	return nil
+}
+
+// GetDelegatedToken will call CallDelegatedTokenAuthenticate if delegated token auth is found in the context.
+func (c *APIClient) GetDelegatedToken(ctx context.Context) (*DelegatedTokenCredentials, error) {
+	log.Println("Performing delegated token authentication")
+	creds, err := CallDelegatedTokenAuthenticate(ctx, c.Cfg.DelegatedTokenConfig)
+	return creds, err
+}
+
+func CallDelegatedTokenAuthenticate(ctx context.Context, config *DelegatedTokenConfig) (*DelegatedTokenCredentials, error) {
+	if config == nil {
+		return nil, nil
+	}
+	creds, err := config.ProviderAuth.Authenticate(ctx, config)
+	if err != nil || creds == nil {
+		return nil, err
+	}
+
+	// If the context already has DelegatedTokenCredentials, update it with the new credentials
+	if delegatedTokenCreds, ok := ctx.Value(ContextDelegatedToken).(*DelegatedTokenCredentials); ok {
+		delegatedTokenCreds.DelegatedToken = creds.DelegatedToken
+		delegatedTokenCreds.DelegatedProof = creds.DelegatedProof
+		delegatedTokenCreds.OrgUUID = creds.OrgUUID
+		delegatedTokenCreds.Expiration = creds.Expiration
+	}
+	return creds, nil
 }
 
 // Add a file to the multipart request.

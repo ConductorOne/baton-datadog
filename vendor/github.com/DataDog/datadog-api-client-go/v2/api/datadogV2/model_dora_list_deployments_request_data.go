@@ -28,6 +28,8 @@ type DORAListDeploymentsRequestData struct {
 func NewDORAListDeploymentsRequestData(attributes DORAListDeploymentsRequestAttributes) *DORAListDeploymentsRequestData {
 	this := DORAListDeploymentsRequestData{}
 	this.Attributes = attributes
+	var typeVar DORAListDeploymentsRequestDataType = DORALISTDEPLOYMENTSREQUESTDATATYPE_DORA_DEPLOYMENTS_LIST_REQUEST
+	this.Type = &typeVar
 	return &this
 }
 
@@ -36,6 +38,8 @@ func NewDORAListDeploymentsRequestData(attributes DORAListDeploymentsRequestAttr
 // but it doesn't guarantee that properties required by API are set.
 func NewDORAListDeploymentsRequestDataWithDefaults() *DORAListDeploymentsRequestData {
 	this := DORAListDeploymentsRequestData{}
+	var typeVar DORAListDeploymentsRequestDataType = DORALISTDEPLOYMENTSREQUESTDATATYPE_DORA_DEPLOYMENTS_LIST_REQUEST
+	this.Type = &typeVar
 	return &this
 }
 
@@ -120,7 +124,7 @@ func (o *DORAListDeploymentsRequestData) UnmarshalJSON(bytes []byte) (err error)
 		return fmt.Errorf("required field attributes missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"attributes", "type"})
 	} else {
 		return err

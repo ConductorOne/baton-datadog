@@ -14,7 +14,9 @@ import (
 type ObservabilityPipelineSensitiveDataScannerProcessorActionHash struct {
 	// Action type that replaces the matched sensitive data with a hashed representation, preserving structure while securing content.
 	Action ObservabilityPipelineSensitiveDataScannerProcessorActionHashAction `json:"action"`
-	// The `ObservabilityPipelineSensitiveDataScannerProcessorActionHash` `options`.
+	// Optional settings for the hash action. When omitted or empty, matched sensitive data is
+	// replaced with a deterministic hashed value that preserves structure for analytics while
+	// protecting the original content. Reserved for future hash configuration (for example, algorithm or salt).
 	Options interface{} `json:"options,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -120,7 +122,7 @@ func (o *ObservabilityPipelineSensitiveDataScannerProcessorActionHash) Unmarshal
 		return fmt.Errorf("required field action missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"action", "options"})
 	} else {
 		return err

@@ -11,10 +11,12 @@ import (
 // SecurityMonitoringRuleNewValueOptions Options on new value detection method.
 type SecurityMonitoringRuleNewValueOptions struct {
 	// The duration in days after which a learned value is forgotten.
-	ForgetAfter *SecurityMonitoringRuleNewValueOptionsForgetAfter `json:"forgetAfter,omitempty"`
+	ForgetAfter *int32 `json:"forgetAfter,omitempty"`
+	// When set to true, Datadog uses previous values that fall within the defined learning window to construct the baseline, enabling the system to establish an accurate baseline more rapidly rather than relying solely on gradual learning over time.
+	InstantaneousBaseline *bool `json:"instantaneousBaseline,omitempty"`
 	// The duration in days during which values are learned, and after which signals will be generated for values that
 	// weren't learned. If set to 0, a signal will be generated for all new values after the first value is learned.
-	LearningDuration *SecurityMonitoringRuleNewValueOptionsLearningDuration `json:"learningDuration,omitempty"`
+	LearningDuration *int32 `json:"learningDuration,omitempty"`
 	// The learning method used to determine when signals should be generated for values that weren't learned.
 	LearningMethod *SecurityMonitoringRuleNewValueOptionsLearningMethod `json:"learningMethod,omitempty"`
 	// A number of occurrences after which signals will be generated for values that weren't learned.
@@ -30,7 +32,7 @@ type SecurityMonitoringRuleNewValueOptions struct {
 // will change when the set of required properties is changed.
 func NewSecurityMonitoringRuleNewValueOptions() *SecurityMonitoringRuleNewValueOptions {
 	this := SecurityMonitoringRuleNewValueOptions{}
-	var learningDuration SecurityMonitoringRuleNewValueOptionsLearningDuration = SECURITYMONITORINGRULENEWVALUEOPTIONSLEARNINGDURATION_ZERO_DAYS
+	var learningDuration int32 = 0
 	this.LearningDuration = &learningDuration
 	var learningMethod SecurityMonitoringRuleNewValueOptionsLearningMethod = SECURITYMONITORINGRULENEWVALUEOPTIONSLEARNINGMETHOD_DURATION
 	this.LearningMethod = &learningMethod
@@ -44,7 +46,7 @@ func NewSecurityMonitoringRuleNewValueOptions() *SecurityMonitoringRuleNewValueO
 // but it doesn't guarantee that properties required by API are set.
 func NewSecurityMonitoringRuleNewValueOptionsWithDefaults() *SecurityMonitoringRuleNewValueOptions {
 	this := SecurityMonitoringRuleNewValueOptions{}
-	var learningDuration SecurityMonitoringRuleNewValueOptionsLearningDuration = SECURITYMONITORINGRULENEWVALUEOPTIONSLEARNINGDURATION_ZERO_DAYS
+	var learningDuration int32 = 0
 	this.LearningDuration = &learningDuration
 	var learningMethod SecurityMonitoringRuleNewValueOptionsLearningMethod = SECURITYMONITORINGRULENEWVALUEOPTIONSLEARNINGMETHOD_DURATION
 	this.LearningMethod = &learningMethod
@@ -54,9 +56,9 @@ func NewSecurityMonitoringRuleNewValueOptionsWithDefaults() *SecurityMonitoringR
 }
 
 // GetForgetAfter returns the ForgetAfter field value if set, zero value otherwise.
-func (o *SecurityMonitoringRuleNewValueOptions) GetForgetAfter() SecurityMonitoringRuleNewValueOptionsForgetAfter {
+func (o *SecurityMonitoringRuleNewValueOptions) GetForgetAfter() int32 {
 	if o == nil || o.ForgetAfter == nil {
-		var ret SecurityMonitoringRuleNewValueOptionsForgetAfter
+		var ret int32
 		return ret
 	}
 	return *o.ForgetAfter
@@ -64,7 +66,7 @@ func (o *SecurityMonitoringRuleNewValueOptions) GetForgetAfter() SecurityMonitor
 
 // GetForgetAfterOk returns a tuple with the ForgetAfter field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SecurityMonitoringRuleNewValueOptions) GetForgetAfterOk() (*SecurityMonitoringRuleNewValueOptionsForgetAfter, bool) {
+func (o *SecurityMonitoringRuleNewValueOptions) GetForgetAfterOk() (*int32, bool) {
 	if o == nil || o.ForgetAfter == nil {
 		return nil, false
 	}
@@ -76,15 +78,43 @@ func (o *SecurityMonitoringRuleNewValueOptions) HasForgetAfter() bool {
 	return o != nil && o.ForgetAfter != nil
 }
 
-// SetForgetAfter gets a reference to the given SecurityMonitoringRuleNewValueOptionsForgetAfter and assigns it to the ForgetAfter field.
-func (o *SecurityMonitoringRuleNewValueOptions) SetForgetAfter(v SecurityMonitoringRuleNewValueOptionsForgetAfter) {
+// SetForgetAfter gets a reference to the given int32 and assigns it to the ForgetAfter field.
+func (o *SecurityMonitoringRuleNewValueOptions) SetForgetAfter(v int32) {
 	o.ForgetAfter = &v
 }
 
+// GetInstantaneousBaseline returns the InstantaneousBaseline field value if set, zero value otherwise.
+func (o *SecurityMonitoringRuleNewValueOptions) GetInstantaneousBaseline() bool {
+	if o == nil || o.InstantaneousBaseline == nil {
+		var ret bool
+		return ret
+	}
+	return *o.InstantaneousBaseline
+}
+
+// GetInstantaneousBaselineOk returns a tuple with the InstantaneousBaseline field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SecurityMonitoringRuleNewValueOptions) GetInstantaneousBaselineOk() (*bool, bool) {
+	if o == nil || o.InstantaneousBaseline == nil {
+		return nil, false
+	}
+	return o.InstantaneousBaseline, true
+}
+
+// HasInstantaneousBaseline returns a boolean if a field has been set.
+func (o *SecurityMonitoringRuleNewValueOptions) HasInstantaneousBaseline() bool {
+	return o != nil && o.InstantaneousBaseline != nil
+}
+
+// SetInstantaneousBaseline gets a reference to the given bool and assigns it to the InstantaneousBaseline field.
+func (o *SecurityMonitoringRuleNewValueOptions) SetInstantaneousBaseline(v bool) {
+	o.InstantaneousBaseline = &v
+}
+
 // GetLearningDuration returns the LearningDuration field value if set, zero value otherwise.
-func (o *SecurityMonitoringRuleNewValueOptions) GetLearningDuration() SecurityMonitoringRuleNewValueOptionsLearningDuration {
+func (o *SecurityMonitoringRuleNewValueOptions) GetLearningDuration() int32 {
 	if o == nil || o.LearningDuration == nil {
-		var ret SecurityMonitoringRuleNewValueOptionsLearningDuration
+		var ret int32
 		return ret
 	}
 	return *o.LearningDuration
@@ -92,7 +122,7 @@ func (o *SecurityMonitoringRuleNewValueOptions) GetLearningDuration() SecurityMo
 
 // GetLearningDurationOk returns a tuple with the LearningDuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SecurityMonitoringRuleNewValueOptions) GetLearningDurationOk() (*SecurityMonitoringRuleNewValueOptionsLearningDuration, bool) {
+func (o *SecurityMonitoringRuleNewValueOptions) GetLearningDurationOk() (*int32, bool) {
 	if o == nil || o.LearningDuration == nil {
 		return nil, false
 	}
@@ -104,8 +134,8 @@ func (o *SecurityMonitoringRuleNewValueOptions) HasLearningDuration() bool {
 	return o != nil && o.LearningDuration != nil
 }
 
-// SetLearningDuration gets a reference to the given SecurityMonitoringRuleNewValueOptionsLearningDuration and assigns it to the LearningDuration field.
-func (o *SecurityMonitoringRuleNewValueOptions) SetLearningDuration(v SecurityMonitoringRuleNewValueOptionsLearningDuration) {
+// SetLearningDuration gets a reference to the given int32 and assigns it to the LearningDuration field.
+func (o *SecurityMonitoringRuleNewValueOptions) SetLearningDuration(v int32) {
 	o.LearningDuration = &v
 }
 
@@ -174,6 +204,9 @@ func (o SecurityMonitoringRuleNewValueOptions) MarshalJSON() ([]byte, error) {
 	if o.ForgetAfter != nil {
 		toSerialize["forgetAfter"] = o.ForgetAfter
 	}
+	if o.InstantaneousBaseline != nil {
+		toSerialize["instantaneousBaseline"] = o.InstantaneousBaseline
+	}
 	if o.LearningDuration != nil {
 		toSerialize["learningDuration"] = o.LearningDuration
 	}
@@ -193,32 +226,26 @@ func (o SecurityMonitoringRuleNewValueOptions) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *SecurityMonitoringRuleNewValueOptions) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		ForgetAfter       *SecurityMonitoringRuleNewValueOptionsForgetAfter       `json:"forgetAfter,omitempty"`
-		LearningDuration  *SecurityMonitoringRuleNewValueOptionsLearningDuration  `json:"learningDuration,omitempty"`
-		LearningMethod    *SecurityMonitoringRuleNewValueOptionsLearningMethod    `json:"learningMethod,omitempty"`
-		LearningThreshold *SecurityMonitoringRuleNewValueOptionsLearningThreshold `json:"learningThreshold,omitempty"`
+		ForgetAfter           *int32                                                  `json:"forgetAfter,omitempty"`
+		InstantaneousBaseline *bool                                                   `json:"instantaneousBaseline,omitempty"`
+		LearningDuration      *int32                                                  `json:"learningDuration,omitempty"`
+		LearningMethod        *SecurityMonitoringRuleNewValueOptionsLearningMethod    `json:"learningMethod,omitempty"`
+		LearningThreshold     *SecurityMonitoringRuleNewValueOptionsLearningThreshold `json:"learningThreshold,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"forgetAfter", "learningDuration", "learningMethod", "learningThreshold"})
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"forgetAfter", "instantaneousBaseline", "learningDuration", "learningMethod", "learningThreshold"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	if all.ForgetAfter != nil && !all.ForgetAfter.IsValid() {
-		hasInvalidField = true
-	} else {
-		o.ForgetAfter = all.ForgetAfter
-	}
-	if all.LearningDuration != nil && !all.LearningDuration.IsValid() {
-		hasInvalidField = true
-	} else {
-		o.LearningDuration = all.LearningDuration
-	}
+	o.ForgetAfter = all.ForgetAfter
+	o.InstantaneousBaseline = all.InstantaneousBaseline
+	o.LearningDuration = all.LearningDuration
 	if all.LearningMethod != nil && !all.LearningMethod.IsValid() {
 		hasInvalidField = true
 	} else {

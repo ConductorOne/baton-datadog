@@ -12,7 +12,7 @@ import (
 
 // ObservabilityPipelineSensitiveDataScannerProcessorScopeOptions Fields to which the scope rule applies.
 type ObservabilityPipelineSensitiveDataScannerProcessorScopeOptions struct {
-	// The `ObservabilityPipelineSensitiveDataScannerProcessorScopeOptions` `fields`.
+	// List of log attribute names (field paths) to which the scope applies. Only these fields are included in or excluded from pattern matching.
 	Fields []string `json:"fields"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -86,7 +86,7 @@ func (o *ObservabilityPipelineSensitiveDataScannerProcessorScopeOptions) Unmarsh
 		return fmt.Errorf("required field fields missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"fields"})
 	} else {
 		return err

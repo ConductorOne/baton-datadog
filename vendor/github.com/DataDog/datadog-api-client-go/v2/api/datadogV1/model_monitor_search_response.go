@@ -8,7 +8,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// MonitorSearchResponse The response form a monitor search.
+// MonitorSearchResponse The response from a monitor search.
 type MonitorSearchResponse struct {
 	// The counts of monitors per different criteria.
 	Counts *MonitorSearchResponseCounts `json:"counts,omitempty"`
@@ -155,7 +155,7 @@ func (o *MonitorSearchResponse) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"counts", "metadata", "monitors"})
 	} else {
 		return err

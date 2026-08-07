@@ -15,14 +15,15 @@ type WidgetMarker struct {
 	// Combination of:
 	//   - A severity error, warning, ok, or info
 	//   - A line type: dashed, solid, or bold
-	// In this case of a Distribution widget, this can be set to be `x_axis_percentile`.
-	//
+	// In this case of a Distribution widget, this can be set to be `percentile`.
 	DisplayType *string `json:"display_type,omitempty"`
 	// Label to display over the marker.
 	Label *string `json:"label,omitempty"`
 	// Timestamp for the widget.
 	Time *string `json:"time,omitempty"`
 	// Value to apply. Can be a single value y = 15 or a range of values 0 < y < 10.
+	// For Distribution widgets with `display_type` set to `percentile`, this should be
+	// a numeric percentile value (for example, "90" for P90).
 	Value string `json:"value"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -192,7 +193,7 @@ func (o *WidgetMarker) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field value missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"display_type", "label", "time", "value"})
 	} else {
 		return err
