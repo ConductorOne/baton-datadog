@@ -23,7 +23,7 @@ type AwsCURConfigAttributes struct {
 	// The timestamp when the AWS CUR config was created.
 	CreatedAt *string `json:"created_at,omitempty"`
 	// The error messages for the AWS CUR config.
-	ErrorMessages datadog.NullableList[string] `json:"error_messages,omitempty"`
+	ErrorMessages []string `json:"error_messages,omitempty"`
 	// The number of months the report has been backfilled.
 	// Deprecated
 	Months *int32 `json:"months,omitempty"`
@@ -190,43 +190,32 @@ func (o *AwsCURConfigAttributes) SetCreatedAt(v string) {
 	o.CreatedAt = &v
 }
 
-// GetErrorMessages returns the ErrorMessages field value if set, zero value otherwise (both if not set or set to explicit null).
+// GetErrorMessages returns the ErrorMessages field value if set, zero value otherwise.
 func (o *AwsCURConfigAttributes) GetErrorMessages() []string {
-	if o == nil || o.ErrorMessages.Get() == nil {
+	if o == nil || o.ErrorMessages == nil {
 		var ret []string
 		return ret
 	}
-	return *o.ErrorMessages.Get()
+	return o.ErrorMessages
 }
 
 // GetErrorMessagesOk returns a tuple with the ErrorMessages field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-// NOTE: If the value is an explicit nil, `nil, true` will be returned.
 func (o *AwsCURConfigAttributes) GetErrorMessagesOk() (*[]string, bool) {
-	if o == nil {
+	if o == nil || o.ErrorMessages == nil {
 		return nil, false
 	}
-	return o.ErrorMessages.Get(), o.ErrorMessages.IsSet()
+	return &o.ErrorMessages, true
 }
 
 // HasErrorMessages returns a boolean if a field has been set.
 func (o *AwsCURConfigAttributes) HasErrorMessages() bool {
-	return o != nil && o.ErrorMessages.IsSet()
+	return o != nil && o.ErrorMessages != nil
 }
 
-// SetErrorMessages gets a reference to the given datadog.NullableList[string] and assigns it to the ErrorMessages field.
+// SetErrorMessages gets a reference to the given []string and assigns it to the ErrorMessages field.
 func (o *AwsCURConfigAttributes) SetErrorMessages(v []string) {
-	o.ErrorMessages.Set(&v)
-}
-
-// SetErrorMessagesNil sets the value for ErrorMessages to be an explicit nil.
-func (o *AwsCURConfigAttributes) SetErrorMessagesNil() {
-	o.ErrorMessages.Set(nil)
-}
-
-// UnsetErrorMessages ensures that no value is present for ErrorMessages, not even an explicit nil.
-func (o *AwsCURConfigAttributes) UnsetErrorMessages() {
-	o.ErrorMessages.Unset()
+	o.ErrorMessages = v
 }
 
 // GetMonths returns the Months field value if set, zero value otherwise.
@@ -400,8 +389,8 @@ func (o AwsCURConfigAttributes) MarshalJSON() ([]byte, error) {
 	if o.CreatedAt != nil {
 		toSerialize["created_at"] = o.CreatedAt
 	}
-	if o.ErrorMessages.IsSet() {
-		toSerialize["error_messages"] = o.ErrorMessages.Get()
+	if o.ErrorMessages != nil {
+		toSerialize["error_messages"] = o.ErrorMessages
 	}
 	if o.Months != nil {
 		toSerialize["months"] = o.Months
@@ -425,18 +414,18 @@ func (o AwsCURConfigAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *AwsCURConfigAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		AccountFilters  *AccountFilteringConfig      `json:"account_filters,omitempty"`
-		AccountId       *string                      `json:"account_id"`
-		BucketName      *string                      `json:"bucket_name"`
-		BucketRegion    *string                      `json:"bucket_region"`
-		CreatedAt       *string                      `json:"created_at,omitempty"`
-		ErrorMessages   datadog.NullableList[string] `json:"error_messages,omitempty"`
-		Months          *int32                       `json:"months,omitempty"`
-		ReportName      *string                      `json:"report_name"`
-		ReportPrefix    *string                      `json:"report_prefix"`
-		Status          *string                      `json:"status"`
-		StatusUpdatedAt *string                      `json:"status_updated_at,omitempty"`
-		UpdatedAt       *string                      `json:"updated_at,omitempty"`
+		AccountFilters  *AccountFilteringConfig `json:"account_filters,omitempty"`
+		AccountId       *string                 `json:"account_id"`
+		BucketName      *string                 `json:"bucket_name"`
+		BucketRegion    *string                 `json:"bucket_region"`
+		CreatedAt       *string                 `json:"created_at,omitempty"`
+		ErrorMessages   []string                `json:"error_messages,omitempty"`
+		Months          *int32                  `json:"months,omitempty"`
+		ReportName      *string                 `json:"report_name"`
+		ReportPrefix    *string                 `json:"report_prefix"`
+		Status          *string                 `json:"status"`
+		StatusUpdatedAt *string                 `json:"status_updated_at,omitempty"`
+		UpdatedAt       *string                 `json:"updated_at,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -460,7 +449,7 @@ func (o *AwsCURConfigAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field status missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"account_filters", "account_id", "bucket_name", "bucket_region", "created_at", "error_messages", "months", "report_name", "report_prefix", "status", "status_updated_at", "updated_at"})
 	} else {
 		return err

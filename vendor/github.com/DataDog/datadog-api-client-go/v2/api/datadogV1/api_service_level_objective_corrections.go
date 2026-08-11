@@ -16,8 +16,7 @@ import (
 type ServiceLevelObjectiveCorrectionsApi datadog.Service
 
 // CreateSLOCorrection Create an SLO correction.
-// Create an SLO correction. Use `slo_id` to apply the correction to a single SLO, or `slo_query` to apply the
-// correction to SLOs that match a query. Exactly one of `slo_id` or `slo_query` is required.
+// Create an SLO Correction.
 func (a *ServiceLevelObjectiveCorrectionsApi) CreateSLOCorrection(ctx _context.Context, body SLOCorrectionCreateRequest) (SLOCorrectionResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -40,19 +39,12 @@ func (a *ServiceLevelObjectiveCorrectionsApi) CreateSLOCorrection(ctx _context.C
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -117,19 +109,12 @@ func (a *ServiceLevelObjectiveCorrectionsApi) DeleteSLOCorrection(ctx _context.C
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "*/*"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return nil, err
@@ -186,19 +171,12 @@ func (a *ServiceLevelObjectiveCorrectionsApi) GetSLOCorrection(ctx _context.Cont
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -301,19 +279,12 @@ func (a *ServiceLevelObjectiveCorrectionsApi) ListSLOCorrection(ctx _context.Con
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -432,19 +403,12 @@ func (a *ServiceLevelObjectiveCorrectionsApi) UpdateSLOCorrection(ctx _context.C
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err

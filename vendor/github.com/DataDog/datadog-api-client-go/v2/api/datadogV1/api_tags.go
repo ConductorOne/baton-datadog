@@ -34,7 +34,7 @@ func (r *CreateHostTagsOptionalParameters) WithSource(source string) *CreateHost
 
 // CreateHostTags Add tags to a host.
 // This endpoint allows you to add new tags to a host,
-// optionally specifying what source these tags come from. If tags already exist, appends new tags to the tag list. If no source is specified, defaults to "user".
+// optionally specifying where these tags come from.
 func (a *TagsApi) CreateHostTags(ctx _context.Context, hostName string, body HostTags, o ...CreateHostTagsOptionalParameters) (HostTags, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -69,19 +69,12 @@ func (a *TagsApi) CreateHostTags(ctx _context.Context, hostName string, body Hos
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -143,8 +136,8 @@ func (r *DeleteHostTagsOptionalParameters) WithSource(source string) *DeleteHost
 }
 
 // DeleteHostTags Remove host tags.
-// This endpoint allows you to remove all tags
-// for a single host. If no source is specified, only deletes from the source "User".
+// This endpoint allows you to remove all user-assigned tags
+// for a single host.
 func (a *TagsApi) DeleteHostTags(ctx _context.Context, hostName string, o ...DeleteHostTagsOptionalParameters) (*_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod = _nethttp.MethodDelete
@@ -175,19 +168,12 @@ func (a *TagsApi) DeleteHostTags(ctx _context.Context, hostName string, o ...Del
 	}
 	localVarHeaderParams["Accept"] = "*/*"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return nil, err
@@ -239,7 +225,7 @@ func (r *GetHostTagsOptionalParameters) WithSource(source string) *GetHostTagsOp
 	return r
 }
 
-// GetHostTags Get Host Tags.
+// GetHostTags Get host tags.
 // Return the list of tags that apply to a given host.
 func (a *TagsApi) GetHostTags(ctx _context.Context, hostName string, o ...GetHostTagsOptionalParameters) (HostTags, *_nethttp.Response, error) {
 	var (
@@ -272,19 +258,12 @@ func (a *TagsApi) GetHostTags(ctx _context.Context, hostName string, o ...GetHos
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -345,8 +324,8 @@ func (r *ListHostTagsOptionalParameters) WithSource(source string) *ListHostTags
 	return r
 }
 
-// ListHostTags Get All Host Tags.
-// Returns a mapping of tags to hosts. For each tag, the response returns a list of host names that contain this tag. There is a restriction of 10k total host names from the org that can be attached to tags and returned.
+// ListHostTags Get Tags.
+// Return a mapping of tags to hosts for your whole infrastructure.
 func (a *TagsApi) ListHostTags(ctx _context.Context, o ...ListHostTagsOptionalParameters) (TagToHosts, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodGet
@@ -377,19 +356,12 @@ func (a *TagsApi) ListHostTags(ctx _context.Context, o ...ListHostTagsOptionalPa
 	}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -487,19 +459,12 @@ func (a *TagsApi) UpdateHostTags(ctx _context.Context, hostName string, body Hos
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err

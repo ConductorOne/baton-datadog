@@ -39,19 +39,12 @@ func (a *FastlyIntegrationApi) CreateFastlyAccount(ctx _context.Context, body Fa
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -120,19 +113,12 @@ func (a *FastlyIntegrationApi) CreateFastlyService(ctx _context.Context, account
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -197,19 +183,12 @@ func (a *FastlyIntegrationApi) DeleteFastlyAccount(ctx _context.Context, account
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "*/*"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return nil, err
@@ -266,19 +245,12 @@ func (a *FastlyIntegrationApi) DeleteFastlyService(ctx _context.Context, account
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "*/*"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return nil, err
@@ -335,19 +307,12 @@ func (a *FastlyIntegrationApi) GetFastlyAccount(ctx _context.Context, accountId 
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -414,19 +379,12 @@ func (a *FastlyIntegrationApi) GetFastlyService(ctx _context.Context, accountId 
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -491,19 +449,12 @@ func (a *FastlyIntegrationApi) ListFastlyAccounts(ctx _context.Context) (FastlyA
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -569,19 +520,12 @@ func (a *FastlyIntegrationApi) ListFastlyServices(ctx _context.Context, accountI
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -650,19 +594,12 @@ func (a *FastlyIntegrationApi) UpdateFastlyAccount(ctx _context.Context, account
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -732,19 +669,12 @@ func (a *FastlyIntegrationApi) UpdateFastlyService(ctx _context.Context, account
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err

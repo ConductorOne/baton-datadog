@@ -40,8 +40,6 @@ type LogsIndexUpdateRequest struct {
 	//
 	// **Note**: Changing this value affects all logs already in this index. It may also affect billing.
 	NumRetentionDays *int64 `json:"num_retention_days,omitempty"`
-	// A list of tags associated with the index. Tags must be in `key:value` format.
-	Tags []string `json:"tags,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -284,34 +282,6 @@ func (o *LogsIndexUpdateRequest) SetNumRetentionDays(v int64) {
 	o.NumRetentionDays = &v
 }
 
-// GetTags returns the Tags field value if set, zero value otherwise.
-func (o *LogsIndexUpdateRequest) GetTags() []string {
-	if o == nil || o.Tags == nil {
-		var ret []string
-		return ret
-	}
-	return o.Tags
-}
-
-// GetTagsOk returns a tuple with the Tags field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *LogsIndexUpdateRequest) GetTagsOk() (*[]string, bool) {
-	if o == nil || o.Tags == nil {
-		return nil, false
-	}
-	return &o.Tags, true
-}
-
-// HasTags returns a boolean if a field has been set.
-func (o *LogsIndexUpdateRequest) HasTags() bool {
-	return o != nil && o.Tags != nil
-}
-
-// SetTags gets a reference to the given []string and assigns it to the Tags field.
-func (o *LogsIndexUpdateRequest) SetTags(v []string) {
-	o.Tags = v
-}
-
 // MarshalJSON serializes the struct using spec logic.
 func (o LogsIndexUpdateRequest) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
@@ -340,9 +310,6 @@ func (o LogsIndexUpdateRequest) MarshalJSON() ([]byte, error) {
 	if o.NumRetentionDays != nil {
 		toSerialize["num_retention_days"] = o.NumRetentionDays
 	}
-	if o.Tags != nil {
-		toSerialize["tags"] = o.Tags
-	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -361,7 +328,6 @@ func (o *LogsIndexUpdateRequest) UnmarshalJSON(bytes []byte) (err error) {
 		Filter                               *LogsFilter          `json:"filter"`
 		NumFlexLogsRetentionDays             *int64               `json:"num_flex_logs_retention_days,omitempty"`
 		NumRetentionDays                     *int64               `json:"num_retention_days,omitempty"`
-		Tags                                 []string             `json:"tags,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -370,8 +336,8 @@ func (o *LogsIndexUpdateRequest) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field filter missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"daily_limit", "daily_limit_reset", "daily_limit_warning_threshold_percentage", "disable_daily_limit", "exclusion_filters", "filter", "num_flex_logs_retention_days", "num_retention_days", "tags"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"daily_limit", "daily_limit_reset", "daily_limit_warning_threshold_percentage", "disable_daily_limit", "exclusion_filters", "filter", "num_flex_logs_retention_days", "num_retention_days"})
 	} else {
 		return err
 	}
@@ -391,7 +357,6 @@ func (o *LogsIndexUpdateRequest) UnmarshalJSON(bytes []byte) (err error) {
 	o.Filter = *all.Filter
 	o.NumFlexLogsRetentionDays = all.NumFlexLogsRetentionDays
 	o.NumRetentionDays = all.NumRetentionDays
-	o.Tags = all.Tags
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

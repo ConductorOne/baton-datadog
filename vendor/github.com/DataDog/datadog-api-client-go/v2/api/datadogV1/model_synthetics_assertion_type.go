@@ -34,10 +34,6 @@ const (
 	SYNTHETICSASSERTIONTYPE_GRPC_METADATA           SyntheticsAssertionType = "grpcMetadata"
 	SYNTHETICSASSERTIONTYPE_GRPC_PROTO              SyntheticsAssertionType = "grpcProto"
 	SYNTHETICSASSERTIONTYPE_CONNECTION              SyntheticsAssertionType = "connection"
-	SYNTHETICSASSERTIONTYPE_MULTI_NETWORK_HOP       SyntheticsAssertionType = "multiNetworkHop"
-	SYNTHETICSASSERTIONTYPE_JITTER                  SyntheticsAssertionType = "jitter"
-	SYNTHETICSASSERTIONTYPE_MCP_TOOL_NAME_LENGTH    SyntheticsAssertionType = "mcpToolNameLength"
-	SYNTHETICSASSERTIONTYPE_MCP_TOOL_COUNT          SyntheticsAssertionType = "mcpToolCount"
 )
 
 var allowedSyntheticsAssertionTypeEnumValues = []SyntheticsAssertionType{
@@ -60,10 +56,6 @@ var allowedSyntheticsAssertionTypeEnumValues = []SyntheticsAssertionType{
 	SYNTHETICSASSERTIONTYPE_GRPC_METADATA,
 	SYNTHETICSASSERTIONTYPE_GRPC_PROTO,
 	SYNTHETICSASSERTIONTYPE_CONNECTION,
-	SYNTHETICSASSERTIONTYPE_MULTI_NETWORK_HOP,
-	SYNTHETICSASSERTIONTYPE_JITTER,
-	SYNTHETICSASSERTIONTYPE_MCP_TOOL_NAME_LENGTH,
-	SYNTHETICSASSERTIONTYPE_MCP_TOOL_COUNT,
 }
 
 // GetAllowedValues reeturns the list of possible values.

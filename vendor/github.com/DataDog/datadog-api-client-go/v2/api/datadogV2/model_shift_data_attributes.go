@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// ShiftDataAttributes Attributes for an on-call shift.
+// ShiftDataAttributes The definition of `ShiftDataAttributes` object.
 type ShiftDataAttributes struct {
 	// The end time of the shift.
 	End *time.Time `json:"end,omitempty"`
@@ -131,7 +131,7 @@ func (o *ShiftDataAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"end", "start"})
 	} else {
 		return err

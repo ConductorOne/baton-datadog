@@ -12,8 +12,6 @@ import (
 
 // AwsScanOptionsCreateAttributes Attributes for the AWS scan options to create.
 type AwsScanOptionsCreateAttributes struct {
-	// Indicates whether host compliance scanning is enabled.
-	ComplianceHost bool `json:"compliance_host"`
 	// Indicates if scanning of Lambda functions is enabled.
 	Lambda bool `json:"lambda"`
 	// Indicates if scanning for sensitive data is enabled.
@@ -31,9 +29,8 @@ type AwsScanOptionsCreateAttributes struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewAwsScanOptionsCreateAttributes(complianceHost bool, lambda bool, sensitiveData bool, vulnContainersOs bool, vulnHostOs bool) *AwsScanOptionsCreateAttributes {
+func NewAwsScanOptionsCreateAttributes(lambda bool, sensitiveData bool, vulnContainersOs bool, vulnHostOs bool) *AwsScanOptionsCreateAttributes {
 	this := AwsScanOptionsCreateAttributes{}
-	this.ComplianceHost = complianceHost
 	this.Lambda = lambda
 	this.SensitiveData = sensitiveData
 	this.VulnContainersOs = vulnContainersOs
@@ -47,29 +44,6 @@ func NewAwsScanOptionsCreateAttributes(complianceHost bool, lambda bool, sensiti
 func NewAwsScanOptionsCreateAttributesWithDefaults() *AwsScanOptionsCreateAttributes {
 	this := AwsScanOptionsCreateAttributes{}
 	return &this
-}
-
-// GetComplianceHost returns the ComplianceHost field value.
-func (o *AwsScanOptionsCreateAttributes) GetComplianceHost() bool {
-	if o == nil {
-		var ret bool
-		return ret
-	}
-	return o.ComplianceHost
-}
-
-// GetComplianceHostOk returns a tuple with the ComplianceHost field value
-// and a boolean to check if the value has been set.
-func (o *AwsScanOptionsCreateAttributes) GetComplianceHostOk() (*bool, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.ComplianceHost, true
-}
-
-// SetComplianceHost sets field value.
-func (o *AwsScanOptionsCreateAttributes) SetComplianceHost(v bool) {
-	o.ComplianceHost = v
 }
 
 // GetLambda returns the Lambda field value.
@@ -170,7 +144,6 @@ func (o AwsScanOptionsCreateAttributes) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	toSerialize["compliance_host"] = o.ComplianceHost
 	toSerialize["lambda"] = o.Lambda
 	toSerialize["sensitive_data"] = o.SensitiveData
 	toSerialize["vuln_containers_os"] = o.VulnContainersOs
@@ -185,7 +158,6 @@ func (o AwsScanOptionsCreateAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *AwsScanOptionsCreateAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		ComplianceHost   *bool `json:"compliance_host"`
 		Lambda           *bool `json:"lambda"`
 		SensitiveData    *bool `json:"sensitive_data"`
 		VulnContainersOs *bool `json:"vuln_containers_os"`
@@ -193,9 +165,6 @@ func (o *AwsScanOptionsCreateAttributes) UnmarshalJSON(bytes []byte) (err error)
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
-	}
-	if all.ComplianceHost == nil {
-		return fmt.Errorf("required field compliance_host missing")
 	}
 	if all.Lambda == nil {
 		return fmt.Errorf("required field lambda missing")
@@ -210,12 +179,11 @@ func (o *AwsScanOptionsCreateAttributes) UnmarshalJSON(bytes []byte) (err error)
 		return fmt.Errorf("required field vuln_host_os missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"compliance_host", "lambda", "sensitive_data", "vuln_containers_os", "vuln_host_os"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"lambda", "sensitive_data", "vuln_containers_os", "vuln_host_os"})
 	} else {
 		return err
 	}
-	o.ComplianceHost = *all.ComplianceHost
 	o.Lambda = *all.Lambda
 	o.SensitiveData = *all.SensitiveData
 	o.VulnContainersOs = *all.VulnContainersOs

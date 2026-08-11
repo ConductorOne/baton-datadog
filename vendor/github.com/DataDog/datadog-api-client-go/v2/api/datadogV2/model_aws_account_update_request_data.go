@@ -15,8 +15,7 @@ type AWSAccountUpdateRequestData struct {
 	// The AWS Account Integration Config to be updated.
 	Attributes AWSAccountUpdateRequestAttributes `json:"attributes"`
 	// Unique Datadog ID of the AWS Account Integration Config.
-	// To get the config ID for an account, use the
-	// [List all AWS integrations](https://docs.datadoghq.com/api/latest/aws-integration/#list-all-aws-integrations)
+	// To get the config ID for an account, use the [List all AWS integrations](https://docs.datadoghq.com/api/latest/aws-integration/#list-all-aws-integrations)
 	// endpoint and query by AWS Account ID.
 	Id *string `json:"id,omitempty"`
 	// AWS Account resource type.
@@ -156,7 +155,7 @@ func (o *AWSAccountUpdateRequestData) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"attributes", "id", "type"})
 	} else {
 		return err

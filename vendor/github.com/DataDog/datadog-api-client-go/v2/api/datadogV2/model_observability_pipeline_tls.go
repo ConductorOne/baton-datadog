@@ -18,8 +18,6 @@ type ObservabilityPipelineTls struct {
 	CrtFile string `json:"crt_file"`
 	// Path to the private key file associated with the TLS client certificate. Used for mutual TLS authentication.
 	KeyFile *string `json:"key_file,omitempty"`
-	// Name of the environment variable or secret that holds the passphrase for the private key file.
-	KeyPassKey *string `json:"key_pass_key,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -122,34 +120,6 @@ func (o *ObservabilityPipelineTls) SetKeyFile(v string) {
 	o.KeyFile = &v
 }
 
-// GetKeyPassKey returns the KeyPassKey field value if set, zero value otherwise.
-func (o *ObservabilityPipelineTls) GetKeyPassKey() string {
-	if o == nil || o.KeyPassKey == nil {
-		var ret string
-		return ret
-	}
-	return *o.KeyPassKey
-}
-
-// GetKeyPassKeyOk returns a tuple with the KeyPassKey field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineTls) GetKeyPassKeyOk() (*string, bool) {
-	if o == nil || o.KeyPassKey == nil {
-		return nil, false
-	}
-	return o.KeyPassKey, true
-}
-
-// HasKeyPassKey returns a boolean if a field has been set.
-func (o *ObservabilityPipelineTls) HasKeyPassKey() bool {
-	return o != nil && o.KeyPassKey != nil
-}
-
-// SetKeyPassKey gets a reference to the given string and assigns it to the KeyPassKey field.
-func (o *ObservabilityPipelineTls) SetKeyPassKey(v string) {
-	o.KeyPassKey = &v
-}
-
 // MarshalJSON serializes the struct using spec logic.
 func (o ObservabilityPipelineTls) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
@@ -163,9 +133,6 @@ func (o ObservabilityPipelineTls) MarshalJSON() ([]byte, error) {
 	if o.KeyFile != nil {
 		toSerialize["key_file"] = o.KeyFile
 	}
-	if o.KeyPassKey != nil {
-		toSerialize["key_pass_key"] = o.KeyPassKey
-	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -176,10 +143,9 @@ func (o ObservabilityPipelineTls) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *ObservabilityPipelineTls) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		CaFile     *string `json:"ca_file,omitempty"`
-		CrtFile    *string `json:"crt_file"`
-		KeyFile    *string `json:"key_file,omitempty"`
-		KeyPassKey *string `json:"key_pass_key,omitempty"`
+		CaFile  *string `json:"ca_file,omitempty"`
+		CrtFile *string `json:"crt_file"`
+		KeyFile *string `json:"key_file,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -188,15 +154,14 @@ func (o *ObservabilityPipelineTls) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field crt_file missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"ca_file", "crt_file", "key_file", "key_pass_key"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"ca_file", "crt_file", "key_file"})
 	} else {
 		return err
 	}
 	o.CaFile = all.CaFile
 	o.CrtFile = *all.CrtFile
 	o.KeyFile = all.KeyFile
-	o.KeyPassKey = all.KeyPassKey
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

@@ -10,9 +10,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// GCPUsageCostConfigPostRequest Google Cloud Usage Cost config post request.
+// GCPUsageCostConfigPostRequest GCP Usage Cost config post request.
 type GCPUsageCostConfigPostRequest struct {
-	// Google Cloud Usage Cost config post data.
+	// GCP Usage Cost config post data.
 	Data GCPUsageCostConfigPostData `json:"data"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -86,7 +86,7 @@ func (o *GCPUsageCostConfigPostRequest) UnmarshalJSON(bytes []byte) (err error) 
 		return fmt.Errorf("required field data missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err

@@ -10,14 +10,18 @@ import (
 
 // EscalationPolicyIncluded - Represents included related resources when retrieving an escalation policy, such as teams, steps, or targets.
 type EscalationPolicyIncluded struct {
+	TeamReference        *TeamReference
 	EscalationPolicyStep *EscalationPolicyStep
 	EscalationPolicyUser *EscalationPolicyUser
 	ScheduleData         *ScheduleData
-	ConfiguredSchedule   *ConfiguredSchedule
-	TeamReference        *TeamReference
 
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject interface{}
+}
+
+// TeamReferenceAsEscalationPolicyIncluded is a convenience function that returns TeamReference wrapped in EscalationPolicyIncluded.
+func TeamReferenceAsEscalationPolicyIncluded(v *TeamReference) EscalationPolicyIncluded {
+	return EscalationPolicyIncluded{TeamReference: v}
 }
 
 // EscalationPolicyStepAsEscalationPolicyIncluded is a convenience function that returns EscalationPolicyStep wrapped in EscalationPolicyIncluded.
@@ -35,20 +39,27 @@ func ScheduleDataAsEscalationPolicyIncluded(v *ScheduleData) EscalationPolicyInc
 	return EscalationPolicyIncluded{ScheduleData: v}
 }
 
-// ConfiguredScheduleAsEscalationPolicyIncluded is a convenience function that returns ConfiguredSchedule wrapped in EscalationPolicyIncluded.
-func ConfiguredScheduleAsEscalationPolicyIncluded(v *ConfiguredSchedule) EscalationPolicyIncluded {
-	return EscalationPolicyIncluded{ConfiguredSchedule: v}
-}
-
-// TeamReferenceAsEscalationPolicyIncluded is a convenience function that returns TeamReference wrapped in EscalationPolicyIncluded.
-func TeamReferenceAsEscalationPolicyIncluded(v *TeamReference) EscalationPolicyIncluded {
-	return EscalationPolicyIncluded{TeamReference: v}
-}
-
 // UnmarshalJSON turns data into one of the pointers in the struct.
 func (obj *EscalationPolicyIncluded) UnmarshalJSON(data []byte) error {
 	var err error
 	match := 0
+	// try to unmarshal data into TeamReference
+	err = datadog.Unmarshal(data, &obj.TeamReference)
+	if err == nil {
+		if obj.TeamReference != nil && obj.TeamReference.UnparsedObject == nil {
+			jsonTeamReference, _ := datadog.Marshal(obj.TeamReference)
+			if string(jsonTeamReference) == "{}" { // empty struct
+				obj.TeamReference = nil
+			} else {
+				match++
+			}
+		} else {
+			obj.TeamReference = nil
+		}
+	} else {
+		obj.TeamReference = nil
+	}
+
 	// try to unmarshal data into EscalationPolicyStep
 	err = datadog.Unmarshal(data, &obj.EscalationPolicyStep)
 	if err == nil {
@@ -100,47 +111,12 @@ func (obj *EscalationPolicyIncluded) UnmarshalJSON(data []byte) error {
 		obj.ScheduleData = nil
 	}
 
-	// try to unmarshal data into ConfiguredSchedule
-	err = datadog.Unmarshal(data, &obj.ConfiguredSchedule)
-	if err == nil {
-		if obj.ConfiguredSchedule != nil && obj.ConfiguredSchedule.UnparsedObject == nil {
-			jsonConfiguredSchedule, _ := datadog.Marshal(obj.ConfiguredSchedule)
-			if string(jsonConfiguredSchedule) == "{}" { // empty struct
-				obj.ConfiguredSchedule = nil
-			} else {
-				match++
-			}
-		} else {
-			obj.ConfiguredSchedule = nil
-		}
-	} else {
-		obj.ConfiguredSchedule = nil
-	}
-
-	// try to unmarshal data into TeamReference
-	err = datadog.Unmarshal(data, &obj.TeamReference)
-	if err == nil {
-		if obj.TeamReference != nil && obj.TeamReference.UnparsedObject == nil {
-			jsonTeamReference, _ := datadog.Marshal(obj.TeamReference)
-			if string(jsonTeamReference) == "{}" { // empty struct
-				obj.TeamReference = nil
-			} else {
-				match++
-			}
-		} else {
-			obj.TeamReference = nil
-		}
-	} else {
-		obj.TeamReference = nil
-	}
-
 	if match != 1 { // more than 1 match
 		// reset to nil
+		obj.TeamReference = nil
 		obj.EscalationPolicyStep = nil
 		obj.EscalationPolicyUser = nil
 		obj.ScheduleData = nil
-		obj.ConfiguredSchedule = nil
-		obj.TeamReference = nil
 		return datadog.Unmarshal(data, &obj.UnparsedObject)
 	}
 	return nil // exactly one match
@@ -148,6 +124,10 @@ func (obj *EscalationPolicyIncluded) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON turns data from the first non-nil pointers in the struct to JSON.
 func (obj EscalationPolicyIncluded) MarshalJSON() ([]byte, error) {
+	if obj.TeamReference != nil {
+		return datadog.Marshal(&obj.TeamReference)
+	}
+
 	if obj.EscalationPolicyStep != nil {
 		return datadog.Marshal(&obj.EscalationPolicyStep)
 	}
@@ -160,14 +140,6 @@ func (obj EscalationPolicyIncluded) MarshalJSON() ([]byte, error) {
 		return datadog.Marshal(&obj.ScheduleData)
 	}
 
-	if obj.ConfiguredSchedule != nil {
-		return datadog.Marshal(&obj.ConfiguredSchedule)
-	}
-
-	if obj.TeamReference != nil {
-		return datadog.Marshal(&obj.TeamReference)
-	}
-
 	if obj.UnparsedObject != nil {
 		return datadog.Marshal(obj.UnparsedObject)
 	}
@@ -176,6 +148,10 @@ func (obj EscalationPolicyIncluded) MarshalJSON() ([]byte, error) {
 
 // GetActualInstance returns the actual instance.
 func (obj *EscalationPolicyIncluded) GetActualInstance() interface{} {
+	if obj.TeamReference != nil {
+		return obj.TeamReference
+	}
+
 	if obj.EscalationPolicyStep != nil {
 		return obj.EscalationPolicyStep
 	}
@@ -186,14 +162,6 @@ func (obj *EscalationPolicyIncluded) GetActualInstance() interface{} {
 
 	if obj.ScheduleData != nil {
 		return obj.ScheduleData
-	}
-
-	if obj.ConfiguredSchedule != nil {
-		return obj.ConfiguredSchedule
-	}
-
-	if obj.TeamReference != nil {
-		return obj.TeamReference
 	}
 
 	// all schemas are nil

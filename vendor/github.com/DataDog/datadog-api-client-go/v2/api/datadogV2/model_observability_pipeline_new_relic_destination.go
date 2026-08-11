@@ -11,19 +11,11 @@ import (
 )
 
 // ObservabilityPipelineNewRelicDestination The `new_relic` destination sends logs to the New Relic platform.
-//
-// **Supported pipeline types:** logs
 type ObservabilityPipelineNewRelicDestination struct {
-	// Name of the environment variable or secret that holds the New Relic account ID.
-	AccountIdKey *string `json:"account_id_key,omitempty"`
-	// Configuration for buffer settings on destination components.
-	Buffer *ObservabilityPipelineBufferOptions `json:"buffer,omitempty"`
 	// The unique identifier for this component.
 	Id string `json:"id"`
 	// A list of component IDs whose output is used as the `input` for this component.
 	Inputs []string `json:"inputs"`
-	// Name of the environment variable or secret that holds the New Relic license key.
-	LicenseKeyKey *string `json:"license_key_key,omitempty"`
 	// The New Relic region.
 	Region ObservabilityPipelineNewRelicDestinationRegion `json:"region"`
 	// The destination type. The value should always be `new_relic`.
@@ -54,62 +46,6 @@ func NewObservabilityPipelineNewRelicDestinationWithDefaults() *ObservabilityPip
 	var typeVar ObservabilityPipelineNewRelicDestinationType = OBSERVABILITYPIPELINENEWRELICDESTINATIONTYPE_NEW_RELIC
 	this.Type = typeVar
 	return &this
-}
-
-// GetAccountIdKey returns the AccountIdKey field value if set, zero value otherwise.
-func (o *ObservabilityPipelineNewRelicDestination) GetAccountIdKey() string {
-	if o == nil || o.AccountIdKey == nil {
-		var ret string
-		return ret
-	}
-	return *o.AccountIdKey
-}
-
-// GetAccountIdKeyOk returns a tuple with the AccountIdKey field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineNewRelicDestination) GetAccountIdKeyOk() (*string, bool) {
-	if o == nil || o.AccountIdKey == nil {
-		return nil, false
-	}
-	return o.AccountIdKey, true
-}
-
-// HasAccountIdKey returns a boolean if a field has been set.
-func (o *ObservabilityPipelineNewRelicDestination) HasAccountIdKey() bool {
-	return o != nil && o.AccountIdKey != nil
-}
-
-// SetAccountIdKey gets a reference to the given string and assigns it to the AccountIdKey field.
-func (o *ObservabilityPipelineNewRelicDestination) SetAccountIdKey(v string) {
-	o.AccountIdKey = &v
-}
-
-// GetBuffer returns the Buffer field value if set, zero value otherwise.
-func (o *ObservabilityPipelineNewRelicDestination) GetBuffer() ObservabilityPipelineBufferOptions {
-	if o == nil || o.Buffer == nil {
-		var ret ObservabilityPipelineBufferOptions
-		return ret
-	}
-	return *o.Buffer
-}
-
-// GetBufferOk returns a tuple with the Buffer field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineNewRelicDestination) GetBufferOk() (*ObservabilityPipelineBufferOptions, bool) {
-	if o == nil || o.Buffer == nil {
-		return nil, false
-	}
-	return o.Buffer, true
-}
-
-// HasBuffer returns a boolean if a field has been set.
-func (o *ObservabilityPipelineNewRelicDestination) HasBuffer() bool {
-	return o != nil && o.Buffer != nil
-}
-
-// SetBuffer gets a reference to the given ObservabilityPipelineBufferOptions and assigns it to the Buffer field.
-func (o *ObservabilityPipelineNewRelicDestination) SetBuffer(v ObservabilityPipelineBufferOptions) {
-	o.Buffer = &v
 }
 
 // GetId returns the Id field value.
@@ -156,34 +92,6 @@ func (o *ObservabilityPipelineNewRelicDestination) GetInputsOk() (*[]string, boo
 // SetInputs sets field value.
 func (o *ObservabilityPipelineNewRelicDestination) SetInputs(v []string) {
 	o.Inputs = v
-}
-
-// GetLicenseKeyKey returns the LicenseKeyKey field value if set, zero value otherwise.
-func (o *ObservabilityPipelineNewRelicDestination) GetLicenseKeyKey() string {
-	if o == nil || o.LicenseKeyKey == nil {
-		var ret string
-		return ret
-	}
-	return *o.LicenseKeyKey
-}
-
-// GetLicenseKeyKeyOk returns a tuple with the LicenseKeyKey field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineNewRelicDestination) GetLicenseKeyKeyOk() (*string, bool) {
-	if o == nil || o.LicenseKeyKey == nil {
-		return nil, false
-	}
-	return o.LicenseKeyKey, true
-}
-
-// HasLicenseKeyKey returns a boolean if a field has been set.
-func (o *ObservabilityPipelineNewRelicDestination) HasLicenseKeyKey() bool {
-	return o != nil && o.LicenseKeyKey != nil
-}
-
-// SetLicenseKeyKey gets a reference to the given string and assigns it to the LicenseKeyKey field.
-func (o *ObservabilityPipelineNewRelicDestination) SetLicenseKeyKey(v string) {
-	o.LicenseKeyKey = &v
 }
 
 // GetRegion returns the Region field value.
@@ -238,17 +146,8 @@ func (o ObservabilityPipelineNewRelicDestination) MarshalJSON() ([]byte, error) 
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.AccountIdKey != nil {
-		toSerialize["account_id_key"] = o.AccountIdKey
-	}
-	if o.Buffer != nil {
-		toSerialize["buffer"] = o.Buffer
-	}
 	toSerialize["id"] = o.Id
 	toSerialize["inputs"] = o.Inputs
-	if o.LicenseKeyKey != nil {
-		toSerialize["license_key_key"] = o.LicenseKeyKey
-	}
 	toSerialize["region"] = o.Region
 	toSerialize["type"] = o.Type
 
@@ -261,13 +160,10 @@ func (o ObservabilityPipelineNewRelicDestination) MarshalJSON() ([]byte, error) 
 // UnmarshalJSON deserializes the given payload.
 func (o *ObservabilityPipelineNewRelicDestination) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		AccountIdKey  *string                                         `json:"account_id_key,omitempty"`
-		Buffer        *ObservabilityPipelineBufferOptions             `json:"buffer,omitempty"`
-		Id            *string                                         `json:"id"`
-		Inputs        *[]string                                       `json:"inputs"`
-		LicenseKeyKey *string                                         `json:"license_key_key,omitempty"`
-		Region        *ObservabilityPipelineNewRelicDestinationRegion `json:"region"`
-		Type          *ObservabilityPipelineNewRelicDestinationType   `json:"type"`
+		Id     *string                                         `json:"id"`
+		Inputs *[]string                                       `json:"inputs"`
+		Region *ObservabilityPipelineNewRelicDestinationRegion `json:"region"`
+		Type   *ObservabilityPipelineNewRelicDestinationType   `json:"type"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -285,18 +181,15 @@ func (o *ObservabilityPipelineNewRelicDestination) UnmarshalJSON(bytes []byte) (
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"account_id_key", "buffer", "id", "inputs", "license_key_key", "region", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"id", "inputs", "region", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	o.AccountIdKey = all.AccountIdKey
-	o.Buffer = all.Buffer
 	o.Id = *all.Id
 	o.Inputs = *all.Inputs
-	o.LicenseKeyKey = all.LicenseKeyKey
 	if !all.Region.IsValid() {
 		hasInvalidField = true
 	} else {

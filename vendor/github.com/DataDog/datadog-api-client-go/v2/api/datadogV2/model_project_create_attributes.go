@@ -10,16 +10,12 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// ProjectCreateAttributes Project creation attributes.
+// ProjectCreateAttributes Project creation attributes
 type ProjectCreateAttributes struct {
-	// List of enabled custom case type IDs.
-	EnabledCustomCaseTypes []string `json:"enabled_custom_case_types,omitempty"`
-	// Project's key. Cannot be "CASE".
+	// Project's key. Cannot be "CASE"
 	Key string `json:"key"`
-	// Project name.
+	// name
 	Name string `json:"name"`
-	// Team UUID to associate with the project.
-	TeamUuid *string `json:"team_uuid,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -42,34 +38,6 @@ func NewProjectCreateAttributes(key string, name string) *ProjectCreateAttribute
 func NewProjectCreateAttributesWithDefaults() *ProjectCreateAttributes {
 	this := ProjectCreateAttributes{}
 	return &this
-}
-
-// GetEnabledCustomCaseTypes returns the EnabledCustomCaseTypes field value if set, zero value otherwise.
-func (o *ProjectCreateAttributes) GetEnabledCustomCaseTypes() []string {
-	if o == nil || o.EnabledCustomCaseTypes == nil {
-		var ret []string
-		return ret
-	}
-	return o.EnabledCustomCaseTypes
-}
-
-// GetEnabledCustomCaseTypesOk returns a tuple with the EnabledCustomCaseTypes field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ProjectCreateAttributes) GetEnabledCustomCaseTypesOk() (*[]string, bool) {
-	if o == nil || o.EnabledCustomCaseTypes == nil {
-		return nil, false
-	}
-	return &o.EnabledCustomCaseTypes, true
-}
-
-// HasEnabledCustomCaseTypes returns a boolean if a field has been set.
-func (o *ProjectCreateAttributes) HasEnabledCustomCaseTypes() bool {
-	return o != nil && o.EnabledCustomCaseTypes != nil
-}
-
-// SetEnabledCustomCaseTypes gets a reference to the given []string and assigns it to the EnabledCustomCaseTypes field.
-func (o *ProjectCreateAttributes) SetEnabledCustomCaseTypes(v []string) {
-	o.EnabledCustomCaseTypes = v
 }
 
 // GetKey returns the Key field value.
@@ -118,48 +86,14 @@ func (o *ProjectCreateAttributes) SetName(v string) {
 	o.Name = v
 }
 
-// GetTeamUuid returns the TeamUuid field value if set, zero value otherwise.
-func (o *ProjectCreateAttributes) GetTeamUuid() string {
-	if o == nil || o.TeamUuid == nil {
-		var ret string
-		return ret
-	}
-	return *o.TeamUuid
-}
-
-// GetTeamUuidOk returns a tuple with the TeamUuid field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ProjectCreateAttributes) GetTeamUuidOk() (*string, bool) {
-	if o == nil || o.TeamUuid == nil {
-		return nil, false
-	}
-	return o.TeamUuid, true
-}
-
-// HasTeamUuid returns a boolean if a field has been set.
-func (o *ProjectCreateAttributes) HasTeamUuid() bool {
-	return o != nil && o.TeamUuid != nil
-}
-
-// SetTeamUuid gets a reference to the given string and assigns it to the TeamUuid field.
-func (o *ProjectCreateAttributes) SetTeamUuid(v string) {
-	o.TeamUuid = &v
-}
-
 // MarshalJSON serializes the struct using spec logic.
 func (o ProjectCreateAttributes) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.EnabledCustomCaseTypes != nil {
-		toSerialize["enabled_custom_case_types"] = o.EnabledCustomCaseTypes
-	}
 	toSerialize["key"] = o.Key
 	toSerialize["name"] = o.Name
-	if o.TeamUuid != nil {
-		toSerialize["team_uuid"] = o.TeamUuid
-	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -170,10 +104,8 @@ func (o ProjectCreateAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *ProjectCreateAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		EnabledCustomCaseTypes []string `json:"enabled_custom_case_types,omitempty"`
-		Key                    *string  `json:"key"`
-		Name                   *string  `json:"name"`
-		TeamUuid               *string  `json:"team_uuid,omitempty"`
+		Key  *string `json:"key"`
+		Name *string `json:"name"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -185,15 +117,13 @@ func (o *ProjectCreateAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field name missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"enabled_custom_case_types", "key", "name", "team_uuid"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"key", "name"})
 	} else {
 		return err
 	}
-	o.EnabledCustomCaseTypes = all.EnabledCustomCaseTypes
 	o.Key = *all.Key
 	o.Name = *all.Name
-	o.TeamUuid = all.TeamUuid
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

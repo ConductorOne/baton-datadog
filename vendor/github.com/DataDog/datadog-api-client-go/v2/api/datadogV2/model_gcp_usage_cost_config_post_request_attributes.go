@@ -10,19 +10,19 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// GCPUsageCostConfigPostRequestAttributes Attributes for Google Cloud Usage Cost config post request.
+// GCPUsageCostConfigPostRequestAttributes Attributes for GCP Usage Cost config post request.
 type GCPUsageCostConfigPostRequestAttributes struct {
-	// The Google Cloud account ID.
+	// The GCP account ID.
 	BillingAccountId string `json:"billing_account_id"`
-	// The Google Cloud bucket name used to store the Usage Cost export.
+	// The GCP bucket name used to store the Usage Cost export.
 	BucketName string `json:"bucket_name"`
-	// The export dataset name used for the Google Cloud Usage Cost report.
+	// The export dataset name used for the GCP Usage Cost report.
 	ExportDatasetName string `json:"export_dataset_name"`
-	// The export prefix used for the Google Cloud Usage Cost report.
+	// The export prefix used for the GCP Usage Cost report.
 	ExportPrefix *string `json:"export_prefix,omitempty"`
-	// The name of the Google Cloud Usage Cost report.
+	// The name of the GCP Usage Cost report.
 	ExportProjectName string `json:"export_project_name"`
-	// The unique Google Cloud service account email.
+	// The unique GCP service account email.
 	ServiceAccount string `json:"service_account"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -244,7 +244,7 @@ func (o *GCPUsageCostConfigPostRequestAttributes) UnmarshalJSON(bytes []byte) (e
 		return fmt.Errorf("required field service_account missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"billing_account_id", "bucket_name", "export_dataset_name", "export_prefix", "export_project_name", "service_account"})
 	} else {
 		return err

@@ -19,10 +19,6 @@ type RoleCreateAttributes struct {
 	ModifiedAt *time.Time `json:"modified_at,omitempty"`
 	// Name of the role.
 	Name string `json:"name"`
-	// The managed role from which this role automatically inherits new permissions.
-	// Specify one of the following: "Datadog Admin Role", "Datadog Standard Role", or "Datadog Read Only Role".
-	// If empty or not specified, the role does not automatically inherit permissions from any managed role.
-	ReceivesPermissionsFrom []string `json:"receives_permissions_from,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -125,34 +121,6 @@ func (o *RoleCreateAttributes) SetName(v string) {
 	o.Name = v
 }
 
-// GetReceivesPermissionsFrom returns the ReceivesPermissionsFrom field value if set, zero value otherwise.
-func (o *RoleCreateAttributes) GetReceivesPermissionsFrom() []string {
-	if o == nil || o.ReceivesPermissionsFrom == nil {
-		var ret []string
-		return ret
-	}
-	return o.ReceivesPermissionsFrom
-}
-
-// GetReceivesPermissionsFromOk returns a tuple with the ReceivesPermissionsFrom field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RoleCreateAttributes) GetReceivesPermissionsFromOk() (*[]string, bool) {
-	if o == nil || o.ReceivesPermissionsFrom == nil {
-		return nil, false
-	}
-	return &o.ReceivesPermissionsFrom, true
-}
-
-// HasReceivesPermissionsFrom returns a boolean if a field has been set.
-func (o *RoleCreateAttributes) HasReceivesPermissionsFrom() bool {
-	return o != nil && o.ReceivesPermissionsFrom != nil
-}
-
-// SetReceivesPermissionsFrom gets a reference to the given []string and assigns it to the ReceivesPermissionsFrom field.
-func (o *RoleCreateAttributes) SetReceivesPermissionsFrom(v []string) {
-	o.ReceivesPermissionsFrom = v
-}
-
 // MarshalJSON serializes the struct using spec logic.
 func (o RoleCreateAttributes) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
@@ -174,9 +142,6 @@ func (o RoleCreateAttributes) MarshalJSON() ([]byte, error) {
 		}
 	}
 	toSerialize["name"] = o.Name
-	if o.ReceivesPermissionsFrom != nil {
-		toSerialize["receives_permissions_from"] = o.ReceivesPermissionsFrom
-	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -187,10 +152,9 @@ func (o RoleCreateAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *RoleCreateAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		CreatedAt               *time.Time `json:"created_at,omitempty"`
-		ModifiedAt              *time.Time `json:"modified_at,omitempty"`
-		Name                    *string    `json:"name"`
-		ReceivesPermissionsFrom []string   `json:"receives_permissions_from,omitempty"`
+		CreatedAt  *time.Time `json:"created_at,omitempty"`
+		ModifiedAt *time.Time `json:"modified_at,omitempty"`
+		Name       *string    `json:"name"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -199,15 +163,14 @@ func (o *RoleCreateAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field name missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"created_at", "modified_at", "name", "receives_permissions_from"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"created_at", "modified_at", "name"})
 	} else {
 		return err
 	}
 	o.CreatedAt = all.CreatedAt
 	o.ModifiedAt = all.ModifiedAt
 	o.Name = *all.Name
-	o.ReceivesPermissionsFrom = all.ReceivesPermissionsFrom
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

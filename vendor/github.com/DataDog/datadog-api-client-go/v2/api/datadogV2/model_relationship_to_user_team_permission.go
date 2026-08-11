@@ -11,7 +11,7 @@ import (
 // RelationshipToUserTeamPermission Relationship between a user team permission and a team
 type RelationshipToUserTeamPermission struct {
 	// Related user team permission data
-	Data NullableRelationshipToUserTeamPermissionData `json:"data,omitempty"`
+	Data *RelationshipToUserTeamPermissionData `json:"data,omitempty"`
 	// Links attributes.
 	Links *TeamRelationshipsLinks `json:"links,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
@@ -36,43 +36,32 @@ func NewRelationshipToUserTeamPermissionWithDefaults() *RelationshipToUserTeamPe
 	return &this
 }
 
-// GetData returns the Data field value if set, zero value otherwise (both if not set or set to explicit null).
+// GetData returns the Data field value if set, zero value otherwise.
 func (o *RelationshipToUserTeamPermission) GetData() RelationshipToUserTeamPermissionData {
-	if o == nil || o.Data.Get() == nil {
+	if o == nil || o.Data == nil {
 		var ret RelationshipToUserTeamPermissionData
 		return ret
 	}
-	return *o.Data.Get()
+	return *o.Data
 }
 
 // GetDataOk returns a tuple with the Data field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-// NOTE: If the value is an explicit nil, `nil, true` will be returned.
 func (o *RelationshipToUserTeamPermission) GetDataOk() (*RelationshipToUserTeamPermissionData, bool) {
-	if o == nil {
+	if o == nil || o.Data == nil {
 		return nil, false
 	}
-	return o.Data.Get(), o.Data.IsSet()
+	return o.Data, true
 }
 
 // HasData returns a boolean if a field has been set.
 func (o *RelationshipToUserTeamPermission) HasData() bool {
-	return o != nil && o.Data.IsSet()
+	return o != nil && o.Data != nil
 }
 
-// SetData gets a reference to the given NullableRelationshipToUserTeamPermissionData and assigns it to the Data field.
+// SetData gets a reference to the given RelationshipToUserTeamPermissionData and assigns it to the Data field.
 func (o *RelationshipToUserTeamPermission) SetData(v RelationshipToUserTeamPermissionData) {
-	o.Data.Set(&v)
-}
-
-// SetDataNil sets the value for Data to be an explicit nil.
-func (o *RelationshipToUserTeamPermission) SetDataNil() {
-	o.Data.Set(nil)
-}
-
-// UnsetData ensures that no value is present for Data, not even an explicit nil.
-func (o *RelationshipToUserTeamPermission) UnsetData() {
-	o.Data.Unset()
+	o.Data = &v
 }
 
 // GetLinks returns the Links field value if set, zero value otherwise.
@@ -109,8 +98,8 @@ func (o RelationshipToUserTeamPermission) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.Data.IsSet() {
-		toSerialize["data"] = o.Data.Get()
+	if o.Data != nil {
+		toSerialize["data"] = o.Data
 	}
 	if o.Links != nil {
 		toSerialize["links"] = o.Links
@@ -125,20 +114,23 @@ func (o RelationshipToUserTeamPermission) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *RelationshipToUserTeamPermission) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Data  NullableRelationshipToUserTeamPermissionData `json:"data,omitempty"`
-		Links *TeamRelationshipsLinks                      `json:"links,omitempty"`
+		Data  *RelationshipToUserTeamPermissionData `json:"data,omitempty"`
+		Links *TeamRelationshipsLinks               `json:"links,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data", "links"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
+	if all.Data != nil && all.Data.UnparsedObject != nil && o.UnparsedObject == nil {
+		hasInvalidField = true
+	}
 	o.Data = all.Data
 	if all.Links != nil && all.Links.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true

@@ -10,9 +10,8 @@ import (
 
 // SyntheticsAPIStep - The steps used in a Synthetic multi-step API test.
 type SyntheticsAPIStep struct {
-	SyntheticsAPITestStep    *SyntheticsAPITestStep
-	SyntheticsAPIWaitStep    *SyntheticsAPIWaitStep
-	SyntheticsAPISubtestStep *SyntheticsAPISubtestStep
+	SyntheticsAPITestStep *SyntheticsAPITestStep
+	SyntheticsAPIWaitStep *SyntheticsAPIWaitStep
 
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject interface{}
@@ -26,11 +25,6 @@ func SyntheticsAPITestStepAsSyntheticsAPIStep(v *SyntheticsAPITestStep) Syntheti
 // SyntheticsAPIWaitStepAsSyntheticsAPIStep is a convenience function that returns SyntheticsAPIWaitStep wrapped in SyntheticsAPIStep.
 func SyntheticsAPIWaitStepAsSyntheticsAPIStep(v *SyntheticsAPIWaitStep) SyntheticsAPIStep {
 	return SyntheticsAPIStep{SyntheticsAPIWaitStep: v}
-}
-
-// SyntheticsAPISubtestStepAsSyntheticsAPIStep is a convenience function that returns SyntheticsAPISubtestStep wrapped in SyntheticsAPIStep.
-func SyntheticsAPISubtestStepAsSyntheticsAPIStep(v *SyntheticsAPISubtestStep) SyntheticsAPIStep {
-	return SyntheticsAPIStep{SyntheticsAPISubtestStep: v}
 }
 
 // UnmarshalJSON turns data into one of the pointers in the struct.
@@ -71,28 +65,10 @@ func (obj *SyntheticsAPIStep) UnmarshalJSON(data []byte) error {
 		obj.SyntheticsAPIWaitStep = nil
 	}
 
-	// try to unmarshal data into SyntheticsAPISubtestStep
-	err = datadog.Unmarshal(data, &obj.SyntheticsAPISubtestStep)
-	if err == nil {
-		if obj.SyntheticsAPISubtestStep != nil && obj.SyntheticsAPISubtestStep.UnparsedObject == nil {
-			jsonSyntheticsAPISubtestStep, _ := datadog.Marshal(obj.SyntheticsAPISubtestStep)
-			if string(jsonSyntheticsAPISubtestStep) == "{}" { // empty struct
-				obj.SyntheticsAPISubtestStep = nil
-			} else {
-				match++
-			}
-		} else {
-			obj.SyntheticsAPISubtestStep = nil
-		}
-	} else {
-		obj.SyntheticsAPISubtestStep = nil
-	}
-
 	if match != 1 { // more than 1 match
 		// reset to nil
 		obj.SyntheticsAPITestStep = nil
 		obj.SyntheticsAPIWaitStep = nil
-		obj.SyntheticsAPISubtestStep = nil
 		return datadog.Unmarshal(data, &obj.UnparsedObject)
 	}
 	return nil // exactly one match
@@ -106,10 +82,6 @@ func (obj SyntheticsAPIStep) MarshalJSON() ([]byte, error) {
 
 	if obj.SyntheticsAPIWaitStep != nil {
 		return datadog.Marshal(&obj.SyntheticsAPIWaitStep)
-	}
-
-	if obj.SyntheticsAPISubtestStep != nil {
-		return datadog.Marshal(&obj.SyntheticsAPISubtestStep)
 	}
 
 	if obj.UnparsedObject != nil {
@@ -126,10 +98,6 @@ func (obj *SyntheticsAPIStep) GetActualInstance() interface{} {
 
 	if obj.SyntheticsAPIWaitStep != nil {
 		return obj.SyntheticsAPIWaitStep
-	}
-
-	if obj.SyntheticsAPISubtestStep != nil {
-		return obj.SyntheticsAPISubtestStep
 	}
 
 	// all schemas are nil

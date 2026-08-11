@@ -8,10 +8,8 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// EscalationPolicyStepTarget Defines a single escalation target within a step for an escalation policy creation request. Contains `id`, `type`, and optional `config`.
+// EscalationPolicyStepTarget Defines a single escalation target within a step for an escalation policy creation request. Contains `id` and `type`.
 type EscalationPolicyStepTarget struct {
-	// Configuration for an escalation target, such as schedule position.
-	Config *EscalationPolicyStepTargetConfig `json:"config,omitempty"`
 	// Specifies the unique identifier for this target.
 	Id *string `json:"id,omitempty"`
 	// Specifies the type of escalation target (example `users`, `schedules`, or `teams`).
@@ -36,34 +34,6 @@ func NewEscalationPolicyStepTarget() *EscalationPolicyStepTarget {
 func NewEscalationPolicyStepTargetWithDefaults() *EscalationPolicyStepTarget {
 	this := EscalationPolicyStepTarget{}
 	return &this
-}
-
-// GetConfig returns the Config field value if set, zero value otherwise.
-func (o *EscalationPolicyStepTarget) GetConfig() EscalationPolicyStepTargetConfig {
-	if o == nil || o.Config == nil {
-		var ret EscalationPolicyStepTargetConfig
-		return ret
-	}
-	return *o.Config
-}
-
-// GetConfigOk returns a tuple with the Config field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *EscalationPolicyStepTarget) GetConfigOk() (*EscalationPolicyStepTargetConfig, bool) {
-	if o == nil || o.Config == nil {
-		return nil, false
-	}
-	return o.Config, true
-}
-
-// HasConfig returns a boolean if a field has been set.
-func (o *EscalationPolicyStepTarget) HasConfig() bool {
-	return o != nil && o.Config != nil
-}
-
-// SetConfig gets a reference to the given EscalationPolicyStepTargetConfig and assigns it to the Config field.
-func (o *EscalationPolicyStepTarget) SetConfig(v EscalationPolicyStepTargetConfig) {
-	o.Config = &v
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
@@ -128,9 +98,6 @@ func (o EscalationPolicyStepTarget) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.Config != nil {
-		toSerialize["config"] = o.Config
-	}
 	if o.Id != nil {
 		toSerialize["id"] = o.Id
 	}
@@ -147,25 +114,20 @@ func (o EscalationPolicyStepTarget) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *EscalationPolicyStepTarget) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Config *EscalationPolicyStepTargetConfig `json:"config,omitempty"`
-		Id     *string                           `json:"id,omitempty"`
-		Type   *EscalationPolicyStepTargetType   `json:"type,omitempty"`
+		Id   *string                         `json:"id,omitempty"`
+		Type *EscalationPolicyStepTargetType `json:"type,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"config", "id", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"id", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	if all.Config != nil && all.Config.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
-	o.Config = all.Config
 	o.Id = all.Id
 	if all.Type != nil && !all.Type.IsValid() {
 		hasInvalidField = true

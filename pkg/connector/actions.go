@@ -199,7 +199,7 @@ func (u *userBuilder) updateUser(ctx context.Context, args *structpb.Struct) (*s
 		attrs.SetEmail(email)
 	}
 	if title != "" {
-		attrs.SetTitle(title)
+		attrs.AdditionalProperties = map[string]any{"title": title}
 	}
 	data := datadogV2.NewUserUpdateData(*attrs, userID, datadogV2.USERSTYPE_USERS)
 	req := datadogV2.NewUserUpdateRequest(*data)

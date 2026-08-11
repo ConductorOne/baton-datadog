@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// DORAListFailuresRequestAttributes Attributes to get a list of incidents.
+// DORAListFailuresRequestAttributes Attributes to get a list of failures.
 type DORAListFailuresRequestAttributes struct {
 	// Minimum timestamp for requested events.
 	From *time.Time `json:"from,omitempty"`
@@ -237,7 +237,7 @@ func (o *DORAListFailuresRequestAttributes) UnmarshalJSON(bytes []byte) (err err
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"from", "limit", "query", "sort", "to"})
 	} else {
 		return err

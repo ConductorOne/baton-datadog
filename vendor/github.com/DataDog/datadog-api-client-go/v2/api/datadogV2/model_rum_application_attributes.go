@@ -12,8 +12,6 @@ import (
 
 // RUMApplicationAttributes RUM application attributes.
 type RUMApplicationAttributes struct {
-	// ID of the API key associated with the application.
-	ApiKeyId *int32 `json:"api_key_id,omitempty"`
 	// ID of the RUM application.
 	ApplicationId string `json:"application_id"`
 	// Client token of the RUM application.
@@ -30,10 +28,6 @@ type RUMApplicationAttributes struct {
 	Name string `json:"name"`
 	// Org ID of the RUM application.
 	OrgId int32 `json:"org_id"`
-	// Product Scales configuration for the RUM application.
-	ProductScales *RUMProductScales `json:"product_scales,omitempty"`
-	// ID of the RUM SDK remote configuration for the application, if one exists.
-	RemoteConfigId *string `json:"remote_config_id,omitempty"`
 	// Type of the RUM application. Supported values are `browser`, `ios`, `android`, `react-native`, `flutter`, `roku`, `electron`, `unity`, `kotlin-multiplatform`.
 	Type string `json:"type"`
 	// Timestamp in ms of the last update date.
@@ -69,34 +63,6 @@ func NewRUMApplicationAttributes(applicationId string, clientToken string, creat
 func NewRUMApplicationAttributesWithDefaults() *RUMApplicationAttributes {
 	this := RUMApplicationAttributes{}
 	return &this
-}
-
-// GetApiKeyId returns the ApiKeyId field value if set, zero value otherwise.
-func (o *RUMApplicationAttributes) GetApiKeyId() int32 {
-	if o == nil || o.ApiKeyId == nil {
-		var ret int32
-		return ret
-	}
-	return *o.ApiKeyId
-}
-
-// GetApiKeyIdOk returns a tuple with the ApiKeyId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RUMApplicationAttributes) GetApiKeyIdOk() (*int32, bool) {
-	if o == nil || o.ApiKeyId == nil {
-		return nil, false
-	}
-	return o.ApiKeyId, true
-}
-
-// HasApiKeyId returns a boolean if a field has been set.
-func (o *RUMApplicationAttributes) HasApiKeyId() bool {
-	return o != nil && o.ApiKeyId != nil
-}
-
-// SetApiKeyId gets a reference to the given int32 and assigns it to the ApiKeyId field.
-func (o *RUMApplicationAttributes) SetApiKeyId(v int32) {
-	o.ApiKeyId = &v
 }
 
 // GetApplicationId returns the ApplicationId field value.
@@ -293,62 +259,6 @@ func (o *RUMApplicationAttributes) SetOrgId(v int32) {
 	o.OrgId = v
 }
 
-// GetProductScales returns the ProductScales field value if set, zero value otherwise.
-func (o *RUMApplicationAttributes) GetProductScales() RUMProductScales {
-	if o == nil || o.ProductScales == nil {
-		var ret RUMProductScales
-		return ret
-	}
-	return *o.ProductScales
-}
-
-// GetProductScalesOk returns a tuple with the ProductScales field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RUMApplicationAttributes) GetProductScalesOk() (*RUMProductScales, bool) {
-	if o == nil || o.ProductScales == nil {
-		return nil, false
-	}
-	return o.ProductScales, true
-}
-
-// HasProductScales returns a boolean if a field has been set.
-func (o *RUMApplicationAttributes) HasProductScales() bool {
-	return o != nil && o.ProductScales != nil
-}
-
-// SetProductScales gets a reference to the given RUMProductScales and assigns it to the ProductScales field.
-func (o *RUMApplicationAttributes) SetProductScales(v RUMProductScales) {
-	o.ProductScales = &v
-}
-
-// GetRemoteConfigId returns the RemoteConfigId field value if set, zero value otherwise.
-func (o *RUMApplicationAttributes) GetRemoteConfigId() string {
-	if o == nil || o.RemoteConfigId == nil {
-		var ret string
-		return ret
-	}
-	return *o.RemoteConfigId
-}
-
-// GetRemoteConfigIdOk returns a tuple with the RemoteConfigId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RUMApplicationAttributes) GetRemoteConfigIdOk() (*string, bool) {
-	if o == nil || o.RemoteConfigId == nil {
-		return nil, false
-	}
-	return o.RemoteConfigId, true
-}
-
-// HasRemoteConfigId returns a boolean if a field has been set.
-func (o *RUMApplicationAttributes) HasRemoteConfigId() bool {
-	return o != nil && o.RemoteConfigId != nil
-}
-
-// SetRemoteConfigId gets a reference to the given string and assigns it to the RemoteConfigId field.
-func (o *RUMApplicationAttributes) SetRemoteConfigId(v string) {
-	o.RemoteConfigId = &v
-}
-
 // GetType returns the Type field value.
 func (o *RUMApplicationAttributes) GetType() string {
 	if o == nil {
@@ -424,9 +334,6 @@ func (o RUMApplicationAttributes) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.ApiKeyId != nil {
-		toSerialize["api_key_id"] = o.ApiKeyId
-	}
 	toSerialize["application_id"] = o.ApplicationId
 	toSerialize["client_token"] = o.ClientToken
 	toSerialize["created_at"] = o.CreatedAt
@@ -439,12 +346,6 @@ func (o RUMApplicationAttributes) MarshalJSON() ([]byte, error) {
 	}
 	toSerialize["name"] = o.Name
 	toSerialize["org_id"] = o.OrgId
-	if o.ProductScales != nil {
-		toSerialize["product_scales"] = o.ProductScales
-	}
-	if o.RemoteConfigId != nil {
-		toSerialize["remote_config_id"] = o.RemoteConfigId
-	}
 	toSerialize["type"] = o.Type
 	toSerialize["updated_at"] = o.UpdatedAt
 	toSerialize["updated_by_handle"] = o.UpdatedByHandle
@@ -458,20 +359,17 @@ func (o RUMApplicationAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *RUMApplicationAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		ApiKeyId        *int32            `json:"api_key_id,omitempty"`
-		ApplicationId   *string           `json:"application_id"`
-		ClientToken     *string           `json:"client_token"`
-		CreatedAt       *int64            `json:"created_at"`
-		CreatedByHandle *string           `json:"created_by_handle"`
-		Hash            *string           `json:"hash,omitempty"`
-		IsActive        *bool             `json:"is_active,omitempty"`
-		Name            *string           `json:"name"`
-		OrgId           *int32            `json:"org_id"`
-		ProductScales   *RUMProductScales `json:"product_scales,omitempty"`
-		RemoteConfigId  *string           `json:"remote_config_id,omitempty"`
-		Type            *string           `json:"type"`
-		UpdatedAt       *int64            `json:"updated_at"`
-		UpdatedByHandle *string           `json:"updated_by_handle"`
+		ApplicationId   *string `json:"application_id"`
+		ClientToken     *string `json:"client_token"`
+		CreatedAt       *int64  `json:"created_at"`
+		CreatedByHandle *string `json:"created_by_handle"`
+		Hash            *string `json:"hash,omitempty"`
+		IsActive        *bool   `json:"is_active,omitempty"`
+		Name            *string `json:"name"`
+		OrgId           *int32  `json:"org_id"`
+		Type            *string `json:"type"`
+		UpdatedAt       *int64  `json:"updated_at"`
+		UpdatedByHandle *string `json:"updated_by_handle"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -504,14 +402,11 @@ func (o *RUMApplicationAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field updated_by_handle missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"api_key_id", "application_id", "client_token", "created_at", "created_by_handle", "hash", "is_active", "name", "org_id", "product_scales", "remote_config_id", "type", "updated_at", "updated_by_handle"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"application_id", "client_token", "created_at", "created_by_handle", "hash", "is_active", "name", "org_id", "type", "updated_at", "updated_by_handle"})
 	} else {
 		return err
 	}
-
-	hasInvalidField := false
-	o.ApiKeyId = all.ApiKeyId
 	o.ApplicationId = *all.ApplicationId
 	o.ClientToken = *all.ClientToken
 	o.CreatedAt = *all.CreatedAt
@@ -520,21 +415,12 @@ func (o *RUMApplicationAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	o.IsActive = all.IsActive
 	o.Name = *all.Name
 	o.OrgId = *all.OrgId
-	if all.ProductScales != nil && all.ProductScales.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
-	o.ProductScales = all.ProductScales
-	o.RemoteConfigId = all.RemoteConfigId
 	o.Type = *all.Type
 	o.UpdatedAt = *all.UpdatedAt
 	o.UpdatedByHandle = *all.UpdatedByHandle
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties
-	}
-
-	if hasInvalidField {
-		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 
 	return nil

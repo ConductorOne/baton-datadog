@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// GCPUsageCostConfigPatchRequestAttributes Attributes for Google Cloud Usage Cost config patch request.
+// GCPUsageCostConfigPatchRequestAttributes Attributes for GCP Usage Cost config patch request.
 type GCPUsageCostConfigPatchRequestAttributes struct {
 	// Whether or not the Cloud Cost Management account is enabled.
 	IsEnabled bool `json:"is_enabled"`
@@ -86,7 +86,7 @@ func (o *GCPUsageCostConfigPatchRequestAttributes) UnmarshalJSON(bytes []byte) (
 		return fmt.Errorf("required field is_enabled missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"is_enabled"})
 	} else {
 		return err

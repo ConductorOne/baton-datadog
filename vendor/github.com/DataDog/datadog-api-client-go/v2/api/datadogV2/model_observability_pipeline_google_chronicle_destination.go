@@ -11,19 +11,14 @@ import (
 )
 
 // ObservabilityPipelineGoogleChronicleDestination The `google_chronicle` destination sends logs to Google Chronicle.
-//
-// **Supported pipeline types:** logs
 type ObservabilityPipelineGoogleChronicleDestination struct {
-	// Google Cloud credentials used to authenticate with Google Cloud Storage.
-	Auth *ObservabilityPipelineGcpAuth `json:"auth,omitempty"`
-	// Configuration for buffer settings on destination components.
-	Buffer *ObservabilityPipelineBufferOptions `json:"buffer,omitempty"`
+	// GCP credentials used to authenticate with Google Cloud Storage.
+	//
+	Auth ObservabilityPipelineGcpAuth `json:"auth"`
 	// The Google Chronicle customer ID.
 	CustomerId string `json:"customer_id"`
 	// The encoding format for the logs sent to Chronicle.
 	Encoding *ObservabilityPipelineGoogleChronicleDestinationEncoding `json:"encoding,omitempty"`
-	// Name of the environment variable or secret that holds the Google Chronicle endpoint URL.
-	EndpointUrlKey *string `json:"endpoint_url_key,omitempty"`
 	// The unique identifier for this component.
 	Id string `json:"id"`
 	// A list of component IDs whose output is used as the `input` for this component.
@@ -41,8 +36,9 @@ type ObservabilityPipelineGoogleChronicleDestination struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewObservabilityPipelineGoogleChronicleDestination(customerId string, id string, inputs []string, typeVar ObservabilityPipelineGoogleChronicleDestinationType) *ObservabilityPipelineGoogleChronicleDestination {
+func NewObservabilityPipelineGoogleChronicleDestination(auth ObservabilityPipelineGcpAuth, customerId string, id string, inputs []string, typeVar ObservabilityPipelineGoogleChronicleDestinationType) *ObservabilityPipelineGoogleChronicleDestination {
 	this := ObservabilityPipelineGoogleChronicleDestination{}
+	this.Auth = auth
 	this.CustomerId = customerId
 	this.Id = id
 	this.Inputs = inputs
@@ -60,60 +56,27 @@ func NewObservabilityPipelineGoogleChronicleDestinationWithDefaults() *Observabi
 	return &this
 }
 
-// GetAuth returns the Auth field value if set, zero value otherwise.
+// GetAuth returns the Auth field value.
 func (o *ObservabilityPipelineGoogleChronicleDestination) GetAuth() ObservabilityPipelineGcpAuth {
-	if o == nil || o.Auth == nil {
+	if o == nil {
 		var ret ObservabilityPipelineGcpAuth
 		return ret
 	}
-	return *o.Auth
+	return o.Auth
 }
 
-// GetAuthOk returns a tuple with the Auth field value if set, nil otherwise
+// GetAuthOk returns a tuple with the Auth field value
 // and a boolean to check if the value has been set.
 func (o *ObservabilityPipelineGoogleChronicleDestination) GetAuthOk() (*ObservabilityPipelineGcpAuth, bool) {
-	if o == nil || o.Auth == nil {
+	if o == nil {
 		return nil, false
 	}
-	return o.Auth, true
+	return &o.Auth, true
 }
 
-// HasAuth returns a boolean if a field has been set.
-func (o *ObservabilityPipelineGoogleChronicleDestination) HasAuth() bool {
-	return o != nil && o.Auth != nil
-}
-
-// SetAuth gets a reference to the given ObservabilityPipelineGcpAuth and assigns it to the Auth field.
+// SetAuth sets field value.
 func (o *ObservabilityPipelineGoogleChronicleDestination) SetAuth(v ObservabilityPipelineGcpAuth) {
-	o.Auth = &v
-}
-
-// GetBuffer returns the Buffer field value if set, zero value otherwise.
-func (o *ObservabilityPipelineGoogleChronicleDestination) GetBuffer() ObservabilityPipelineBufferOptions {
-	if o == nil || o.Buffer == nil {
-		var ret ObservabilityPipelineBufferOptions
-		return ret
-	}
-	return *o.Buffer
-}
-
-// GetBufferOk returns a tuple with the Buffer field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineGoogleChronicleDestination) GetBufferOk() (*ObservabilityPipelineBufferOptions, bool) {
-	if o == nil || o.Buffer == nil {
-		return nil, false
-	}
-	return o.Buffer, true
-}
-
-// HasBuffer returns a boolean if a field has been set.
-func (o *ObservabilityPipelineGoogleChronicleDestination) HasBuffer() bool {
-	return o != nil && o.Buffer != nil
-}
-
-// SetBuffer gets a reference to the given ObservabilityPipelineBufferOptions and assigns it to the Buffer field.
-func (o *ObservabilityPipelineGoogleChronicleDestination) SetBuffer(v ObservabilityPipelineBufferOptions) {
-	o.Buffer = &v
+	o.Auth = v
 }
 
 // GetCustomerId returns the CustomerId field value.
@@ -165,34 +128,6 @@ func (o *ObservabilityPipelineGoogleChronicleDestination) HasEncoding() bool {
 // SetEncoding gets a reference to the given ObservabilityPipelineGoogleChronicleDestinationEncoding and assigns it to the Encoding field.
 func (o *ObservabilityPipelineGoogleChronicleDestination) SetEncoding(v ObservabilityPipelineGoogleChronicleDestinationEncoding) {
 	o.Encoding = &v
-}
-
-// GetEndpointUrlKey returns the EndpointUrlKey field value if set, zero value otherwise.
-func (o *ObservabilityPipelineGoogleChronicleDestination) GetEndpointUrlKey() string {
-	if o == nil || o.EndpointUrlKey == nil {
-		var ret string
-		return ret
-	}
-	return *o.EndpointUrlKey
-}
-
-// GetEndpointUrlKeyOk returns a tuple with the EndpointUrlKey field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineGoogleChronicleDestination) GetEndpointUrlKeyOk() (*string, bool) {
-	if o == nil || o.EndpointUrlKey == nil {
-		return nil, false
-	}
-	return o.EndpointUrlKey, true
-}
-
-// HasEndpointUrlKey returns a boolean if a field has been set.
-func (o *ObservabilityPipelineGoogleChronicleDestination) HasEndpointUrlKey() bool {
-	return o != nil && o.EndpointUrlKey != nil
-}
-
-// SetEndpointUrlKey gets a reference to the given string and assigns it to the EndpointUrlKey field.
-func (o *ObservabilityPipelineGoogleChronicleDestination) SetEndpointUrlKey(v string) {
-	o.EndpointUrlKey = &v
 }
 
 // GetId returns the Id field value.
@@ -298,18 +233,10 @@ func (o ObservabilityPipelineGoogleChronicleDestination) MarshalJSON() ([]byte, 
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.Auth != nil {
-		toSerialize["auth"] = o.Auth
-	}
-	if o.Buffer != nil {
-		toSerialize["buffer"] = o.Buffer
-	}
+	toSerialize["auth"] = o.Auth
 	toSerialize["customer_id"] = o.CustomerId
 	if o.Encoding != nil {
 		toSerialize["encoding"] = o.Encoding
-	}
-	if o.EndpointUrlKey != nil {
-		toSerialize["endpoint_url_key"] = o.EndpointUrlKey
 	}
 	toSerialize["id"] = o.Id
 	toSerialize["inputs"] = o.Inputs
@@ -327,18 +254,19 @@ func (o ObservabilityPipelineGoogleChronicleDestination) MarshalJSON() ([]byte, 
 // UnmarshalJSON deserializes the given payload.
 func (o *ObservabilityPipelineGoogleChronicleDestination) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Auth           *ObservabilityPipelineGcpAuth                            `json:"auth,omitempty"`
-		Buffer         *ObservabilityPipelineBufferOptions                      `json:"buffer,omitempty"`
-		CustomerId     *string                                                  `json:"customer_id"`
-		Encoding       *ObservabilityPipelineGoogleChronicleDestinationEncoding `json:"encoding,omitempty"`
-		EndpointUrlKey *string                                                  `json:"endpoint_url_key,omitempty"`
-		Id             *string                                                  `json:"id"`
-		Inputs         *[]string                                                `json:"inputs"`
-		LogType        *string                                                  `json:"log_type,omitempty"`
-		Type           *ObservabilityPipelineGoogleChronicleDestinationType     `json:"type"`
+		Auth       *ObservabilityPipelineGcpAuth                            `json:"auth"`
+		CustomerId *string                                                  `json:"customer_id"`
+		Encoding   *ObservabilityPipelineGoogleChronicleDestinationEncoding `json:"encoding,omitempty"`
+		Id         *string                                                  `json:"id"`
+		Inputs     *[]string                                                `json:"inputs"`
+		LogType    *string                                                  `json:"log_type,omitempty"`
+		Type       *ObservabilityPipelineGoogleChronicleDestinationType     `json:"type"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
+	}
+	if all.Auth == nil {
+		return fmt.Errorf("required field auth missing")
 	}
 	if all.CustomerId == nil {
 		return fmt.Errorf("required field customer_id missing")
@@ -353,25 +281,23 @@ func (o *ObservabilityPipelineGoogleChronicleDestination) UnmarshalJSON(bytes []
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"auth", "buffer", "customer_id", "encoding", "endpoint_url_key", "id", "inputs", "log_type", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"auth", "customer_id", "encoding", "id", "inputs", "log_type", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	if all.Auth != nil && all.Auth.UnparsedObject != nil && o.UnparsedObject == nil {
+	if all.Auth.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true
 	}
-	o.Auth = all.Auth
-	o.Buffer = all.Buffer
+	o.Auth = *all.Auth
 	o.CustomerId = *all.CustomerId
 	if all.Encoding != nil && !all.Encoding.IsValid() {
 		hasInvalidField = true
 	} else {
 		o.Encoding = all.Encoding
 	}
-	o.EndpointUrlKey = all.EndpointUrlKey
 	o.Id = *all.Id
 	o.Inputs = *all.Inputs
 	o.LogType = all.LogType

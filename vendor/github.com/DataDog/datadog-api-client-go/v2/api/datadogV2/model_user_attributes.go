@@ -12,34 +12,29 @@ import (
 
 // UserAttributes Attributes of user object returned by the API.
 type UserAttributes struct {
-	// The ISO 8601 timestamp of when the user account was created.
+	// Creation time of the user.
 	CreatedAt *time.Time `json:"created_at,omitempty"`
-	// Whether the user account is deactivated. Disabled users cannot log in.
+	// Whether the user is disabled.
 	Disabled *bool `json:"disabled,omitempty"`
-	// The email address of the user, used for login and notifications.
+	// Email of the user.
 	Email *string `json:"email,omitempty"`
-	// The unique handle (username) of the user, typically matching their email prefix.
+	// Handle of the user.
 	Handle *string `json:"handle,omitempty"`
-	// URL of the user's profile icon, typically a Gravatar URL derived from the email address.
+	// URL of the user's icon.
 	Icon *string `json:"icon,omitempty"`
-	// The ISO 8601 timestamp of the user's most recent login, or null if the user has never logged in.
-	LastLoginTime datadog.NullableTime `json:"last_login_time,omitempty"`
-	// Whether multi-factor authentication (MFA) is enabled for the user's account.
+	// If user has MFA enabled.
 	MfaEnabled *bool `json:"mfa_enabled,omitempty"`
-	// The ISO 8601 timestamp of when the user account was last modified.
+	// Time that the user was last modified.
 	ModifiedAt *time.Time `json:"modified_at,omitempty"`
-	// The full display name of the user as shown in the Datadog UI.
+	// Name of the user.
 	Name datadog.NullableString `json:"name,omitempty"`
-	// Whether this is a service account rather than a human user.
-	// Service accounts are used for programmatic API access.
+	// Whether the user is a service account.
 	ServiceAccount *bool `json:"service_account,omitempty"`
-	// The current status of the user account (for example, `Active`, `Pending`, or `Disabled`).
+	// Status of the user.
 	Status *string `json:"status,omitempty"`
-	// The job title of the user (for example, "Senior Engineer" or "Product Manager").
+	// Title of the user.
 	Title datadog.NullableString `json:"title,omitempty"`
-	// The globally unique identifier (UUID) of the user.
-	Uuid *string `json:"uuid,omitempty"`
-	// Whether the user's email address has been verified.
+	// Whether the user is verified.
 	Verified *bool `json:"verified,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -201,45 +196,6 @@ func (o *UserAttributes) HasIcon() bool {
 // SetIcon gets a reference to the given string and assigns it to the Icon field.
 func (o *UserAttributes) SetIcon(v string) {
 	o.Icon = &v
-}
-
-// GetLastLoginTime returns the LastLoginTime field value if set, zero value otherwise (both if not set or set to explicit null).
-func (o *UserAttributes) GetLastLoginTime() time.Time {
-	if o == nil || o.LastLoginTime.Get() == nil {
-		var ret time.Time
-		return ret
-	}
-	return *o.LastLoginTime.Get()
-}
-
-// GetLastLoginTimeOk returns a tuple with the LastLoginTime field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-// NOTE: If the value is an explicit nil, `nil, true` will be returned.
-func (o *UserAttributes) GetLastLoginTimeOk() (*time.Time, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return o.LastLoginTime.Get(), o.LastLoginTime.IsSet()
-}
-
-// HasLastLoginTime returns a boolean if a field has been set.
-func (o *UserAttributes) HasLastLoginTime() bool {
-	return o != nil && o.LastLoginTime.IsSet()
-}
-
-// SetLastLoginTime gets a reference to the given datadog.NullableTime and assigns it to the LastLoginTime field.
-func (o *UserAttributes) SetLastLoginTime(v time.Time) {
-	o.LastLoginTime.Set(&v)
-}
-
-// SetLastLoginTimeNil sets the value for LastLoginTime to be an explicit nil.
-func (o *UserAttributes) SetLastLoginTimeNil() {
-	o.LastLoginTime.Set(nil)
-}
-
-// UnsetLastLoginTime ensures that no value is present for LastLoginTime, not even an explicit nil.
-func (o *UserAttributes) UnsetLastLoginTime() {
-	o.LastLoginTime.Unset()
 }
 
 // GetMfaEnabled returns the MfaEnabled field value if set, zero value otherwise.
@@ -432,34 +388,6 @@ func (o *UserAttributes) UnsetTitle() {
 	o.Title.Unset()
 }
 
-// GetUuid returns the Uuid field value if set, zero value otherwise.
-func (o *UserAttributes) GetUuid() string {
-	if o == nil || o.Uuid == nil {
-		var ret string
-		return ret
-	}
-	return *o.Uuid
-}
-
-// GetUuidOk returns a tuple with the Uuid field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *UserAttributes) GetUuidOk() (*string, bool) {
-	if o == nil || o.Uuid == nil {
-		return nil, false
-	}
-	return o.Uuid, true
-}
-
-// HasUuid returns a boolean if a field has been set.
-func (o *UserAttributes) HasUuid() bool {
-	return o != nil && o.Uuid != nil
-}
-
-// SetUuid gets a reference to the given string and assigns it to the Uuid field.
-func (o *UserAttributes) SetUuid(v string) {
-	o.Uuid = &v
-}
-
 // GetVerified returns the Verified field value if set, zero value otherwise.
 func (o *UserAttributes) GetVerified() bool {
 	if o == nil || o.Verified == nil {
@@ -513,9 +441,6 @@ func (o UserAttributes) MarshalJSON() ([]byte, error) {
 	if o.Icon != nil {
 		toSerialize["icon"] = o.Icon
 	}
-	if o.LastLoginTime.IsSet() {
-		toSerialize["last_login_time"] = o.LastLoginTime.Get()
-	}
 	if o.MfaEnabled != nil {
 		toSerialize["mfa_enabled"] = o.MfaEnabled
 	}
@@ -538,9 +463,6 @@ func (o UserAttributes) MarshalJSON() ([]byte, error) {
 	if o.Title.IsSet() {
 		toSerialize["title"] = o.Title.Get()
 	}
-	if o.Uuid != nil {
-		toSerialize["uuid"] = o.Uuid
-	}
 	if o.Verified != nil {
 		toSerialize["verified"] = o.Verified
 	}
@@ -559,22 +481,20 @@ func (o *UserAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		Email          *string                `json:"email,omitempty"`
 		Handle         *string                `json:"handle,omitempty"`
 		Icon           *string                `json:"icon,omitempty"`
-		LastLoginTime  datadog.NullableTime   `json:"last_login_time,omitempty"`
 		MfaEnabled     *bool                  `json:"mfa_enabled,omitempty"`
 		ModifiedAt     *time.Time             `json:"modified_at,omitempty"`
 		Name           datadog.NullableString `json:"name,omitempty"`
 		ServiceAccount *bool                  `json:"service_account,omitempty"`
 		Status         *string                `json:"status,omitempty"`
 		Title          datadog.NullableString `json:"title,omitempty"`
-		Uuid           *string                `json:"uuid,omitempty"`
 		Verified       *bool                  `json:"verified,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"created_at", "disabled", "email", "handle", "icon", "last_login_time", "mfa_enabled", "modified_at", "name", "service_account", "status", "title", "uuid", "verified"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"created_at", "disabled", "email", "handle", "icon", "mfa_enabled", "modified_at", "name", "service_account", "status", "title", "verified"})
 	} else {
 		return err
 	}
@@ -583,14 +503,12 @@ func (o *UserAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	o.Email = all.Email
 	o.Handle = all.Handle
 	o.Icon = all.Icon
-	o.LastLoginTime = all.LastLoginTime
 	o.MfaEnabled = all.MfaEnabled
 	o.ModifiedAt = all.ModifiedAt
 	o.Name = all.Name
 	o.ServiceAccount = all.ServiceAccount
 	o.Status = all.Status
 	o.Title = all.Title
-	o.Uuid = all.Uuid
 	o.Verified = all.Verified
 
 	if len(additionalProperties) > 0 {

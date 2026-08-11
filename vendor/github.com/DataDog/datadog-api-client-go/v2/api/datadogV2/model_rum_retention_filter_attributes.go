@@ -10,8 +10,6 @@ import (
 
 // RumRetentionFilterAttributes The object describing attributes of a RUM retention filter.
 type RumRetentionFilterAttributes struct {
-	// The configuration for cross-product retention filters.
-	CrossProductSampling *RumCrossProductSampling `json:"cross_product_sampling,omitempty"`
 	// Whether the retention filter is enabled.
 	Enabled *bool `json:"enabled,omitempty"`
 	// The type of RUM events to filter on.
@@ -20,8 +18,8 @@ type RumRetentionFilterAttributes struct {
 	Name *string `json:"name,omitempty"`
 	// The query string for a RUM retention filter.
 	Query *string `json:"query,omitempty"`
-	// The sample rate for a RUM retention filter, between 0.1 and 100.
-	SampleRate *float64 `json:"sample_rate,omitempty"`
+	// The sample rate for a RUM retention filter, between 0 and 100.
+	SampleRate *int64 `json:"sample_rate,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -42,34 +40,6 @@ func NewRumRetentionFilterAttributes() *RumRetentionFilterAttributes {
 func NewRumRetentionFilterAttributesWithDefaults() *RumRetentionFilterAttributes {
 	this := RumRetentionFilterAttributes{}
 	return &this
-}
-
-// GetCrossProductSampling returns the CrossProductSampling field value if set, zero value otherwise.
-func (o *RumRetentionFilterAttributes) GetCrossProductSampling() RumCrossProductSampling {
-	if o == nil || o.CrossProductSampling == nil {
-		var ret RumCrossProductSampling
-		return ret
-	}
-	return *o.CrossProductSampling
-}
-
-// GetCrossProductSamplingOk returns a tuple with the CrossProductSampling field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RumRetentionFilterAttributes) GetCrossProductSamplingOk() (*RumCrossProductSampling, bool) {
-	if o == nil || o.CrossProductSampling == nil {
-		return nil, false
-	}
-	return o.CrossProductSampling, true
-}
-
-// HasCrossProductSampling returns a boolean if a field has been set.
-func (o *RumRetentionFilterAttributes) HasCrossProductSampling() bool {
-	return o != nil && o.CrossProductSampling != nil
-}
-
-// SetCrossProductSampling gets a reference to the given RumCrossProductSampling and assigns it to the CrossProductSampling field.
-func (o *RumRetentionFilterAttributes) SetCrossProductSampling(v RumCrossProductSampling) {
-	o.CrossProductSampling = &v
 }
 
 // GetEnabled returns the Enabled field value if set, zero value otherwise.
@@ -185,9 +155,9 @@ func (o *RumRetentionFilterAttributes) SetQuery(v string) {
 }
 
 // GetSampleRate returns the SampleRate field value if set, zero value otherwise.
-func (o *RumRetentionFilterAttributes) GetSampleRate() float64 {
+func (o *RumRetentionFilterAttributes) GetSampleRate() int64 {
 	if o == nil || o.SampleRate == nil {
-		var ret float64
+		var ret int64
 		return ret
 	}
 	return *o.SampleRate
@@ -195,7 +165,7 @@ func (o *RumRetentionFilterAttributes) GetSampleRate() float64 {
 
 // GetSampleRateOk returns a tuple with the SampleRate field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RumRetentionFilterAttributes) GetSampleRateOk() (*float64, bool) {
+func (o *RumRetentionFilterAttributes) GetSampleRateOk() (*int64, bool) {
 	if o == nil || o.SampleRate == nil {
 		return nil, false
 	}
@@ -207,8 +177,8 @@ func (o *RumRetentionFilterAttributes) HasSampleRate() bool {
 	return o != nil && o.SampleRate != nil
 }
 
-// SetSampleRate gets a reference to the given float64 and assigns it to the SampleRate field.
-func (o *RumRetentionFilterAttributes) SetSampleRate(v float64) {
+// SetSampleRate gets a reference to the given int64 and assigns it to the SampleRate field.
+func (o *RumRetentionFilterAttributes) SetSampleRate(v int64) {
 	o.SampleRate = &v
 }
 
@@ -217,9 +187,6 @@ func (o RumRetentionFilterAttributes) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
-	}
-	if o.CrossProductSampling != nil {
-		toSerialize["cross_product_sampling"] = o.CrossProductSampling
 	}
 	if o.Enabled != nil {
 		toSerialize["enabled"] = o.Enabled
@@ -246,28 +213,23 @@ func (o RumRetentionFilterAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *RumRetentionFilterAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		CrossProductSampling *RumCrossProductSampling     `json:"cross_product_sampling,omitempty"`
-		Enabled              *bool                        `json:"enabled,omitempty"`
-		EventType            *RumRetentionFilterEventType `json:"event_type,omitempty"`
-		Name                 *string                      `json:"name,omitempty"`
-		Query                *string                      `json:"query,omitempty"`
-		SampleRate           *float64                     `json:"sample_rate,omitempty"`
+		Enabled    *bool                        `json:"enabled,omitempty"`
+		EventType  *RumRetentionFilterEventType `json:"event_type,omitempty"`
+		Name       *string                      `json:"name,omitempty"`
+		Query      *string                      `json:"query,omitempty"`
+		SampleRate *int64                       `json:"sample_rate,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"cross_product_sampling", "enabled", "event_type", "name", "query", "sample_rate"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"enabled", "event_type", "name", "query", "sample_rate"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	if all.CrossProductSampling != nil && all.CrossProductSampling.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
-	o.CrossProductSampling = all.CrossProductSampling
 	o.Enabled = all.Enabled
 	if all.EventType != nil && !all.EventType.IsValid() {
 		hasInvalidField = true

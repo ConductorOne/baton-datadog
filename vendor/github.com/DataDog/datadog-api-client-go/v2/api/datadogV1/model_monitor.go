@@ -13,8 +13,6 @@ import (
 
 // Monitor Object describing a monitor.
 type Monitor struct {
-	// The list of monitor assets tied to a monitor, which represents key links for users to take action on monitor alerts (for example, runbooks).
-	Assets []MonitorAsset `json:"assets,omitempty"`
 	// Timestamp of the monitor creation.
 	Created *time.Time `json:"created,omitempty"`
 	// Object describing the creator of the shared element.
@@ -27,6 +25,7 @@ type Monitor struct {
 	// `published`: The monitor is active and evaluates conditions and notify as configured.
 	//
 	// This field is in preview. The draft value is only available to customers with the feature enabled.
+	//
 	DraftStatus *MonitorDraftStatus `json:"draft_status,omitempty"`
 	// ID of this monitor.
 	Id *int64 `json:"id,omitempty"`
@@ -82,34 +81,6 @@ func NewMonitorWithDefaults() *Monitor {
 	var draftStatus MonitorDraftStatus = MONITORDRAFTSTATUS_PUBLISHED
 	this.DraftStatus = &draftStatus
 	return &this
-}
-
-// GetAssets returns the Assets field value if set, zero value otherwise.
-func (o *Monitor) GetAssets() []MonitorAsset {
-	if o == nil || o.Assets == nil {
-		var ret []MonitorAsset
-		return ret
-	}
-	return o.Assets
-}
-
-// GetAssetsOk returns a tuple with the Assets field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *Monitor) GetAssetsOk() (*[]MonitorAsset, bool) {
-	if o == nil || o.Assets == nil {
-		return nil, false
-	}
-	return &o.Assets, true
-}
-
-// HasAssets returns a boolean if a field has been set.
-func (o *Monitor) HasAssets() bool {
-	return o != nil && o.Assets != nil
-}
-
-// SetAssets gets a reference to the given []MonitorAsset and assigns it to the Assets field.
-func (o *Monitor) SetAssets(v []MonitorAsset) {
-	o.Assets = v
 }
 
 // GetCreated returns the Created field value if set, zero value otherwise.
@@ -645,9 +616,6 @@ func (o Monitor) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.Assets != nil {
-		toSerialize["assets"] = o.Assets
-	}
 	if o.Created != nil {
 		if o.Created.Nanosecond() == 0 {
 			toSerialize["created"] = o.Created.Format("2006-01-02T15:04:05Z07:00")
@@ -716,7 +684,6 @@ func (o Monitor) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *Monitor) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Assets            []MonitorAsset               `json:"assets,omitempty"`
 		Created           *time.Time                   `json:"created,omitempty"`
 		Creator           *Creator                     `json:"creator,omitempty"`
 		Deleted           datadog.NullableTime         `json:"deleted,omitempty"`
@@ -746,14 +713,13 @@ func (o *Monitor) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"assets", "created", "creator", "deleted", "draft_status", "id", "matching_downtimes", "message", "modified", "multi", "name", "options", "overall_state", "priority", "query", "restricted_roles", "state", "tags", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"created", "creator", "deleted", "draft_status", "id", "matching_downtimes", "message", "modified", "multi", "name", "options", "overall_state", "priority", "query", "restricted_roles", "state", "tags", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	o.Assets = all.Assets
 	o.Created = all.Created
 	if all.Creator != nil && all.Creator.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true

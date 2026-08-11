@@ -10,17 +10,12 @@ import (
 
 // UserUpdateAttributes Attributes of the edited user.
 type UserUpdateAttributes struct {
-	// When set to `true`, the user is deactivated and can no longer log in.
-	// When `false`, the user is active.
+	// If the user is enabled or disabled.
 	Disabled *bool `json:"disabled,omitempty"`
-	// The email address of the user, used for login and notifications.
-	// Must be a valid email format.
+	// The email of the user.
 	Email *string `json:"email,omitempty"`
-	// The full display name of the user as shown in the Datadog UI.
-	// Maximum 55 characters, cannot contain `<` or `>`.
+	// The name of the user.
 	Name *string `json:"name,omitempty"`
-	// The job title of the user (for example, "Senior Engineer" or "Product Manager").
-	Title datadog.NullableString `json:"title,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -127,45 +122,6 @@ func (o *UserUpdateAttributes) SetName(v string) {
 	o.Name = &v
 }
 
-// GetTitle returns the Title field value if set, zero value otherwise (both if not set or set to explicit null).
-func (o *UserUpdateAttributes) GetTitle() string {
-	if o == nil || o.Title.Get() == nil {
-		var ret string
-		return ret
-	}
-	return *o.Title.Get()
-}
-
-// GetTitleOk returns a tuple with the Title field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-// NOTE: If the value is an explicit nil, `nil, true` will be returned.
-func (o *UserUpdateAttributes) GetTitleOk() (*string, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return o.Title.Get(), o.Title.IsSet()
-}
-
-// HasTitle returns a boolean if a field has been set.
-func (o *UserUpdateAttributes) HasTitle() bool {
-	return o != nil && o.Title.IsSet()
-}
-
-// SetTitle gets a reference to the given datadog.NullableString and assigns it to the Title field.
-func (o *UserUpdateAttributes) SetTitle(v string) {
-	o.Title.Set(&v)
-}
-
-// SetTitleNil sets the value for Title to be an explicit nil.
-func (o *UserUpdateAttributes) SetTitleNil() {
-	o.Title.Set(nil)
-}
-
-// UnsetTitle ensures that no value is present for Title, not even an explicit nil.
-func (o *UserUpdateAttributes) UnsetTitle() {
-	o.Title.Unset()
-}
-
 // MarshalJSON serializes the struct using spec logic.
 func (o UserUpdateAttributes) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
@@ -181,9 +137,6 @@ func (o UserUpdateAttributes) MarshalJSON() ([]byte, error) {
 	if o.Name != nil {
 		toSerialize["name"] = o.Name
 	}
-	if o.Title.IsSet() {
-		toSerialize["title"] = o.Title.Get()
-	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -194,24 +147,22 @@ func (o UserUpdateAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *UserUpdateAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Disabled *bool                  `json:"disabled,omitempty"`
-		Email    *string                `json:"email,omitempty"`
-		Name     *string                `json:"name,omitempty"`
-		Title    datadog.NullableString `json:"title,omitempty"`
+		Disabled *bool   `json:"disabled,omitempty"`
+		Email    *string `json:"email,omitempty"`
+		Name     *string `json:"name,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"disabled", "email", "name", "title"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"disabled", "email", "name"})
 	} else {
 		return err
 	}
 	o.Disabled = all.Disabled
 	o.Email = all.Email
 	o.Name = all.Name
-	o.Title = all.Title
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

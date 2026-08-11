@@ -10,11 +10,11 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// GCPUsageCostConfigPatchData Google Cloud Usage Cost config patch data.
+// GCPUsageCostConfigPatchData GCP Usage Cost config patch data.
 type GCPUsageCostConfigPatchData struct {
-	// Attributes for Google Cloud Usage Cost config patch request.
+	// Attributes for GCP Usage Cost config patch request.
 	Attributes GCPUsageCostConfigPatchRequestAttributes `json:"attributes"`
-	// Type of Google Cloud Usage Cost config patch request.
+	// Type of GCP Usage Cost config patch request.
 	Type GCPUsageCostConfigPatchRequestType `json:"type"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -119,7 +119,7 @@ func (o *GCPUsageCostConfigPatchData) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"attributes", "type"})
 	} else {
 		return err

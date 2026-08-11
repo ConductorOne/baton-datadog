@@ -12,8 +12,6 @@ import (
 type MetricDashboardAttributes struct {
 	// Value from 0 to 5 that ranks popularity of the dashboard.
 	Popularity *float64 `json:"popularity,omitempty"`
-	// List of tag keys used in the asset.
-	Tags []string `json:"tags,omitempty"`
 	// Title of the asset.
 	Title *string `json:"title,omitempty"`
 	// URL path of the asset.
@@ -66,34 +64,6 @@ func (o *MetricDashboardAttributes) HasPopularity() bool {
 // SetPopularity gets a reference to the given float64 and assigns it to the Popularity field.
 func (o *MetricDashboardAttributes) SetPopularity(v float64) {
 	o.Popularity = &v
-}
-
-// GetTags returns the Tags field value if set, zero value otherwise.
-func (o *MetricDashboardAttributes) GetTags() []string {
-	if o == nil || o.Tags == nil {
-		var ret []string
-		return ret
-	}
-	return o.Tags
-}
-
-// GetTagsOk returns a tuple with the Tags field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *MetricDashboardAttributes) GetTagsOk() (*[]string, bool) {
-	if o == nil || o.Tags == nil {
-		return nil, false
-	}
-	return &o.Tags, true
-}
-
-// HasTags returns a boolean if a field has been set.
-func (o *MetricDashboardAttributes) HasTags() bool {
-	return o != nil && o.Tags != nil
-}
-
-// SetTags gets a reference to the given []string and assigns it to the Tags field.
-func (o *MetricDashboardAttributes) SetTags(v []string) {
-	o.Tags = v
 }
 
 // GetTitle returns the Title field value if set, zero value otherwise.
@@ -161,9 +131,6 @@ func (o MetricDashboardAttributes) MarshalJSON() ([]byte, error) {
 	if o.Popularity != nil {
 		toSerialize["popularity"] = o.Popularity
 	}
-	if o.Tags != nil {
-		toSerialize["tags"] = o.Tags
-	}
 	if o.Title != nil {
 		toSerialize["title"] = o.Title
 	}
@@ -181,7 +148,6 @@ func (o MetricDashboardAttributes) MarshalJSON() ([]byte, error) {
 func (o *MetricDashboardAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
 		Popularity *float64 `json:"popularity,omitempty"`
-		Tags       []string `json:"tags,omitempty"`
 		Title      *string  `json:"title,omitempty"`
 		Url        *string  `json:"url,omitempty"`
 	}{}
@@ -189,13 +155,12 @@ func (o *MetricDashboardAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"popularity", "tags", "title", "url"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"popularity", "title", "url"})
 	} else {
 		return err
 	}
 	o.Popularity = all.Popularity
-	o.Tags = all.Tags
 	o.Title = all.Title
 	o.Url = all.Url
 

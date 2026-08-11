@@ -5,15 +5,13 @@
 package datadogV2
 
 import (
-	"fmt"
-
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
 // AwsCURConfigsResponse List of AWS CUR configs.
 type AwsCURConfigsResponse struct {
 	// An AWS CUR config.
-	Data []AwsCURConfig `json:"data"`
+	Data []AwsCURConfig `json:"data,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -23,9 +21,8 @@ type AwsCURConfigsResponse struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewAwsCURConfigsResponse(data []AwsCURConfig) *AwsCURConfigsResponse {
+func NewAwsCURConfigsResponse() *AwsCURConfigsResponse {
 	this := AwsCURConfigsResponse{}
-	this.Data = data
 	return &this
 }
 
@@ -37,25 +34,30 @@ func NewAwsCURConfigsResponseWithDefaults() *AwsCURConfigsResponse {
 	return &this
 }
 
-// GetData returns the Data field value.
+// GetData returns the Data field value if set, zero value otherwise.
 func (o *AwsCURConfigsResponse) GetData() []AwsCURConfig {
-	if o == nil {
+	if o == nil || o.Data == nil {
 		var ret []AwsCURConfig
 		return ret
 	}
 	return o.Data
 }
 
-// GetDataOk returns a tuple with the Data field value
+// GetDataOk returns a tuple with the Data field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *AwsCURConfigsResponse) GetDataOk() (*[]AwsCURConfig, bool) {
-	if o == nil {
+	if o == nil || o.Data == nil {
 		return nil, false
 	}
 	return &o.Data, true
 }
 
-// SetData sets field value.
+// HasData returns a boolean if a field has been set.
+func (o *AwsCURConfigsResponse) HasData() bool {
+	return o != nil && o.Data != nil
+}
+
+// SetData gets a reference to the given []AwsCURConfig and assigns it to the Data field.
 func (o *AwsCURConfigsResponse) SetData(v []AwsCURConfig) {
 	o.Data = v
 }
@@ -66,7 +68,9 @@ func (o AwsCURConfigsResponse) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	toSerialize["data"] = o.Data
+	if o.Data != nil {
+		toSerialize["data"] = o.Data
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -77,21 +81,18 @@ func (o AwsCURConfigsResponse) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *AwsCURConfigsResponse) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Data *[]AwsCURConfig `json:"data"`
+		Data []AwsCURConfig `json:"data,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
-	if all.Data == nil {
-		return fmt.Errorf("required field data missing")
-	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err
 	}
-	o.Data = *all.Data
+	o.Data = all.Data
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

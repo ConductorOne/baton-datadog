@@ -12,8 +12,6 @@ import (
 
 // SyntheticsAPIWaitStep The Wait step used in a Synthetic multi-step API test.
 type SyntheticsAPIWaitStep struct {
-	// ID of the step.
-	Id *string `json:"id,omitempty"`
 	// The name of the step.
 	Name string `json:"name"`
 	// The subtype of the Synthetic multi-step API wait step.
@@ -43,34 +41,6 @@ func NewSyntheticsAPIWaitStep(name string, subtype SyntheticsAPIWaitStepSubtype,
 func NewSyntheticsAPIWaitStepWithDefaults() *SyntheticsAPIWaitStep {
 	this := SyntheticsAPIWaitStep{}
 	return &this
-}
-
-// GetId returns the Id field value if set, zero value otherwise.
-func (o *SyntheticsAPIWaitStep) GetId() string {
-	if o == nil || o.Id == nil {
-		var ret string
-		return ret
-	}
-	return *o.Id
-}
-
-// GetIdOk returns a tuple with the Id field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SyntheticsAPIWaitStep) GetIdOk() (*string, bool) {
-	if o == nil || o.Id == nil {
-		return nil, false
-	}
-	return o.Id, true
-}
-
-// HasId returns a boolean if a field has been set.
-func (o *SyntheticsAPIWaitStep) HasId() bool {
-	return o != nil && o.Id != nil
-}
-
-// SetId gets a reference to the given string and assigns it to the Id field.
-func (o *SyntheticsAPIWaitStep) SetId(v string) {
-	o.Id = &v
 }
 
 // GetName returns the Name field value.
@@ -148,9 +118,6 @@ func (o SyntheticsAPIWaitStep) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.Id != nil {
-		toSerialize["id"] = o.Id
-	}
 	toSerialize["name"] = o.Name
 	toSerialize["subtype"] = o.Subtype
 	toSerialize["value"] = o.Value
@@ -164,7 +131,6 @@ func (o SyntheticsAPIWaitStep) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *SyntheticsAPIWaitStep) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Id      *string                       `json:"id,omitempty"`
 		Name    *string                       `json:"name"`
 		Subtype *SyntheticsAPIWaitStepSubtype `json:"subtype"`
 		Value   *int32                        `json:"value"`
@@ -182,14 +148,13 @@ func (o *SyntheticsAPIWaitStep) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field value missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"id", "name", "subtype", "value"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"name", "subtype", "value"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	o.Id = all.Id
 	o.Name = *all.Name
 	if !all.Subtype.IsValid() {
 		hasInvalidField = true

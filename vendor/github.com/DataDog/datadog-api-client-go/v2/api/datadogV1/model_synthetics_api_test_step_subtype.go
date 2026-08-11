@@ -23,7 +23,6 @@ const (
 	SYNTHETICSAPITESTSTEPSUBTYPE_UDP       SyntheticsAPITestStepSubtype = "udp"
 	SYNTHETICSAPITESTSTEPSUBTYPE_ICMP      SyntheticsAPITestStepSubtype = "icmp"
 	SYNTHETICSAPITESTSTEPSUBTYPE_WEBSOCKET SyntheticsAPITestStepSubtype = "websocket"
-	SYNTHETICSAPITESTSTEPSUBTYPE_MCP       SyntheticsAPITestStepSubtype = "mcp"
 )
 
 var allowedSyntheticsAPITestStepSubtypeEnumValues = []SyntheticsAPITestStepSubtype{
@@ -35,7 +34,6 @@ var allowedSyntheticsAPITestStepSubtypeEnumValues = []SyntheticsAPITestStepSubty
 	SYNTHETICSAPITESTSTEPSUBTYPE_UDP,
 	SYNTHETICSAPITESTSTEPSUBTYPE_ICMP,
 	SYNTHETICSAPITESTSTEPSUBTYPE_WEBSOCKET,
-	SYNTHETICSAPITESTSTEPSUBTYPE_MCP,
 }
 
 // GetAllowedValues reeturns the list of possible values.

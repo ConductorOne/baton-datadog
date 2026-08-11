@@ -14,8 +14,6 @@ import (
 //
 // See the dedicated [Events JSON schema documentation](https://docs.datadoghq.com/dashboards/graphing_json/widget_json/#events-schema)
 // to learn how to build the `<EVENTS_SCHEMA>`.
-//
-// Deprecated: This model is deprecated.
 type WidgetEvent struct {
 	// Query definition.
 	Q string `json:"q"`
@@ -125,7 +123,7 @@ func (o *WidgetEvent) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field q missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"q", "tags_execution"})
 	} else {
 		return err

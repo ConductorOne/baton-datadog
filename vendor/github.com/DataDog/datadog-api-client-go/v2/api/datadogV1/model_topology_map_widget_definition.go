@@ -14,8 +14,6 @@ import (
 type TopologyMapWidgetDefinition struct {
 	// List of custom links.
 	CustomLinks []WidgetCustomLink `json:"custom_links,omitempty"`
-	// The description of the widget.
-	Description *string `json:"description,omitempty"`
 	// One or more Topology requests.
 	Requests []TopologyRequest `json:"requests"`
 	// Title of your widget.
@@ -78,34 +76,6 @@ func (o *TopologyMapWidgetDefinition) HasCustomLinks() bool {
 // SetCustomLinks gets a reference to the given []WidgetCustomLink and assigns it to the CustomLinks field.
 func (o *TopologyMapWidgetDefinition) SetCustomLinks(v []WidgetCustomLink) {
 	o.CustomLinks = v
-}
-
-// GetDescription returns the Description field value if set, zero value otherwise.
-func (o *TopologyMapWidgetDefinition) GetDescription() string {
-	if o == nil || o.Description == nil {
-		var ret string
-		return ret
-	}
-	return *o.Description
-}
-
-// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *TopologyMapWidgetDefinition) GetDescriptionOk() (*string, bool) {
-	if o == nil || o.Description == nil {
-		return nil, false
-	}
-	return o.Description, true
-}
-
-// HasDescription returns a boolean if a field has been set.
-func (o *TopologyMapWidgetDefinition) HasDescription() bool {
-	return o != nil && o.Description != nil
-}
-
-// SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *TopologyMapWidgetDefinition) SetDescription(v string) {
-	o.Description = &v
 }
 
 // GetRequests returns the Requests field value.
@@ -247,9 +217,6 @@ func (o TopologyMapWidgetDefinition) MarshalJSON() ([]byte, error) {
 	if o.CustomLinks != nil {
 		toSerialize["custom_links"] = o.CustomLinks
 	}
-	if o.Description != nil {
-		toSerialize["description"] = o.Description
-	}
 	toSerialize["requests"] = o.Requests
 	if o.Title != nil {
 		toSerialize["title"] = o.Title
@@ -272,7 +239,6 @@ func (o TopologyMapWidgetDefinition) MarshalJSON() ([]byte, error) {
 func (o *TopologyMapWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
 		CustomLinks []WidgetCustomLink               `json:"custom_links,omitempty"`
-		Description *string                          `json:"description,omitempty"`
 		Requests    *[]TopologyRequest               `json:"requests"`
 		Title       *string                          `json:"title,omitempty"`
 		TitleAlign  *WidgetTextAlign                 `json:"title_align,omitempty"`
@@ -289,15 +255,14 @@ func (o *TopologyMapWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"custom_links", "description", "requests", "title", "title_align", "title_size", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"custom_links", "requests", "title", "title_align", "title_size", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
 	o.CustomLinks = all.CustomLinks
-	o.Description = all.Description
 	o.Requests = *all.Requests
 	o.Title = all.Title
 	if all.TitleAlign != nil && !all.TitleAlign.IsValid() {

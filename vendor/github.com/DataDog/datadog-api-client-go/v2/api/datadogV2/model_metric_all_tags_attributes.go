@@ -8,11 +8,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// MetricAllTagsAttributes Object containing the definition of a metric's indexed and ingested tags.
+// MetricAllTagsAttributes Object containing the definition of a metric's tags.
 type MetricAllTagsAttributes struct {
-	// List of ingested tags that are not indexed.
-	IngestedTags []string `json:"ingested_tags,omitempty"`
-	// List of indexed tags.
+	// List of indexed tag value pairs.
 	Tags []string `json:"tags,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -34,34 +32,6 @@ func NewMetricAllTagsAttributes() *MetricAllTagsAttributes {
 func NewMetricAllTagsAttributesWithDefaults() *MetricAllTagsAttributes {
 	this := MetricAllTagsAttributes{}
 	return &this
-}
-
-// GetIngestedTags returns the IngestedTags field value if set, zero value otherwise.
-func (o *MetricAllTagsAttributes) GetIngestedTags() []string {
-	if o == nil || o.IngestedTags == nil {
-		var ret []string
-		return ret
-	}
-	return o.IngestedTags
-}
-
-// GetIngestedTagsOk returns a tuple with the IngestedTags field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *MetricAllTagsAttributes) GetIngestedTagsOk() (*[]string, bool) {
-	if o == nil || o.IngestedTags == nil {
-		return nil, false
-	}
-	return &o.IngestedTags, true
-}
-
-// HasIngestedTags returns a boolean if a field has been set.
-func (o *MetricAllTagsAttributes) HasIngestedTags() bool {
-	return o != nil && o.IngestedTags != nil
-}
-
-// SetIngestedTags gets a reference to the given []string and assigns it to the IngestedTags field.
-func (o *MetricAllTagsAttributes) SetIngestedTags(v []string) {
-	o.IngestedTags = v
 }
 
 // GetTags returns the Tags field value if set, zero value otherwise.
@@ -98,9 +68,6 @@ func (o MetricAllTagsAttributes) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.IngestedTags != nil {
-		toSerialize["ingested_tags"] = o.IngestedTags
-	}
 	if o.Tags != nil {
 		toSerialize["tags"] = o.Tags
 	}
@@ -114,19 +81,17 @@ func (o MetricAllTagsAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *MetricAllTagsAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		IngestedTags []string `json:"ingested_tags,omitempty"`
-		Tags         []string `json:"tags,omitempty"`
+		Tags []string `json:"tags,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"ingested_tags", "tags"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"tags"})
 	} else {
 		return err
 	}
-	o.IngestedTags = all.IngestedTags
 	o.Tags = all.Tags
 
 	if len(additionalProperties) > 0 {

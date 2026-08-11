@@ -10,18 +10,14 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// CaseAttributes Case resource attributes
+// CaseAttributes Case attributes
 type CaseAttributes struct {
 	// Timestamp of when the case was archived
 	ArchivedAt datadog.NullableTime `json:"archived_at,omitempty"`
-	// Key-value pairs of case attributes. Each key maps to an array of string values, used for flexible metadata such as labels or tags.
-	Attributes map[string][]string `json:"attributes,omitempty"`
 	// Timestamp of when the case was closed
 	ClosedAt datadog.NullableTime `json:"closed_at,omitempty"`
 	// Timestamp of when the case was created
 	CreatedAt *time.Time `json:"created_at,omitempty"`
-	// Case custom attributes
-	CustomAttributes map[string]CustomAttributeValue `json:"custom_attributes,omitempty"`
 	// Description
 	Description *string `json:"description,omitempty"`
 	// Jira issue attached to case
@@ -34,20 +30,12 @@ type CaseAttributes struct {
 	Priority *CasePriority `json:"priority,omitempty"`
 	// ServiceNow ticket attached to case
 	ServiceNowTicket NullableServiceNowTicket `json:"service_now_ticket,omitempty"`
-	// Deprecated way of representing the case status, which only supports OPEN, IN_PROGRESS, and CLOSED statuses. Use `status_name` instead.
-	// Deprecated
+	// Case status
 	Status *CaseStatus `json:"status,omitempty"`
-	// Status group of the case.
-	StatusGroup *CaseStatusGroup `json:"status_group,omitempty"`
-	// Status of the case. Must be one of the existing statuses for the case's type.
-	StatusName *string `json:"status_name,omitempty"`
 	// Title
 	Title *string `json:"title,omitempty"`
 	// Case type
-	// Deprecated
 	Type *CaseType `json:"type,omitempty"`
-	// Case type UUID
-	TypeId *string `json:"type_id,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -111,34 +99,6 @@ func (o *CaseAttributes) SetArchivedAtNil() {
 // UnsetArchivedAt ensures that no value is present for ArchivedAt, not even an explicit nil.
 func (o *CaseAttributes) UnsetArchivedAt() {
 	o.ArchivedAt.Unset()
-}
-
-// GetAttributes returns the Attributes field value if set, zero value otherwise.
-func (o *CaseAttributes) GetAttributes() map[string][]string {
-	if o == nil || o.Attributes == nil {
-		var ret map[string][]string
-		return ret
-	}
-	return o.Attributes
-}
-
-// GetAttributesOk returns a tuple with the Attributes field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CaseAttributes) GetAttributesOk() (*map[string][]string, bool) {
-	if o == nil || o.Attributes == nil {
-		return nil, false
-	}
-	return &o.Attributes, true
-}
-
-// HasAttributes returns a boolean if a field has been set.
-func (o *CaseAttributes) HasAttributes() bool {
-	return o != nil && o.Attributes != nil
-}
-
-// SetAttributes gets a reference to the given map[string][]string and assigns it to the Attributes field.
-func (o *CaseAttributes) SetAttributes(v map[string][]string) {
-	o.Attributes = v
 }
 
 // GetClosedAt returns the ClosedAt field value if set, zero value otherwise (both if not set or set to explicit null).
@@ -206,34 +166,6 @@ func (o *CaseAttributes) HasCreatedAt() bool {
 // SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
 func (o *CaseAttributes) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
-}
-
-// GetCustomAttributes returns the CustomAttributes field value if set, zero value otherwise.
-func (o *CaseAttributes) GetCustomAttributes() map[string]CustomAttributeValue {
-	if o == nil || o.CustomAttributes == nil {
-		var ret map[string]CustomAttributeValue
-		return ret
-	}
-	return o.CustomAttributes
-}
-
-// GetCustomAttributesOk returns a tuple with the CustomAttributes field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CaseAttributes) GetCustomAttributesOk() (*map[string]CustomAttributeValue, bool) {
-	if o == nil || o.CustomAttributes == nil {
-		return nil, false
-	}
-	return &o.CustomAttributes, true
-}
-
-// HasCustomAttributes returns a boolean if a field has been set.
-func (o *CaseAttributes) HasCustomAttributes() bool {
-	return o != nil && o.CustomAttributes != nil
-}
-
-// SetCustomAttributes gets a reference to the given map[string]CustomAttributeValue and assigns it to the CustomAttributes field.
-func (o *CaseAttributes) SetCustomAttributes(v map[string]CustomAttributeValue) {
-	o.CustomAttributes = v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
@@ -438,7 +370,6 @@ func (o *CaseAttributes) UnsetServiceNowTicket() {
 }
 
 // GetStatus returns the Status field value if set, zero value otherwise.
-// Deprecated
 func (o *CaseAttributes) GetStatus() CaseStatus {
 	if o == nil || o.Status == nil {
 		var ret CaseStatus
@@ -449,7 +380,6 @@ func (o *CaseAttributes) GetStatus() CaseStatus {
 
 // GetStatusOk returns a tuple with the Status field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-// Deprecated
 func (o *CaseAttributes) GetStatusOk() (*CaseStatus, bool) {
 	if o == nil || o.Status == nil {
 		return nil, false
@@ -463,65 +393,8 @@ func (o *CaseAttributes) HasStatus() bool {
 }
 
 // SetStatus gets a reference to the given CaseStatus and assigns it to the Status field.
-// Deprecated
 func (o *CaseAttributes) SetStatus(v CaseStatus) {
 	o.Status = &v
-}
-
-// GetStatusGroup returns the StatusGroup field value if set, zero value otherwise.
-func (o *CaseAttributes) GetStatusGroup() CaseStatusGroup {
-	if o == nil || o.StatusGroup == nil {
-		var ret CaseStatusGroup
-		return ret
-	}
-	return *o.StatusGroup
-}
-
-// GetStatusGroupOk returns a tuple with the StatusGroup field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CaseAttributes) GetStatusGroupOk() (*CaseStatusGroup, bool) {
-	if o == nil || o.StatusGroup == nil {
-		return nil, false
-	}
-	return o.StatusGroup, true
-}
-
-// HasStatusGroup returns a boolean if a field has been set.
-func (o *CaseAttributes) HasStatusGroup() bool {
-	return o != nil && o.StatusGroup != nil
-}
-
-// SetStatusGroup gets a reference to the given CaseStatusGroup and assigns it to the StatusGroup field.
-func (o *CaseAttributes) SetStatusGroup(v CaseStatusGroup) {
-	o.StatusGroup = &v
-}
-
-// GetStatusName returns the StatusName field value if set, zero value otherwise.
-func (o *CaseAttributes) GetStatusName() string {
-	if o == nil || o.StatusName == nil {
-		var ret string
-		return ret
-	}
-	return *o.StatusName
-}
-
-// GetStatusNameOk returns a tuple with the StatusName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CaseAttributes) GetStatusNameOk() (*string, bool) {
-	if o == nil || o.StatusName == nil {
-		return nil, false
-	}
-	return o.StatusName, true
-}
-
-// HasStatusName returns a boolean if a field has been set.
-func (o *CaseAttributes) HasStatusName() bool {
-	return o != nil && o.StatusName != nil
-}
-
-// SetStatusName gets a reference to the given string and assigns it to the StatusName field.
-func (o *CaseAttributes) SetStatusName(v string) {
-	o.StatusName = &v
 }
 
 // GetTitle returns the Title field value if set, zero value otherwise.
@@ -553,7 +426,6 @@ func (o *CaseAttributes) SetTitle(v string) {
 }
 
 // GetType returns the Type field value if set, zero value otherwise.
-// Deprecated
 func (o *CaseAttributes) GetType() CaseType {
 	if o == nil || o.Type == nil {
 		var ret CaseType
@@ -564,7 +436,6 @@ func (o *CaseAttributes) GetType() CaseType {
 
 // GetTypeOk returns a tuple with the Type field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-// Deprecated
 func (o *CaseAttributes) GetTypeOk() (*CaseType, bool) {
 	if o == nil || o.Type == nil {
 		return nil, false
@@ -578,37 +449,8 @@ func (o *CaseAttributes) HasType() bool {
 }
 
 // SetType gets a reference to the given CaseType and assigns it to the Type field.
-// Deprecated
 func (o *CaseAttributes) SetType(v CaseType) {
 	o.Type = &v
-}
-
-// GetTypeId returns the TypeId field value if set, zero value otherwise.
-func (o *CaseAttributes) GetTypeId() string {
-	if o == nil || o.TypeId == nil {
-		var ret string
-		return ret
-	}
-	return *o.TypeId
-}
-
-// GetTypeIdOk returns a tuple with the TypeId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CaseAttributes) GetTypeIdOk() (*string, bool) {
-	if o == nil || o.TypeId == nil {
-		return nil, false
-	}
-	return o.TypeId, true
-}
-
-// HasTypeId returns a boolean if a field has been set.
-func (o *CaseAttributes) HasTypeId() bool {
-	return o != nil && o.TypeId != nil
-}
-
-// SetTypeId gets a reference to the given string and assigns it to the TypeId field.
-func (o *CaseAttributes) SetTypeId(v string) {
-	o.TypeId = &v
 }
 
 // MarshalJSON serializes the struct using spec logic.
@@ -620,9 +462,6 @@ func (o CaseAttributes) MarshalJSON() ([]byte, error) {
 	if o.ArchivedAt.IsSet() {
 		toSerialize["archived_at"] = o.ArchivedAt.Get()
 	}
-	if o.Attributes != nil {
-		toSerialize["attributes"] = o.Attributes
-	}
 	if o.ClosedAt.IsSet() {
 		toSerialize["closed_at"] = o.ClosedAt.Get()
 	}
@@ -632,9 +471,6 @@ func (o CaseAttributes) MarshalJSON() ([]byte, error) {
 		} else {
 			toSerialize["created_at"] = o.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00")
 		}
-	}
-	if o.CustomAttributes != nil {
-		toSerialize["custom_attributes"] = o.CustomAttributes
 	}
 	if o.Description != nil {
 		toSerialize["description"] = o.Description
@@ -657,20 +493,11 @@ func (o CaseAttributes) MarshalJSON() ([]byte, error) {
 	if o.Status != nil {
 		toSerialize["status"] = o.Status
 	}
-	if o.StatusGroup != nil {
-		toSerialize["status_group"] = o.StatusGroup
-	}
-	if o.StatusName != nil {
-		toSerialize["status_name"] = o.StatusName
-	}
 	if o.Title != nil {
 		toSerialize["title"] = o.Title
 	}
 	if o.Type != nil {
 		toSerialize["type"] = o.Type
-	}
-	if o.TypeId != nil {
-		toSerialize["type_id"] = o.TypeId
 	}
 
 	for key, value := range o.AdditionalProperties {
@@ -682,40 +509,33 @@ func (o CaseAttributes) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *CaseAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		ArchivedAt       datadog.NullableTime            `json:"archived_at,omitempty"`
-		Attributes       map[string][]string             `json:"attributes,omitempty"`
-		ClosedAt         datadog.NullableTime            `json:"closed_at,omitempty"`
-		CreatedAt        *time.Time                      `json:"created_at,omitempty"`
-		CustomAttributes map[string]CustomAttributeValue `json:"custom_attributes,omitempty"`
-		Description      *string                         `json:"description,omitempty"`
-		JiraIssue        NullableJiraIssue               `json:"jira_issue,omitempty"`
-		Key              *string                         `json:"key,omitempty"`
-		ModifiedAt       datadog.NullableTime            `json:"modified_at,omitempty"`
-		Priority         *CasePriority                   `json:"priority,omitempty"`
-		ServiceNowTicket NullableServiceNowTicket        `json:"service_now_ticket,omitempty"`
-		Status           *CaseStatus                     `json:"status,omitempty"`
-		StatusGroup      *CaseStatusGroup                `json:"status_group,omitempty"`
-		StatusName       *string                         `json:"status_name,omitempty"`
-		Title            *string                         `json:"title,omitempty"`
-		Type             *CaseType                       `json:"type,omitempty"`
-		TypeId           *string                         `json:"type_id,omitempty"`
+		ArchivedAt       datadog.NullableTime     `json:"archived_at,omitempty"`
+		ClosedAt         datadog.NullableTime     `json:"closed_at,omitempty"`
+		CreatedAt        *time.Time               `json:"created_at,omitempty"`
+		Description      *string                  `json:"description,omitempty"`
+		JiraIssue        NullableJiraIssue        `json:"jira_issue,omitempty"`
+		Key              *string                  `json:"key,omitempty"`
+		ModifiedAt       datadog.NullableTime     `json:"modified_at,omitempty"`
+		Priority         *CasePriority            `json:"priority,omitempty"`
+		ServiceNowTicket NullableServiceNowTicket `json:"service_now_ticket,omitempty"`
+		Status           *CaseStatus              `json:"status,omitempty"`
+		Title            *string                  `json:"title,omitempty"`
+		Type             *CaseType                `json:"type,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"archived_at", "attributes", "closed_at", "created_at", "custom_attributes", "description", "jira_issue", "key", "modified_at", "priority", "service_now_ticket", "status", "status_group", "status_name", "title", "type", "type_id"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"archived_at", "closed_at", "created_at", "description", "jira_issue", "key", "modified_at", "priority", "service_now_ticket", "status", "title", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
 	o.ArchivedAt = all.ArchivedAt
-	o.Attributes = all.Attributes
 	o.ClosedAt = all.ClosedAt
 	o.CreatedAt = all.CreatedAt
-	o.CustomAttributes = all.CustomAttributes
 	o.Description = all.Description
 	o.JiraIssue = all.JiraIssue
 	o.Key = all.Key
@@ -731,19 +551,12 @@ func (o *CaseAttributes) UnmarshalJSON(bytes []byte) (err error) {
 	} else {
 		o.Status = all.Status
 	}
-	if all.StatusGroup != nil && !all.StatusGroup.IsValid() {
-		hasInvalidField = true
-	} else {
-		o.StatusGroup = all.StatusGroup
-	}
-	o.StatusName = all.StatusName
 	o.Title = all.Title
 	if all.Type != nil && !all.Type.IsValid() {
 		hasInvalidField = true
 	} else {
 		o.Type = all.Type
 	}
-	o.TypeId = all.TypeId
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

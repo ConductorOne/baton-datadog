@@ -10,9 +10,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// ObservabilityPipelineGcpAuth Google Cloud credentials used to authenticate with Google Cloud Storage.
+// ObservabilityPipelineGcpAuth GCP credentials used to authenticate with Google Cloud Storage.
 type ObservabilityPipelineGcpAuth struct {
-	// Path to the Google Cloud service account key file.
+	// Path to the GCP service account key file.
 	CredentialsFile string `json:"credentials_file"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -86,7 +86,7 @@ func (o *ObservabilityPipelineGcpAuth) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field credentials_file missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"credentials_file"})
 	} else {
 		return err

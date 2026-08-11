@@ -10,8 +10,8 @@ import (
 
 // IncidentResponseIncludedItem - An object related to an incident that is included in the response.
 type IncidentResponseIncludedItem struct {
-	IncidentUserData *IncidentUserData
-	AttachmentData   *AttachmentData
+	IncidentUserData       *IncidentUserData
+	IncidentAttachmentData *IncidentAttachmentData
 
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject interface{}
@@ -22,9 +22,9 @@ func IncidentUserDataAsIncidentResponseIncludedItem(v *IncidentUserData) Inciden
 	return IncidentResponseIncludedItem{IncidentUserData: v}
 }
 
-// AttachmentDataAsIncidentResponseIncludedItem is a convenience function that returns AttachmentData wrapped in IncidentResponseIncludedItem.
-func AttachmentDataAsIncidentResponseIncludedItem(v *AttachmentData) IncidentResponseIncludedItem {
-	return IncidentResponseIncludedItem{AttachmentData: v}
+// IncidentAttachmentDataAsIncidentResponseIncludedItem is a convenience function that returns IncidentAttachmentData wrapped in IncidentResponseIncludedItem.
+func IncidentAttachmentDataAsIncidentResponseIncludedItem(v *IncidentAttachmentData) IncidentResponseIncludedItem {
+	return IncidentResponseIncludedItem{IncidentAttachmentData: v}
 }
 
 // UnmarshalJSON turns data into one of the pointers in the struct.
@@ -48,27 +48,27 @@ func (obj *IncidentResponseIncludedItem) UnmarshalJSON(data []byte) error {
 		obj.IncidentUserData = nil
 	}
 
-	// try to unmarshal data into AttachmentData
-	err = datadog.Unmarshal(data, &obj.AttachmentData)
+	// try to unmarshal data into IncidentAttachmentData
+	err = datadog.Unmarshal(data, &obj.IncidentAttachmentData)
 	if err == nil {
-		if obj.AttachmentData != nil && obj.AttachmentData.UnparsedObject == nil {
-			jsonAttachmentData, _ := datadog.Marshal(obj.AttachmentData)
-			if string(jsonAttachmentData) == "{}" { // empty struct
-				obj.AttachmentData = nil
+		if obj.IncidentAttachmentData != nil && obj.IncidentAttachmentData.UnparsedObject == nil {
+			jsonIncidentAttachmentData, _ := datadog.Marshal(obj.IncidentAttachmentData)
+			if string(jsonIncidentAttachmentData) == "{}" { // empty struct
+				obj.IncidentAttachmentData = nil
 			} else {
 				match++
 			}
 		} else {
-			obj.AttachmentData = nil
+			obj.IncidentAttachmentData = nil
 		}
 	} else {
-		obj.AttachmentData = nil
+		obj.IncidentAttachmentData = nil
 	}
 
 	if match != 1 { // more than 1 match
 		// reset to nil
 		obj.IncidentUserData = nil
-		obj.AttachmentData = nil
+		obj.IncidentAttachmentData = nil
 		return datadog.Unmarshal(data, &obj.UnparsedObject)
 	}
 	return nil // exactly one match
@@ -80,8 +80,8 @@ func (obj IncidentResponseIncludedItem) MarshalJSON() ([]byte, error) {
 		return datadog.Marshal(&obj.IncidentUserData)
 	}
 
-	if obj.AttachmentData != nil {
-		return datadog.Marshal(&obj.AttachmentData)
+	if obj.IncidentAttachmentData != nil {
+		return datadog.Marshal(&obj.IncidentAttachmentData)
 	}
 
 	if obj.UnparsedObject != nil {
@@ -96,8 +96,8 @@ func (obj *IncidentResponseIncludedItem) GetActualInstance() interface{} {
 		return obj.IncidentUserData
 	}
 
-	if obj.AttachmentData != nil {
-		return obj.AttachmentData
+	if obj.IncidentAttachmentData != nil {
+		return obj.IncidentAttachmentData
 	}
 
 	// all schemas are nil

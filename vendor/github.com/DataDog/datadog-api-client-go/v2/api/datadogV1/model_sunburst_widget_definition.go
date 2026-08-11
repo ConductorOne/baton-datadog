@@ -14,8 +14,6 @@ import (
 type SunburstWidgetDefinition struct {
 	// List of custom links.
 	CustomLinks []WidgetCustomLink `json:"custom_links,omitempty"`
-	// The description of the widget.
-	Description *string `json:"description,omitempty"`
 	// Show the total value in this widget.
 	HideTotal *bool `json:"hide_total,omitempty"`
 	// Configuration of the legend.
@@ -84,34 +82,6 @@ func (o *SunburstWidgetDefinition) HasCustomLinks() bool {
 // SetCustomLinks gets a reference to the given []WidgetCustomLink and assigns it to the CustomLinks field.
 func (o *SunburstWidgetDefinition) SetCustomLinks(v []WidgetCustomLink) {
 	o.CustomLinks = v
-}
-
-// GetDescription returns the Description field value if set, zero value otherwise.
-func (o *SunburstWidgetDefinition) GetDescription() string {
-	if o == nil || o.Description == nil {
-		var ret string
-		return ret
-	}
-	return *o.Description
-}
-
-// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SunburstWidgetDefinition) GetDescriptionOk() (*string, bool) {
-	if o == nil || o.Description == nil {
-		return nil, false
-	}
-	return o.Description, true
-}
-
-// HasDescription returns a boolean if a field has been set.
-func (o *SunburstWidgetDefinition) HasDescription() bool {
-	return o != nil && o.Description != nil
-}
-
-// SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *SunburstWidgetDefinition) SetDescription(v string) {
-	o.Description = &v
 }
 
 // GetHideTotal returns the HideTotal field value if set, zero value otherwise.
@@ -337,9 +307,6 @@ func (o SunburstWidgetDefinition) MarshalJSON() ([]byte, error) {
 	if o.CustomLinks != nil {
 		toSerialize["custom_links"] = o.CustomLinks
 	}
-	if o.Description != nil {
-		toSerialize["description"] = o.Description
-	}
 	if o.HideTotal != nil {
 		toSerialize["hide_total"] = o.HideTotal
 	}
@@ -371,7 +338,6 @@ func (o SunburstWidgetDefinition) MarshalJSON() ([]byte, error) {
 func (o *SunburstWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
 		CustomLinks []WidgetCustomLink            `json:"custom_links,omitempty"`
-		Description *string                       `json:"description,omitempty"`
 		HideTotal   *bool                         `json:"hide_total,omitempty"`
 		Legend      *SunburstWidgetLegend         `json:"legend,omitempty"`
 		Requests    *[]SunburstWidgetRequest      `json:"requests"`
@@ -391,15 +357,14 @@ func (o *SunburstWidgetDefinition) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"custom_links", "description", "hide_total", "legend", "requests", "time", "title", "title_align", "title_size", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"custom_links", "hide_total", "legend", "requests", "time", "title", "title_align", "title_size", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
 	o.CustomLinks = all.CustomLinks
-	o.Description = all.Description
 	o.HideTotal = all.HideTotal
 	o.Legend = all.Legend
 	o.Requests = *all.Requests

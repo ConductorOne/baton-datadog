@@ -10,23 +10,17 @@ import (
 
 // SyntheticsTestOptions Object describing the extra options for a Synthetic test.
 type SyntheticsTestOptions struct {
-	// For SSL tests, whether or not the test should allow self signed
+	// For SSL test, whether or not the test should allow self signed
 	// certificates.
 	AcceptSelfSigned *bool `json:"accept_self_signed,omitempty"`
 	// Allows loading insecure content for an HTTP request in an API test.
 	AllowInsecure *bool `json:"allow_insecure,omitempty"`
-	// Array of URL patterns to block.
-	BlockedRequestPatterns []string `json:"blockedRequestPatterns,omitempty"`
-	// Capture HTTP request/response headers and bodies for Fetch/XHR calls made during browser tests.
-	CaptureNetworkPayloads *bool `json:"captureNetworkPayloads,omitempty"`
-	// For SSL tests, whether or not the test should fail on revoked certificate in stapled OCSP.
+	// For SSL test, whether or not the test should fail on revoked certificate in stapled OCSP.
 	CheckCertificateRevocation *bool `json:"checkCertificateRevocation,omitempty"`
 	// CI/CD options for a Synthetic test.
 	Ci *SyntheticsTestCiOptions `json:"ci,omitempty"`
 	// For browser test, array with the different device IDs used to run the test.
 	DeviceIds []string `json:"device_ids,omitempty"`
-	// For SSL tests, whether or not the test should disable fetching intermediate certificates from AIA.
-	DisableAiaIntermediateFetching *bool `json:"disableAiaIntermediateFetching,omitempty"`
 	// Whether or not to disable CORS mechanism.
 	DisableCors *bool `json:"disableCors,omitempty"`
 	// Disable Content Security Policy for browser tests.
@@ -58,8 +52,7 @@ type SyntheticsTestOptions struct {
 	MonitorPriority *int32 `json:"monitor_priority,omitempty"`
 	// Prevents saving screenshots of the steps.
 	NoScreenshot *bool `json:"noScreenshot,omitempty"`
-	// A list of role identifiers that can be pulled from the Roles API, for restricting read and write access. This field is deprecated. Use the restriction policies API to manage permissions.
-	// Deprecated
+	// A list of role identifiers that can be pulled from the Roles API, for restricting read and write access.
 	RestrictedRoles []string `json:"restricted_roles,omitempty"`
 	// Object describing the retry strategy to apply to a Synthetic test.
 	Retry *SyntheticsTestOptionsRetry `json:"retry,omitempty"`
@@ -157,62 +150,6 @@ func (o *SyntheticsTestOptions) SetAllowInsecure(v bool) {
 	o.AllowInsecure = &v
 }
 
-// GetBlockedRequestPatterns returns the BlockedRequestPatterns field value if set, zero value otherwise.
-func (o *SyntheticsTestOptions) GetBlockedRequestPatterns() []string {
-	if o == nil || o.BlockedRequestPatterns == nil {
-		var ret []string
-		return ret
-	}
-	return o.BlockedRequestPatterns
-}
-
-// GetBlockedRequestPatternsOk returns a tuple with the BlockedRequestPatterns field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SyntheticsTestOptions) GetBlockedRequestPatternsOk() (*[]string, bool) {
-	if o == nil || o.BlockedRequestPatterns == nil {
-		return nil, false
-	}
-	return &o.BlockedRequestPatterns, true
-}
-
-// HasBlockedRequestPatterns returns a boolean if a field has been set.
-func (o *SyntheticsTestOptions) HasBlockedRequestPatterns() bool {
-	return o != nil && o.BlockedRequestPatterns != nil
-}
-
-// SetBlockedRequestPatterns gets a reference to the given []string and assigns it to the BlockedRequestPatterns field.
-func (o *SyntheticsTestOptions) SetBlockedRequestPatterns(v []string) {
-	o.BlockedRequestPatterns = v
-}
-
-// GetCaptureNetworkPayloads returns the CaptureNetworkPayloads field value if set, zero value otherwise.
-func (o *SyntheticsTestOptions) GetCaptureNetworkPayloads() bool {
-	if o == nil || o.CaptureNetworkPayloads == nil {
-		var ret bool
-		return ret
-	}
-	return *o.CaptureNetworkPayloads
-}
-
-// GetCaptureNetworkPayloadsOk returns a tuple with the CaptureNetworkPayloads field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SyntheticsTestOptions) GetCaptureNetworkPayloadsOk() (*bool, bool) {
-	if o == nil || o.CaptureNetworkPayloads == nil {
-		return nil, false
-	}
-	return o.CaptureNetworkPayloads, true
-}
-
-// HasCaptureNetworkPayloads returns a boolean if a field has been set.
-func (o *SyntheticsTestOptions) HasCaptureNetworkPayloads() bool {
-	return o != nil && o.CaptureNetworkPayloads != nil
-}
-
-// SetCaptureNetworkPayloads gets a reference to the given bool and assigns it to the CaptureNetworkPayloads field.
-func (o *SyntheticsTestOptions) SetCaptureNetworkPayloads(v bool) {
-	o.CaptureNetworkPayloads = &v
-}
-
 // GetCheckCertificateRevocation returns the CheckCertificateRevocation field value if set, zero value otherwise.
 func (o *SyntheticsTestOptions) GetCheckCertificateRevocation() bool {
 	if o == nil || o.CheckCertificateRevocation == nil {
@@ -295,34 +232,6 @@ func (o *SyntheticsTestOptions) HasDeviceIds() bool {
 // SetDeviceIds gets a reference to the given []string and assigns it to the DeviceIds field.
 func (o *SyntheticsTestOptions) SetDeviceIds(v []string) {
 	o.DeviceIds = v
-}
-
-// GetDisableAiaIntermediateFetching returns the DisableAiaIntermediateFetching field value if set, zero value otherwise.
-func (o *SyntheticsTestOptions) GetDisableAiaIntermediateFetching() bool {
-	if o == nil || o.DisableAiaIntermediateFetching == nil {
-		var ret bool
-		return ret
-	}
-	return *o.DisableAiaIntermediateFetching
-}
-
-// GetDisableAiaIntermediateFetchingOk returns a tuple with the DisableAiaIntermediateFetching field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SyntheticsTestOptions) GetDisableAiaIntermediateFetchingOk() (*bool, bool) {
-	if o == nil || o.DisableAiaIntermediateFetching == nil {
-		return nil, false
-	}
-	return o.DisableAiaIntermediateFetching, true
-}
-
-// HasDisableAiaIntermediateFetching returns a boolean if a field has been set.
-func (o *SyntheticsTestOptions) HasDisableAiaIntermediateFetching() bool {
-	return o != nil && o.DisableAiaIntermediateFetching != nil
-}
-
-// SetDisableAiaIntermediateFetching gets a reference to the given bool and assigns it to the DisableAiaIntermediateFetching field.
-func (o *SyntheticsTestOptions) SetDisableAiaIntermediateFetching(v bool) {
-	o.DisableAiaIntermediateFetching = &v
 }
 
 // GetDisableCors returns the DisableCors field value if set, zero value otherwise.
@@ -721,7 +630,6 @@ func (o *SyntheticsTestOptions) SetNoScreenshot(v bool) {
 }
 
 // GetRestrictedRoles returns the RestrictedRoles field value if set, zero value otherwise.
-// Deprecated
 func (o *SyntheticsTestOptions) GetRestrictedRoles() []string {
 	if o == nil || o.RestrictedRoles == nil {
 		var ret []string
@@ -732,7 +640,6 @@ func (o *SyntheticsTestOptions) GetRestrictedRoles() []string {
 
 // GetRestrictedRolesOk returns a tuple with the RestrictedRoles field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-// Deprecated
 func (o *SyntheticsTestOptions) GetRestrictedRolesOk() (*[]string, bool) {
 	if o == nil || o.RestrictedRoles == nil {
 		return nil, false
@@ -746,7 +653,6 @@ func (o *SyntheticsTestOptions) HasRestrictedRoles() bool {
 }
 
 // SetRestrictedRoles gets a reference to the given []string and assigns it to the RestrictedRoles field.
-// Deprecated
 func (o *SyntheticsTestOptions) SetRestrictedRoles(v []string) {
 	o.RestrictedRoles = v
 }
@@ -875,12 +781,6 @@ func (o SyntheticsTestOptions) MarshalJSON() ([]byte, error) {
 	if o.AllowInsecure != nil {
 		toSerialize["allow_insecure"] = o.AllowInsecure
 	}
-	if o.BlockedRequestPatterns != nil {
-		toSerialize["blockedRequestPatterns"] = o.BlockedRequestPatterns
-	}
-	if o.CaptureNetworkPayloads != nil {
-		toSerialize["captureNetworkPayloads"] = o.CaptureNetworkPayloads
-	}
 	if o.CheckCertificateRevocation != nil {
 		toSerialize["checkCertificateRevocation"] = o.CheckCertificateRevocation
 	}
@@ -889,9 +789,6 @@ func (o SyntheticsTestOptions) MarshalJSON() ([]byte, error) {
 	}
 	if o.DeviceIds != nil {
 		toSerialize["device_ids"] = o.DeviceIds
-	}
-	if o.DisableAiaIntermediateFetching != nil {
-		toSerialize["disableAiaIntermediateFetching"] = o.DisableAiaIntermediateFetching
 	}
 	if o.DisableCors != nil {
 		toSerialize["disableCors"] = o.DisableCors
@@ -960,40 +857,37 @@ func (o SyntheticsTestOptions) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *SyntheticsTestOptions) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		AcceptSelfSigned               *bool                                `json:"accept_self_signed,omitempty"`
-		AllowInsecure                  *bool                                `json:"allow_insecure,omitempty"`
-		BlockedRequestPatterns         []string                             `json:"blockedRequestPatterns,omitempty"`
-		CaptureNetworkPayloads         *bool                                `json:"captureNetworkPayloads,omitempty"`
-		CheckCertificateRevocation     *bool                                `json:"checkCertificateRevocation,omitempty"`
-		Ci                             *SyntheticsTestCiOptions             `json:"ci,omitempty"`
-		DeviceIds                      []string                             `json:"device_ids,omitempty"`
-		DisableAiaIntermediateFetching *bool                                `json:"disableAiaIntermediateFetching,omitempty"`
-		DisableCors                    *bool                                `json:"disableCors,omitempty"`
-		DisableCsp                     *bool                                `json:"disableCsp,omitempty"`
-		EnableProfiling                *bool                                `json:"enableProfiling,omitempty"`
-		EnableSecurityTesting          *bool                                `json:"enableSecurityTesting,omitempty"`
-		FollowRedirects                *bool                                `json:"follow_redirects,omitempty"`
-		HttpVersion                    *SyntheticsTestOptionsHTTPVersion    `json:"httpVersion,omitempty"`
-		IgnoreServerCertificateError   *bool                                `json:"ignoreServerCertificateError,omitempty"`
-		InitialNavigationTimeout       *int64                               `json:"initialNavigationTimeout,omitempty"`
-		MinFailureDuration             *int64                               `json:"min_failure_duration,omitempty"`
-		MinLocationFailed              *int64                               `json:"min_location_failed,omitempty"`
-		MonitorName                    *string                              `json:"monitor_name,omitempty"`
-		MonitorOptions                 *SyntheticsTestOptionsMonitorOptions `json:"monitor_options,omitempty"`
-		MonitorPriority                *int32                               `json:"monitor_priority,omitempty"`
-		NoScreenshot                   *bool                                `json:"noScreenshot,omitempty"`
-		RestrictedRoles                []string                             `json:"restricted_roles,omitempty"`
-		Retry                          *SyntheticsTestOptionsRetry          `json:"retry,omitempty"`
-		RumSettings                    *SyntheticsBrowserTestRumSettings    `json:"rumSettings,omitempty"`
-		Scheduling                     *SyntheticsTestOptionsScheduling     `json:"scheduling,omitempty"`
-		TickEvery                      *int64                               `json:"tick_every,omitempty"`
+		AcceptSelfSigned             *bool                                `json:"accept_self_signed,omitempty"`
+		AllowInsecure                *bool                                `json:"allow_insecure,omitempty"`
+		CheckCertificateRevocation   *bool                                `json:"checkCertificateRevocation,omitempty"`
+		Ci                           *SyntheticsTestCiOptions             `json:"ci,omitempty"`
+		DeviceIds                    []string                             `json:"device_ids,omitempty"`
+		DisableCors                  *bool                                `json:"disableCors,omitempty"`
+		DisableCsp                   *bool                                `json:"disableCsp,omitempty"`
+		EnableProfiling              *bool                                `json:"enableProfiling,omitempty"`
+		EnableSecurityTesting        *bool                                `json:"enableSecurityTesting,omitempty"`
+		FollowRedirects              *bool                                `json:"follow_redirects,omitempty"`
+		HttpVersion                  *SyntheticsTestOptionsHTTPVersion    `json:"httpVersion,omitempty"`
+		IgnoreServerCertificateError *bool                                `json:"ignoreServerCertificateError,omitempty"`
+		InitialNavigationTimeout     *int64                               `json:"initialNavigationTimeout,omitempty"`
+		MinFailureDuration           *int64                               `json:"min_failure_duration,omitempty"`
+		MinLocationFailed            *int64                               `json:"min_location_failed,omitempty"`
+		MonitorName                  *string                              `json:"monitor_name,omitempty"`
+		MonitorOptions               *SyntheticsTestOptionsMonitorOptions `json:"monitor_options,omitempty"`
+		MonitorPriority              *int32                               `json:"monitor_priority,omitempty"`
+		NoScreenshot                 *bool                                `json:"noScreenshot,omitempty"`
+		RestrictedRoles              []string                             `json:"restricted_roles,omitempty"`
+		Retry                        *SyntheticsTestOptionsRetry          `json:"retry,omitempty"`
+		RumSettings                  *SyntheticsBrowserTestRumSettings    `json:"rumSettings,omitempty"`
+		Scheduling                   *SyntheticsTestOptionsScheduling     `json:"scheduling,omitempty"`
+		TickEvery                    *int64                               `json:"tick_every,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"accept_self_signed", "allow_insecure", "blockedRequestPatterns", "captureNetworkPayloads", "checkCertificateRevocation", "ci", "device_ids", "disableAiaIntermediateFetching", "disableCors", "disableCsp", "enableProfiling", "enableSecurityTesting", "follow_redirects", "httpVersion", "ignoreServerCertificateError", "initialNavigationTimeout", "min_failure_duration", "min_location_failed", "monitor_name", "monitor_options", "monitor_priority", "noScreenshot", "restricted_roles", "retry", "rumSettings", "scheduling", "tick_every"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"accept_self_signed", "allow_insecure", "checkCertificateRevocation", "ci", "device_ids", "disableCors", "disableCsp", "enableProfiling", "enableSecurityTesting", "follow_redirects", "httpVersion", "ignoreServerCertificateError", "initialNavigationTimeout", "min_failure_duration", "min_location_failed", "monitor_name", "monitor_options", "monitor_priority", "noScreenshot", "restricted_roles", "retry", "rumSettings", "scheduling", "tick_every"})
 	} else {
 		return err
 	}
@@ -1001,15 +895,12 @@ func (o *SyntheticsTestOptions) UnmarshalJSON(bytes []byte) (err error) {
 	hasInvalidField := false
 	o.AcceptSelfSigned = all.AcceptSelfSigned
 	o.AllowInsecure = all.AllowInsecure
-	o.BlockedRequestPatterns = all.BlockedRequestPatterns
-	o.CaptureNetworkPayloads = all.CaptureNetworkPayloads
 	o.CheckCertificateRevocation = all.CheckCertificateRevocation
 	if all.Ci != nil && all.Ci.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true
 	}
 	o.Ci = all.Ci
 	o.DeviceIds = all.DeviceIds
-	o.DisableAiaIntermediateFetching = all.DisableAiaIntermediateFetching
 	o.DisableCors = all.DisableCors
 	o.DisableCsp = all.DisableCsp
 	o.EnableProfiling = all.EnableProfiling

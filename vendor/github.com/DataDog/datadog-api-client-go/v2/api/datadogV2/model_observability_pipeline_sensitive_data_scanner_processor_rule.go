@@ -23,7 +23,7 @@ type ObservabilityPipelineSensitiveDataScannerProcessorRule struct {
 	// Determines which parts of the log the pattern-matching rule should be applied to.
 	Scope ObservabilityPipelineSensitiveDataScannerProcessorScope `json:"scope"`
 	// Tags assigned to this rule for filtering and classification.
-	Tags []string `json:"tags,omitempty"`
+	Tags []string `json:"tags"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -33,12 +33,13 @@ type ObservabilityPipelineSensitiveDataScannerProcessorRule struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewObservabilityPipelineSensitiveDataScannerProcessorRule(name string, onMatch ObservabilityPipelineSensitiveDataScannerProcessorAction, pattern ObservabilityPipelineSensitiveDataScannerProcessorPattern, scope ObservabilityPipelineSensitiveDataScannerProcessorScope) *ObservabilityPipelineSensitiveDataScannerProcessorRule {
+func NewObservabilityPipelineSensitiveDataScannerProcessorRule(name string, onMatch ObservabilityPipelineSensitiveDataScannerProcessorAction, pattern ObservabilityPipelineSensitiveDataScannerProcessorPattern, scope ObservabilityPipelineSensitiveDataScannerProcessorScope, tags []string) *ObservabilityPipelineSensitiveDataScannerProcessorRule {
 	this := ObservabilityPipelineSensitiveDataScannerProcessorRule{}
 	this.Name = name
 	this.OnMatch = onMatch
 	this.Pattern = pattern
 	this.Scope = scope
+	this.Tags = tags
 	return &this
 }
 
@@ -170,30 +171,25 @@ func (o *ObservabilityPipelineSensitiveDataScannerProcessorRule) SetScope(v Obse
 	o.Scope = v
 }
 
-// GetTags returns the Tags field value if set, zero value otherwise.
+// GetTags returns the Tags field value.
 func (o *ObservabilityPipelineSensitiveDataScannerProcessorRule) GetTags() []string {
-	if o == nil || o.Tags == nil {
+	if o == nil {
 		var ret []string
 		return ret
 	}
 	return o.Tags
 }
 
-// GetTagsOk returns a tuple with the Tags field value if set, nil otherwise
+// GetTagsOk returns a tuple with the Tags field value
 // and a boolean to check if the value has been set.
 func (o *ObservabilityPipelineSensitiveDataScannerProcessorRule) GetTagsOk() (*[]string, bool) {
-	if o == nil || o.Tags == nil {
+	if o == nil {
 		return nil, false
 	}
 	return &o.Tags, true
 }
 
-// HasTags returns a boolean if a field has been set.
-func (o *ObservabilityPipelineSensitiveDataScannerProcessorRule) HasTags() bool {
-	return o != nil && o.Tags != nil
-}
-
-// SetTags gets a reference to the given []string and assigns it to the Tags field.
+// SetTags sets field value.
 func (o *ObservabilityPipelineSensitiveDataScannerProcessorRule) SetTags(v []string) {
 	o.Tags = v
 }
@@ -211,9 +207,7 @@ func (o ObservabilityPipelineSensitiveDataScannerProcessorRule) MarshalJSON() ([
 	toSerialize["on_match"] = o.OnMatch
 	toSerialize["pattern"] = o.Pattern
 	toSerialize["scope"] = o.Scope
-	if o.Tags != nil {
-		toSerialize["tags"] = o.Tags
-	}
+	toSerialize["tags"] = o.Tags
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -229,7 +223,7 @@ func (o *ObservabilityPipelineSensitiveDataScannerProcessorRule) UnmarshalJSON(b
 		OnMatch        *ObservabilityPipelineSensitiveDataScannerProcessorAction         `json:"on_match"`
 		Pattern        *ObservabilityPipelineSensitiveDataScannerProcessorPattern        `json:"pattern"`
 		Scope          *ObservabilityPipelineSensitiveDataScannerProcessorScope          `json:"scope"`
-		Tags           []string                                                          `json:"tags,omitempty"`
+		Tags           *[]string                                                         `json:"tags"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -246,8 +240,11 @@ func (o *ObservabilityPipelineSensitiveDataScannerProcessorRule) UnmarshalJSON(b
 	if all.Scope == nil {
 		return fmt.Errorf("required field scope missing")
 	}
+	if all.Tags == nil {
+		return fmt.Errorf("required field tags missing")
+	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"keyword_options", "name", "on_match", "pattern", "scope", "tags"})
 	} else {
 		return err
@@ -262,7 +259,7 @@ func (o *ObservabilityPipelineSensitiveDataScannerProcessorRule) UnmarshalJSON(b
 	o.OnMatch = *all.OnMatch
 	o.Pattern = *all.Pattern
 	o.Scope = *all.Scope
-	o.Tags = all.Tags
+	o.Tags = *all.Tags
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

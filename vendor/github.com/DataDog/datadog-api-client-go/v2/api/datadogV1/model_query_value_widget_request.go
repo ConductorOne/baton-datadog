@@ -16,8 +16,6 @@ type QueryValueWidgetRequest struct {
 	ApmQuery *LogQueryDefinition `json:"apm_query,omitempty"`
 	// The log query.
 	AuditQuery *LogQueryDefinition `json:"audit_query,omitempty"`
-	// A change indicator that compares the current value to a historical period.
-	Comparison *QueryValueWidgetComparison `json:"comparison,omitempty"`
 	// List of conditional formats.
 	ConditionalFormats []WidgetConditionalFormat `json:"conditional_formats,omitempty"`
 	// The log query.
@@ -32,8 +30,7 @@ type QueryValueWidgetRequest struct {
 	ProcessQuery *ProcessQueryDefinition `json:"process_query,omitempty"`
 	// The log query.
 	ProfileMetricsQuery *LogQueryDefinition `json:"profile_metrics_query,omitempty"`
-	// Widget query. Deprecated - Use `queries` and `formulas` instead.
-	// Deprecated
+	// TODO.
 	Q *string `json:"q,omitempty"`
 	// List of queries that can be returned directly or used in formulas.
 	Queries []FormulaAndFunctionQueryDefinition `json:"queries,omitempty"`
@@ -147,34 +144,6 @@ func (o *QueryValueWidgetRequest) HasAuditQuery() bool {
 // SetAuditQuery gets a reference to the given LogQueryDefinition and assigns it to the AuditQuery field.
 func (o *QueryValueWidgetRequest) SetAuditQuery(v LogQueryDefinition) {
 	o.AuditQuery = &v
-}
-
-// GetComparison returns the Comparison field value if set, zero value otherwise.
-func (o *QueryValueWidgetRequest) GetComparison() QueryValueWidgetComparison {
-	if o == nil || o.Comparison == nil {
-		var ret QueryValueWidgetComparison
-		return ret
-	}
-	return *o.Comparison
-}
-
-// GetComparisonOk returns a tuple with the Comparison field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *QueryValueWidgetRequest) GetComparisonOk() (*QueryValueWidgetComparison, bool) {
-	if o == nil || o.Comparison == nil {
-		return nil, false
-	}
-	return o.Comparison, true
-}
-
-// HasComparison returns a boolean if a field has been set.
-func (o *QueryValueWidgetRequest) HasComparison() bool {
-	return o != nil && o.Comparison != nil
-}
-
-// SetComparison gets a reference to the given QueryValueWidgetComparison and assigns it to the Comparison field.
-func (o *QueryValueWidgetRequest) SetComparison(v QueryValueWidgetComparison) {
-	o.Comparison = &v
 }
 
 // GetConditionalFormats returns the ConditionalFormats field value if set, zero value otherwise.
@@ -374,7 +343,6 @@ func (o *QueryValueWidgetRequest) SetProfileMetricsQuery(v LogQueryDefinition) {
 }
 
 // GetQ returns the Q field value if set, zero value otherwise.
-// Deprecated
 func (o *QueryValueWidgetRequest) GetQ() string {
 	if o == nil || o.Q == nil {
 		var ret string
@@ -385,7 +353,6 @@ func (o *QueryValueWidgetRequest) GetQ() string {
 
 // GetQOk returns a tuple with the Q field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-// Deprecated
 func (o *QueryValueWidgetRequest) GetQOk() (*string, bool) {
 	if o == nil || o.Q == nil {
 		return nil, false
@@ -399,7 +366,6 @@ func (o *QueryValueWidgetRequest) HasQ() bool {
 }
 
 // SetQ gets a reference to the given string and assigns it to the Q field.
-// Deprecated
 func (o *QueryValueWidgetRequest) SetQ(v string) {
 	o.Q = &v
 }
@@ -531,9 +497,6 @@ func (o QueryValueWidgetRequest) MarshalJSON() ([]byte, error) {
 	if o.AuditQuery != nil {
 		toSerialize["audit_query"] = o.AuditQuery
 	}
-	if o.Comparison != nil {
-		toSerialize["comparison"] = o.Comparison
-	}
 	if o.ConditionalFormats != nil {
 		toSerialize["conditional_formats"] = o.ConditionalFormats
 	}
@@ -583,7 +546,6 @@ func (o *QueryValueWidgetRequest) UnmarshalJSON(bytes []byte) (err error) {
 		Aggregator          *WidgetAggregator                   `json:"aggregator,omitempty"`
 		ApmQuery            *LogQueryDefinition                 `json:"apm_query,omitempty"`
 		AuditQuery          *LogQueryDefinition                 `json:"audit_query,omitempty"`
-		Comparison          *QueryValueWidgetComparison         `json:"comparison,omitempty"`
 		ConditionalFormats  []WidgetConditionalFormat           `json:"conditional_formats,omitempty"`
 		EventQuery          *LogQueryDefinition                 `json:"event_query,omitempty"`
 		Formulas            []WidgetFormula                     `json:"formulas,omitempty"`
@@ -601,8 +563,8 @@ func (o *QueryValueWidgetRequest) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"aggregator", "apm_query", "audit_query", "comparison", "conditional_formats", "event_query", "formulas", "log_query", "network_query", "process_query", "profile_metrics_query", "q", "queries", "response_format", "rum_query", "security_query"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"aggregator", "apm_query", "audit_query", "conditional_formats", "event_query", "formulas", "log_query", "network_query", "process_query", "profile_metrics_query", "q", "queries", "response_format", "rum_query", "security_query"})
 	} else {
 		return err
 	}
@@ -621,10 +583,6 @@ func (o *QueryValueWidgetRequest) UnmarshalJSON(bytes []byte) (err error) {
 		hasInvalidField = true
 	}
 	o.AuditQuery = all.AuditQuery
-	if all.Comparison != nil && all.Comparison.UnparsedObject != nil && o.UnparsedObject == nil {
-		hasInvalidField = true
-	}
-	o.Comparison = all.Comparison
 	o.ConditionalFormats = all.ConditionalFormats
 	if all.EventQuery != nil && all.EventQuery.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true

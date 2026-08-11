@@ -17,8 +17,8 @@ type FiltersPerProduct struct {
 	// Datadog (such as `@tag.key:value`), and only one tag or attribute may be used to define the access strategy
 	// per telemetry type.
 	Filters []string `json:"filters"`
-	// Name of the product the dataset is for. Possible values are 'apm', 'rum',
-	// 'metrics', 'logs', 'error_tracking', 'cloud_cost', and 'sd_repoinfo'.
+	// Name of the product the dataset is for. Possible values are 'apm', 'rum', 'synthetics',
+	// 'metrics', 'logs', 'sd_repoinfo', 'error_tracking', 'cloud_cost', and 'ml_obs'.
 	Product string `json:"product"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -121,7 +121,7 @@ func (o *FiltersPerProduct) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field product missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"filters", "product"})
 	} else {
 		return err
