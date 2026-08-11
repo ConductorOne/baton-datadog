@@ -16,8 +16,7 @@ type UsageBillableSummaryHour struct {
 	AccountName *string `json:"account_name,omitempty"`
 	// The account public ID.
 	AccountPublicId *string `json:"account_public_id,omitempty"`
-	// The billing plan (metadata). (Deprecated from June 2026)
-	// Deprecated
+	// The billing plan.
 	BillingPlan *string `json:"billing_plan,omitempty"`
 	// Shows the last date of usage.
 	EndDate *time.Time `json:"end_date,omitempty"`
@@ -114,7 +113,6 @@ func (o *UsageBillableSummaryHour) SetAccountPublicId(v string) {
 }
 
 // GetBillingPlan returns the BillingPlan field value if set, zero value otherwise.
-// Deprecated
 func (o *UsageBillableSummaryHour) GetBillingPlan() string {
 	if o == nil || o.BillingPlan == nil {
 		var ret string
@@ -125,7 +123,6 @@ func (o *UsageBillableSummaryHour) GetBillingPlan() string {
 
 // GetBillingPlanOk returns a tuple with the BillingPlan field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-// Deprecated
 func (o *UsageBillableSummaryHour) GetBillingPlanOk() (*string, bool) {
 	if o == nil || o.BillingPlan == nil {
 		return nil, false
@@ -139,7 +136,6 @@ func (o *UsageBillableSummaryHour) HasBillingPlan() bool {
 }
 
 // SetBillingPlan gets a reference to the given string and assigns it to the BillingPlan field.
-// Deprecated
 func (o *UsageBillableSummaryHour) SetBillingPlan(v string) {
 	o.BillingPlan = &v
 }
@@ -441,7 +437,7 @@ func (o *UsageBillableSummaryHour) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"account_name", "account_public_id", "billing_plan", "end_date", "num_orgs", "org_name", "public_id", "ratio_in_month", "region", "start_date", "usage"})
 	} else {
 		return err

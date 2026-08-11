@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// DORAFailureRequest Request to create a DORA incident event.
+// DORAFailureRequest Request to create a DORA failure event.
 type DORAFailureRequest struct {
 	// The JSON:API data.
 	Data DORAFailureRequestData `json:"data"`
@@ -86,7 +86,7 @@ func (o *DORAFailureRequest) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field data missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err

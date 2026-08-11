@@ -16,9 +16,8 @@ type ObservabilityPipelineEnrichmentTableFileKeyItems struct {
 	Column string `json:"column"`
 	// Defines how to compare key fields for enrichment table lookups.
 	Comparison ObservabilityPipelineEnrichmentTableFileKeyItemsComparison `json:"comparison"`
-	// Specifies the source of the key value used for enrichment table lookups.
-	// Can be a plain field path string or an object specifying `event`, `vrl`, or `secret`.
-	Field ObservabilityPipelineEnrichmentTableFileKeyItemField `json:"field"`
+	// The `items` `field`.
+	Field string `json:"field"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -28,7 +27,7 @@ type ObservabilityPipelineEnrichmentTableFileKeyItems struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewObservabilityPipelineEnrichmentTableFileKeyItems(column string, comparison ObservabilityPipelineEnrichmentTableFileKeyItemsComparison, field ObservabilityPipelineEnrichmentTableFileKeyItemField) *ObservabilityPipelineEnrichmentTableFileKeyItems {
+func NewObservabilityPipelineEnrichmentTableFileKeyItems(column string, comparison ObservabilityPipelineEnrichmentTableFileKeyItemsComparison, field string) *ObservabilityPipelineEnrichmentTableFileKeyItems {
 	this := ObservabilityPipelineEnrichmentTableFileKeyItems{}
 	this.Column = column
 	this.Comparison = comparison
@@ -91,9 +90,9 @@ func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) SetComparison(v Obser
 }
 
 // GetField returns the Field field value.
-func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) GetField() ObservabilityPipelineEnrichmentTableFileKeyItemField {
+func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) GetField() string {
 	if o == nil {
-		var ret ObservabilityPipelineEnrichmentTableFileKeyItemField
+		var ret string
 		return ret
 	}
 	return o.Field
@@ -101,7 +100,7 @@ func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) GetField() Observabil
 
 // GetFieldOk returns a tuple with the Field field value
 // and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) GetFieldOk() (*ObservabilityPipelineEnrichmentTableFileKeyItemField, bool) {
+func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) GetFieldOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -109,7 +108,7 @@ func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) GetFieldOk() (*Observ
 }
 
 // SetField sets field value.
-func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) SetField(v ObservabilityPipelineEnrichmentTableFileKeyItemField) {
+func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) SetField(v string) {
 	o.Field = v
 }
 
@@ -134,7 +133,7 @@ func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) UnmarshalJSON(bytes [
 	all := struct {
 		Column     *string                                                     `json:"column"`
 		Comparison *ObservabilityPipelineEnrichmentTableFileKeyItemsComparison `json:"comparison"`
-		Field      *ObservabilityPipelineEnrichmentTableFileKeyItemField       `json:"field"`
+		Field      *string                                                     `json:"field"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -149,7 +148,7 @@ func (o *ObservabilityPipelineEnrichmentTableFileKeyItems) UnmarshalJSON(bytes [
 		return fmt.Errorf("required field field missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"column", "comparison", "field"})
 	} else {
 		return err

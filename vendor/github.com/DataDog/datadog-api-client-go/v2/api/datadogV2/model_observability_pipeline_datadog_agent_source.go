@@ -10,13 +10,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// ObservabilityPipelineDatadogAgentSource The `datadog_agent` source collects logs/metrics from the Datadog Agent.
-//
-// **Supported pipeline types:** logs, metrics
+// ObservabilityPipelineDatadogAgentSource The `datadog_agent` source collects logs from the Datadog Agent.
 type ObservabilityPipelineDatadogAgentSource struct {
-	// Name of the environment variable or secret that holds the listen address for the Datadog Agent source.
-	AddressKey *string `json:"address_key,omitempty"`
-	// The unique identifier for this component. Used in other parts of the pipeline to reference this component (for example, as the `input` to downstream components).
+	// The unique identifier for this component. Used to reference this component in other parts of the pipeline (e.g., as input to downstream components).
 	Id string `json:"id"`
 	// Configuration for enabling TLS encryption between the pipeline component and external services.
 	Tls *ObservabilityPipelineTls `json:"tls,omitempty"`
@@ -46,34 +42,6 @@ func NewObservabilityPipelineDatadogAgentSourceWithDefaults() *ObservabilityPipe
 	var typeVar ObservabilityPipelineDatadogAgentSourceType = OBSERVABILITYPIPELINEDATADOGAGENTSOURCETYPE_DATADOG_AGENT
 	this.Type = typeVar
 	return &this
-}
-
-// GetAddressKey returns the AddressKey field value if set, zero value otherwise.
-func (o *ObservabilityPipelineDatadogAgentSource) GetAddressKey() string {
-	if o == nil || o.AddressKey == nil {
-		var ret string
-		return ret
-	}
-	return *o.AddressKey
-}
-
-// GetAddressKeyOk returns a tuple with the AddressKey field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineDatadogAgentSource) GetAddressKeyOk() (*string, bool) {
-	if o == nil || o.AddressKey == nil {
-		return nil, false
-	}
-	return o.AddressKey, true
-}
-
-// HasAddressKey returns a boolean if a field has been set.
-func (o *ObservabilityPipelineDatadogAgentSource) HasAddressKey() bool {
-	return o != nil && o.AddressKey != nil
-}
-
-// SetAddressKey gets a reference to the given string and assigns it to the AddressKey field.
-func (o *ObservabilityPipelineDatadogAgentSource) SetAddressKey(v string) {
-	o.AddressKey = &v
 }
 
 // GetId returns the Id field value.
@@ -156,9 +124,6 @@ func (o ObservabilityPipelineDatadogAgentSource) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.AddressKey != nil {
-		toSerialize["address_key"] = o.AddressKey
-	}
 	toSerialize["id"] = o.Id
 	if o.Tls != nil {
 		toSerialize["tls"] = o.Tls
@@ -174,10 +139,9 @@ func (o ObservabilityPipelineDatadogAgentSource) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *ObservabilityPipelineDatadogAgentSource) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		AddressKey *string                                      `json:"address_key,omitempty"`
-		Id         *string                                      `json:"id"`
-		Tls        *ObservabilityPipelineTls                    `json:"tls,omitempty"`
-		Type       *ObservabilityPipelineDatadogAgentSourceType `json:"type"`
+		Id   *string                                      `json:"id"`
+		Tls  *ObservabilityPipelineTls                    `json:"tls,omitempty"`
+		Type *ObservabilityPipelineDatadogAgentSourceType `json:"type"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -189,14 +153,13 @@ func (o *ObservabilityPipelineDatadogAgentSource) UnmarshalJSON(bytes []byte) (e
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"address_key", "id", "tls", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"id", "tls", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	o.AddressKey = all.AddressKey
 	o.Id = *all.Id
 	if all.Tls != nil && all.Tls.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true

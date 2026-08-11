@@ -10,7 +10,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// ServiceLevelObjectiveQuery A count-based (metric) SLO query. This field is superseded by `sli_specification` but is retained for backwards compatibility. Note that Datadog only allows the sum by aggregator
+// ServiceLevelObjectiveQuery A metric-based SLO. **Required if type is `metric`**. Note that Datadog only allows the sum by aggregator
 // to be used because this will sum up all request counts instead of averaging them, or taking the max or
 // min of all of those requests.
 type ServiceLevelObjectiveQuery struct {
@@ -119,7 +119,7 @@ func (o *ServiceLevelObjectiveQuery) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field numerator missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"denominator", "numerator"})
 	} else {
 		return err

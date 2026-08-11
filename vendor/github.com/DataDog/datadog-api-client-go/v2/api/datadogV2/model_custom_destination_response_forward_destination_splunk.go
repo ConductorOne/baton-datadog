@@ -15,13 +15,6 @@ type CustomDestinationResponseForwardDestinationSplunk struct {
 	// The destination for which logs will be forwarded to.
 	// Must have HTTPS scheme and forwarding back to Datadog is not allowed.
 	Endpoint string `json:"endpoint"`
-	// The Splunk sourcetype for the events sent to this Splunk destination.
-	//
-	// If the field is absent from the request and no sourcetype has been previously set on this destination, the default sourcetype `_json` is used.
-	// On update, if the field is absent from the request but a sourcetype was previously set, the previous value is kept.
-	// If set to `null`, the sourcetype field is omitted from the forwarded event entirely.
-	// Otherwise, the provided string value is used as the sourcetype.
-	Sourcetype datadog.NullableString `json:"sourcetype,omitempty"`
 	// Type of the Splunk HTTP Event Collector (HEC) destination.
 	Type CustomDestinationResponseForwardDestinationSplunkType `json:"type"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
@@ -73,45 +66,6 @@ func (o *CustomDestinationResponseForwardDestinationSplunk) SetEndpoint(v string
 	o.Endpoint = v
 }
 
-// GetSourcetype returns the Sourcetype field value if set, zero value otherwise (both if not set or set to explicit null).
-func (o *CustomDestinationResponseForwardDestinationSplunk) GetSourcetype() string {
-	if o == nil || o.Sourcetype.Get() == nil {
-		var ret string
-		return ret
-	}
-	return *o.Sourcetype.Get()
-}
-
-// GetSourcetypeOk returns a tuple with the Sourcetype field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-// NOTE: If the value is an explicit nil, `nil, true` will be returned.
-func (o *CustomDestinationResponseForwardDestinationSplunk) GetSourcetypeOk() (*string, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return o.Sourcetype.Get(), o.Sourcetype.IsSet()
-}
-
-// HasSourcetype returns a boolean if a field has been set.
-func (o *CustomDestinationResponseForwardDestinationSplunk) HasSourcetype() bool {
-	return o != nil && o.Sourcetype.IsSet()
-}
-
-// SetSourcetype gets a reference to the given datadog.NullableString and assigns it to the Sourcetype field.
-func (o *CustomDestinationResponseForwardDestinationSplunk) SetSourcetype(v string) {
-	o.Sourcetype.Set(&v)
-}
-
-// SetSourcetypeNil sets the value for Sourcetype to be an explicit nil.
-func (o *CustomDestinationResponseForwardDestinationSplunk) SetSourcetypeNil() {
-	o.Sourcetype.Set(nil)
-}
-
-// UnsetSourcetype ensures that no value is present for Sourcetype, not even an explicit nil.
-func (o *CustomDestinationResponseForwardDestinationSplunk) UnsetSourcetype() {
-	o.Sourcetype.Unset()
-}
-
 // GetType returns the Type field value.
 func (o *CustomDestinationResponseForwardDestinationSplunk) GetType() CustomDestinationResponseForwardDestinationSplunkType {
 	if o == nil {
@@ -142,9 +96,6 @@ func (o CustomDestinationResponseForwardDestinationSplunk) MarshalJSON() ([]byte
 		return datadog.Marshal(o.UnparsedObject)
 	}
 	toSerialize["endpoint"] = o.Endpoint
-	if o.Sourcetype.IsSet() {
-		toSerialize["sourcetype"] = o.Sourcetype.Get()
-	}
 	toSerialize["type"] = o.Type
 
 	for key, value := range o.AdditionalProperties {
@@ -156,9 +107,8 @@ func (o CustomDestinationResponseForwardDestinationSplunk) MarshalJSON() ([]byte
 // UnmarshalJSON deserializes the given payload.
 func (o *CustomDestinationResponseForwardDestinationSplunk) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Endpoint   *string                                                `json:"endpoint"`
-		Sourcetype datadog.NullableString                                 `json:"sourcetype,omitempty"`
-		Type       *CustomDestinationResponseForwardDestinationSplunkType `json:"type"`
+		Endpoint *string                                                `json:"endpoint"`
+		Type     *CustomDestinationResponseForwardDestinationSplunkType `json:"type"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -170,15 +120,14 @@ func (o *CustomDestinationResponseForwardDestinationSplunk) UnmarshalJSON(bytes 
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"endpoint", "sourcetype", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"endpoint", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
 	o.Endpoint = *all.Endpoint
-	o.Sourcetype = all.Sourcetype
 	if !all.Type.IsValid() {
 		hasInvalidField = true
 	} else {

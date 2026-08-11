@@ -12,7 +12,7 @@ import (
 
 // AzureUCConfig Azure config.
 type AzureUCConfig struct {
-	// The tenant ID of the Azure account.
+	// The tenant ID of the azure account.
 	AccountId string `json:"account_id"`
 	// The client ID of the Azure account.
 	ClientId string `json:"client_id"`
@@ -21,13 +21,13 @@ type AzureUCConfig struct {
 	// The dataset type of the Azure config.
 	DatasetType string `json:"dataset_type"`
 	// The error messages for the Azure config.
-	ErrorMessages datadog.NullableList[string] `json:"error_messages,omitempty"`
+	ErrorMessages []string `json:"error_messages,omitempty"`
 	// The name of the configured Azure Export.
 	ExportName string `json:"export_name"`
 	// The path where the Azure Export is saved.
 	ExportPath string `json:"export_path"`
 	// The ID of the Azure config.
-	Id *string `json:"id,omitempty"`
+	Id *int64 `json:"id,omitempty"`
 	// The number of months the report has been backfilled.
 	// Deprecated
 	Months *int32 `json:"months,omitempty"`
@@ -171,43 +171,32 @@ func (o *AzureUCConfig) SetDatasetType(v string) {
 	o.DatasetType = v
 }
 
-// GetErrorMessages returns the ErrorMessages field value if set, zero value otherwise (both if not set or set to explicit null).
+// GetErrorMessages returns the ErrorMessages field value if set, zero value otherwise.
 func (o *AzureUCConfig) GetErrorMessages() []string {
-	if o == nil || o.ErrorMessages.Get() == nil {
+	if o == nil || o.ErrorMessages == nil {
 		var ret []string
 		return ret
 	}
-	return *o.ErrorMessages.Get()
+	return o.ErrorMessages
 }
 
 // GetErrorMessagesOk returns a tuple with the ErrorMessages field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-// NOTE: If the value is an explicit nil, `nil, true` will be returned.
 func (o *AzureUCConfig) GetErrorMessagesOk() (*[]string, bool) {
-	if o == nil {
+	if o == nil || o.ErrorMessages == nil {
 		return nil, false
 	}
-	return o.ErrorMessages.Get(), o.ErrorMessages.IsSet()
+	return &o.ErrorMessages, true
 }
 
 // HasErrorMessages returns a boolean if a field has been set.
 func (o *AzureUCConfig) HasErrorMessages() bool {
-	return o != nil && o.ErrorMessages.IsSet()
+	return o != nil && o.ErrorMessages != nil
 }
 
-// SetErrorMessages gets a reference to the given datadog.NullableList[string] and assigns it to the ErrorMessages field.
+// SetErrorMessages gets a reference to the given []string and assigns it to the ErrorMessages field.
 func (o *AzureUCConfig) SetErrorMessages(v []string) {
-	o.ErrorMessages.Set(&v)
-}
-
-// SetErrorMessagesNil sets the value for ErrorMessages to be an explicit nil.
-func (o *AzureUCConfig) SetErrorMessagesNil() {
-	o.ErrorMessages.Set(nil)
-}
-
-// UnsetErrorMessages ensures that no value is present for ErrorMessages, not even an explicit nil.
-func (o *AzureUCConfig) UnsetErrorMessages() {
-	o.ErrorMessages.Unset()
+	o.ErrorMessages = v
 }
 
 // GetExportName returns the ExportName field value.
@@ -257,9 +246,9 @@ func (o *AzureUCConfig) SetExportPath(v string) {
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
-func (o *AzureUCConfig) GetId() string {
+func (o *AzureUCConfig) GetId() int64 {
 	if o == nil || o.Id == nil {
-		var ret string
+		var ret int64
 		return ret
 	}
 	return *o.Id
@@ -267,7 +256,7 @@ func (o *AzureUCConfig) GetId() string {
 
 // GetIdOk returns a tuple with the Id field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AzureUCConfig) GetIdOk() (*string, bool) {
+func (o *AzureUCConfig) GetIdOk() (*int64, bool) {
 	if o == nil || o.Id == nil {
 		return nil, false
 	}
@@ -279,8 +268,8 @@ func (o *AzureUCConfig) HasId() bool {
 	return o != nil && o.Id != nil
 }
 
-// SetId gets a reference to the given string and assigns it to the Id field.
-func (o *AzureUCConfig) SetId(v string) {
+// SetId gets a reference to the given int64 and assigns it to the Id field.
+func (o *AzureUCConfig) SetId(v int64) {
 	o.Id = &v
 }
 
@@ -475,8 +464,8 @@ func (o AzureUCConfig) MarshalJSON() ([]byte, error) {
 		toSerialize["created_at"] = o.CreatedAt
 	}
 	toSerialize["dataset_type"] = o.DatasetType
-	if o.ErrorMessages.IsSet() {
-		toSerialize["error_messages"] = o.ErrorMessages.Get()
+	if o.ErrorMessages != nil {
+		toSerialize["error_messages"] = o.ErrorMessages
 	}
 	toSerialize["export_name"] = o.ExportName
 	toSerialize["export_path"] = o.ExportPath
@@ -506,21 +495,21 @@ func (o AzureUCConfig) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *AzureUCConfig) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		AccountId        *string                      `json:"account_id"`
-		ClientId         *string                      `json:"client_id"`
-		CreatedAt        *string                      `json:"created_at,omitempty"`
-		DatasetType      *string                      `json:"dataset_type"`
-		ErrorMessages    datadog.NullableList[string] `json:"error_messages,omitempty"`
-		ExportName       *string                      `json:"export_name"`
-		ExportPath       *string                      `json:"export_path"`
-		Id               *string                      `json:"id,omitempty"`
-		Months           *int32                       `json:"months,omitempty"`
-		Scope            *string                      `json:"scope"`
-		Status           *string                      `json:"status"`
-		StatusUpdatedAt  *string                      `json:"status_updated_at,omitempty"`
-		StorageAccount   *string                      `json:"storage_account"`
-		StorageContainer *string                      `json:"storage_container"`
-		UpdatedAt        *string                      `json:"updated_at,omitempty"`
+		AccountId        *string  `json:"account_id"`
+		ClientId         *string  `json:"client_id"`
+		CreatedAt        *string  `json:"created_at,omitempty"`
+		DatasetType      *string  `json:"dataset_type"`
+		ErrorMessages    []string `json:"error_messages,omitempty"`
+		ExportName       *string  `json:"export_name"`
+		ExportPath       *string  `json:"export_path"`
+		Id               *int64   `json:"id,omitempty"`
+		Months           *int32   `json:"months,omitempty"`
+		Scope            *string  `json:"scope"`
+		Status           *string  `json:"status"`
+		StatusUpdatedAt  *string  `json:"status_updated_at,omitempty"`
+		StorageAccount   *string  `json:"storage_account"`
+		StorageContainer *string  `json:"storage_container"`
+		UpdatedAt        *string  `json:"updated_at,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -553,7 +542,7 @@ func (o *AzureUCConfig) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field storage_container missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"account_id", "client_id", "created_at", "dataset_type", "error_messages", "export_name", "export_path", "id", "months", "scope", "status", "status_updated_at", "storage_account", "storage_container", "updated_at"})
 	} else {
 		return err

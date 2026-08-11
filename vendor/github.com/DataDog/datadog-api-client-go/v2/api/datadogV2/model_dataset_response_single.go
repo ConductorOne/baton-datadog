@@ -5,23 +5,15 @@
 package datadogV2
 
 import (
+	"fmt"
+
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
 // DatasetResponseSingle Response containing a single dataset object.
 type DatasetResponseSingle struct {
-	// **Datasets Object Constraints**
-	// - **Tag Limit per Dataset**:
-	//   - Each restricted dataset supports a maximum of 10 key:value pairs per product.
-	//
-	// - **Tag Key Rules per Telemetry Type**:
-	//   - Only one tag key or attribute may be used to define access within a single telemetry type.
-	//   - The same or different tag key may be used across different telemetry types.
-	//
-	// - **Tag Value Uniqueness**:
-	//   - Tag values must be unique within a single dataset.
-	//   - A tag value used in one dataset cannot be reused in another dataset of the same telemetry type.
-	Data *DatasetResponse `json:"data,omitempty"`
+	// Dataset object.
+	Data Dataset `json:"data"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -31,8 +23,9 @@ type DatasetResponseSingle struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewDatasetResponseSingle() *DatasetResponseSingle {
+func NewDatasetResponseSingle(data Dataset) *DatasetResponseSingle {
 	this := DatasetResponseSingle{}
+	this.Data = data
 	return &this
 }
 
@@ -44,32 +37,27 @@ func NewDatasetResponseSingleWithDefaults() *DatasetResponseSingle {
 	return &this
 }
 
-// GetData returns the Data field value if set, zero value otherwise.
-func (o *DatasetResponseSingle) GetData() DatasetResponse {
-	if o == nil || o.Data == nil {
-		var ret DatasetResponse
+// GetData returns the Data field value.
+func (o *DatasetResponseSingle) GetData() Dataset {
+	if o == nil {
+		var ret Dataset
 		return ret
 	}
-	return *o.Data
+	return o.Data
 }
 
-// GetDataOk returns a tuple with the Data field value if set, nil otherwise
+// GetDataOk returns a tuple with the Data field value
 // and a boolean to check if the value has been set.
-func (o *DatasetResponseSingle) GetDataOk() (*DatasetResponse, bool) {
-	if o == nil || o.Data == nil {
+func (o *DatasetResponseSingle) GetDataOk() (*Dataset, bool) {
+	if o == nil {
 		return nil, false
 	}
-	return o.Data, true
+	return &o.Data, true
 }
 
-// HasData returns a boolean if a field has been set.
-func (o *DatasetResponseSingle) HasData() bool {
-	return o != nil && o.Data != nil
-}
-
-// SetData gets a reference to the given DatasetResponse and assigns it to the Data field.
-func (o *DatasetResponseSingle) SetData(v DatasetResponse) {
-	o.Data = &v
+// SetData sets field value.
+func (o *DatasetResponseSingle) SetData(v Dataset) {
+	o.Data = v
 }
 
 // MarshalJSON serializes the struct using spec logic.
@@ -78,9 +66,7 @@ func (o DatasetResponseSingle) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.Data != nil {
-		toSerialize["data"] = o.Data
-	}
+	toSerialize["data"] = o.Data
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -91,23 +77,26 @@ func (o DatasetResponseSingle) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *DatasetResponseSingle) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Data *DatasetResponse `json:"data,omitempty"`
+		Data *Dataset `json:"data"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
+	if all.Data == nil {
+		return fmt.Errorf("required field data missing")
+	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	if all.Data != nil && all.Data.UnparsedObject != nil && o.UnparsedObject == nil {
+	if all.Data.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true
 	}
-	o.Data = all.Data
+	o.Data = *all.Data
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

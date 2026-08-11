@@ -12,7 +12,7 @@ import (
 
 // ObservabilityPipelineSensitiveDataScannerProcessorActionRedactOptions Configuration for fully redacting sensitive data.
 type ObservabilityPipelineSensitiveDataScannerProcessorActionRedactOptions struct {
-	// The string used to replace matched sensitive data (for example, "***" or "[REDACTED]").
+	// The `ObservabilityPipelineSensitiveDataScannerProcessorActionRedactOptions` `replace`.
 	Replace string `json:"replace"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -86,7 +86,7 @@ func (o *ObservabilityPipelineSensitiveDataScannerProcessorActionRedactOptions) 
 		return fmt.Errorf("required field replace missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"replace"})
 	} else {
 		return err

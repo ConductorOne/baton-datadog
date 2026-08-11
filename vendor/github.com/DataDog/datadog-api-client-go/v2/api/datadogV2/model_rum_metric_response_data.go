@@ -8,11 +8,11 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// RumMetricResponseData The RUM-based metric properties.
+// RumMetricResponseData The rum-based metric properties.
 type RumMetricResponseData struct {
-	// The object describing a Datadog RUM-based metric.
+	// The object describing a Datadog rum-based metric.
 	Attributes *RumMetricResponseAttributes `json:"attributes,omitempty"`
-	// The name of the RUM-based metric.
+	// The name of the rum-based metric.
 	Id *string `json:"id,omitempty"`
 	// The type of the resource. The value should always be rum_metrics.
 	Type *RumMetricType `json:"type,omitempty"`
@@ -159,7 +159,7 @@ func (o *RumMetricResponseData) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"attributes", "id", "type"})
 	} else {
 		return err

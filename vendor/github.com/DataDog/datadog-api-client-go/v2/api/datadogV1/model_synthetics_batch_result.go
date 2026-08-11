@@ -28,7 +28,7 @@ type SyntheticsBatchResult struct {
 	TestName *string `json:"test_name,omitempty"`
 	// The public ID of the Synthetic test.
 	TestPublicId *string `json:"test_public_id,omitempty"`
-	// Type of the Synthetic test.
+	// Type of the Synthetic test, either `api` or `browser`.
 	TestType *SyntheticsTestDetailsType `json:"test_type,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -393,7 +393,7 @@ func (o *SyntheticsBatchResult) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"device", "duration", "execution_rule", "location", "result_id", "retries", "status", "test_name", "test_public_id", "test_type"})
 	} else {
 		return err

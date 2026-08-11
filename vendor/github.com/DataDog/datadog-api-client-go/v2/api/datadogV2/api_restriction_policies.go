@@ -36,19 +36,12 @@ func (a *RestrictionPoliciesApi) DeleteRestrictionPolicy(ctx _context.Context, r
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "*/*"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return nil, err
@@ -105,19 +98,12 @@ func (a *RestrictionPoliciesApi) GetRestrictionPolicy(ctx _context.Context, reso
 	localVarFormParams := _neturl.Values{}
 	localVarHeaderParams["Accept"] = "application/json"
 
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -184,6 +170,7 @@ func (r *UpdateRestrictionPolicyOptionalParameters) WithAllowSelfLockout(allowSe
 // #### Supported resources
 // Restriction policies can be applied to the following resources:
 // - Dashboards: `dashboard`
+// - Integration Accounts: `integration-account`
 // - Integration Services: `integration-service`
 // - Integration Webhooks: `integration-webhook`
 // - Notebooks: `notebook`
@@ -202,18 +189,12 @@ func (r *UpdateRestrictionPolicyOptionalParameters) WithAllowSelfLockout(allowSe
 // - RUM Applications: `rum-application`
 // - Cross Org Connections: `cross-org-connection`
 // - Spreadsheets: `spreadsheet`
-// - On-Call Schedules: `on-call-schedule`
-// - On-Call Escalation Policies: `on-call-escalation-policy`
-// - On-Call Team Routing Rules: `on-call-team-routing-rules`
-// - Logs Pipelines: `logs-pipeline`
-// - Case Management Projects: `case-management-project`
-// - Monitor Notification Rules: `monitor-notification-rule`
-// - Status Pages: `status-page`
 //
 // #### Supported relations for resources
 // Resource Type               | Supported Relations
 // ----------------------------|--------------------------
 // Dashboards                  | `viewer`, `editor`
+// Integration Accounts        | `viewer`, `editor`
 // Integration Services        | `viewer`, `editor`
 // Integration Webhooks        | `viewer`, `editor`
 // Notebooks                   | `viewer`, `editor`
@@ -232,13 +213,6 @@ func (r *UpdateRestrictionPolicyOptionalParameters) WithAllowSelfLockout(allowSe
 // RUM Application             | `viewer`, `editor`
 // Cross Org Connections       | `viewer`, `editor`
 // Spreadsheets                | `viewer`, `editor`
-// On-Call Schedules           | `viewer`, `overrider`, `editor`
-// On-Call Escalation Policies | `viewer`, `editor`
-// On-Call Team Routing Rules  | `viewer`, `editor`
-// Logs Pipelines              | `viewer`, `processors_editor`, `editor`
-// Case Management Projects    | `viewer`, `contributor`, `manager`
-// Monitor Notification Rules  | `viewer`, `editor`
-// Status Pages                | `viewer`, `responder`, `manager`
 func (a *RestrictionPoliciesApi) UpdateRestrictionPolicy(ctx _context.Context, resourceId string, body RestrictionPolicyUpdateRequest, o ...UpdateRestrictionPolicyOptionalParameters) (RestrictionPolicyResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod  = _nethttp.MethodPost
@@ -273,19 +247,12 @@ func (a *RestrictionPoliciesApi) UpdateRestrictionPolicy(ctx _context.Context, r
 
 	// body params
 	localVarPostBody = &body
-	if a.Client.Cfg.DelegatedTokenConfig != nil {
-		err = datadog.UseDelegatedTokenAuth(ctx, &localVarHeaderParams, a.Client.Cfg.DelegatedTokenConfig)
-		if err != nil {
-			return localVarReturnValue, nil, err
-		}
-	} else {
-		datadog.SetAuthKeys(
-			ctx,
-			&localVarHeaderParams,
-			[2]string{"apiKeyAuth", "DD-API-KEY"},
-			[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
-		)
-	}
+	datadog.SetAuthKeys(
+		ctx,
+		&localVarHeaderParams,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"},
+	)
 	req, err := a.Client.PrepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, nil)
 	if err != nil {
 		return localVarReturnValue, nil, err

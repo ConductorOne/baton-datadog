@@ -14,7 +14,7 @@ import (
 type CaseCreateRelationships struct {
 	// Relationship to user.
 	Assignee NullableNullableUserRelationship `json:"assignee,omitempty"`
-	// Relationship to project.
+	// Relationship to project
 	Project ProjectRelationship `json:"project"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -131,7 +131,7 @@ func (o *CaseCreateRelationships) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field project missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"assignee", "project"})
 	} else {
 		return err

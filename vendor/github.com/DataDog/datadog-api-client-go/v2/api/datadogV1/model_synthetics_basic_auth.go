@@ -16,7 +16,6 @@ type SyntheticsBasicAuth struct {
 	SyntheticsBasicAuthDigest      *SyntheticsBasicAuthDigest
 	SyntheticsBasicAuthOauthClient *SyntheticsBasicAuthOauthClient
 	SyntheticsBasicAuthOauthROP    *SyntheticsBasicAuthOauthROP
-	SyntheticsBasicAuthJWT         *SyntheticsBasicAuthJWT
 
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject interface{}
@@ -50,11 +49,6 @@ func SyntheticsBasicAuthOauthClientAsSyntheticsBasicAuth(v *SyntheticsBasicAuthO
 // SyntheticsBasicAuthOauthROPAsSyntheticsBasicAuth is a convenience function that returns SyntheticsBasicAuthOauthROP wrapped in SyntheticsBasicAuth.
 func SyntheticsBasicAuthOauthROPAsSyntheticsBasicAuth(v *SyntheticsBasicAuthOauthROP) SyntheticsBasicAuth {
 	return SyntheticsBasicAuth{SyntheticsBasicAuthOauthROP: v}
-}
-
-// SyntheticsBasicAuthJWTAsSyntheticsBasicAuth is a convenience function that returns SyntheticsBasicAuthJWT wrapped in SyntheticsBasicAuth.
-func SyntheticsBasicAuthJWTAsSyntheticsBasicAuth(v *SyntheticsBasicAuthJWT) SyntheticsBasicAuth {
-	return SyntheticsBasicAuth{SyntheticsBasicAuthJWT: v}
 }
 
 // UnmarshalJSON turns data into one of the pointers in the struct.
@@ -163,23 +157,6 @@ func (obj *SyntheticsBasicAuth) UnmarshalJSON(data []byte) error {
 		obj.SyntheticsBasicAuthOauthROP = nil
 	}
 
-	// try to unmarshal data into SyntheticsBasicAuthJWT
-	err = datadog.Unmarshal(data, &obj.SyntheticsBasicAuthJWT)
-	if err == nil {
-		if obj.SyntheticsBasicAuthJWT != nil && obj.SyntheticsBasicAuthJWT.UnparsedObject == nil {
-			jsonSyntheticsBasicAuthJWT, _ := datadog.Marshal(obj.SyntheticsBasicAuthJWT)
-			if string(jsonSyntheticsBasicAuthJWT) == "{}" { // empty struct
-				obj.SyntheticsBasicAuthJWT = nil
-			} else {
-				match++
-			}
-		} else {
-			obj.SyntheticsBasicAuthJWT = nil
-		}
-	} else {
-		obj.SyntheticsBasicAuthJWT = nil
-	}
-
 	if match != 1 { // more than 1 match
 		// reset to nil
 		obj.SyntheticsBasicAuthWeb = nil
@@ -188,7 +165,6 @@ func (obj *SyntheticsBasicAuth) UnmarshalJSON(data []byte) error {
 		obj.SyntheticsBasicAuthDigest = nil
 		obj.SyntheticsBasicAuthOauthClient = nil
 		obj.SyntheticsBasicAuthOauthROP = nil
-		obj.SyntheticsBasicAuthJWT = nil
 		return datadog.Unmarshal(data, &obj.UnparsedObject)
 	}
 	return nil // exactly one match
@@ -218,10 +194,6 @@ func (obj SyntheticsBasicAuth) MarshalJSON() ([]byte, error) {
 
 	if obj.SyntheticsBasicAuthOauthROP != nil {
 		return datadog.Marshal(&obj.SyntheticsBasicAuthOauthROP)
-	}
-
-	if obj.SyntheticsBasicAuthJWT != nil {
-		return datadog.Marshal(&obj.SyntheticsBasicAuthJWT)
 	}
 
 	if obj.UnparsedObject != nil {
@@ -254,10 +226,6 @@ func (obj *SyntheticsBasicAuth) GetActualInstance() interface{} {
 
 	if obj.SyntheticsBasicAuthOauthROP != nil {
 		return obj.SyntheticsBasicAuthOauthROP
-	}
-
-	if obj.SyntheticsBasicAuthJWT != nil {
-		return obj.SyntheticsBasicAuthJWT
 	}
 
 	// all schemas are nil

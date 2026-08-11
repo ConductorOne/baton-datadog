@@ -32,8 +32,8 @@ type HourlyUsageAttributionBody struct {
 	TotalUsageSum *float64 `json:"total_usage_sum,omitempty"`
 	// Shows the most recent hour in the current month for all organizations where usages are calculated.
 	UpdatedAt *string `json:"updated_at,omitempty"`
-	// Supported products for hourly usage attribution requests. Usage types are in the format `<usage_type>_usage`.
-	// To obtain the complete list of valid usage types, make a request to the [Get usage attribution types API](https://docs.datadoghq.com/api/latest/usage-metering/#get-usage-attribution-types).
+	// Supported products for hourly usage attribution requests.
+	// The following values have been **deprecated**: `estimated_indexed_spans_usage`, `estimated_ingested_spans_usage`.
 	UsageType *HourlyUsageAttributionUsageType `json:"usage_type,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -371,7 +371,7 @@ func (o *HourlyUsageAttributionBody) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"hour", "org_name", "public_id", "region", "tag_config_source", "tags", "total_usage_sum", "updated_at", "usage_type"})
 	} else {
 		return err

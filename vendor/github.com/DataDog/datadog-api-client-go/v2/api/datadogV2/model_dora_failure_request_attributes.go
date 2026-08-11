@@ -10,25 +10,25 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// DORAFailureRequestAttributes Attributes to create a DORA incident event.
+// DORAFailureRequestAttributes Attributes to create a DORA failure event.
 type DORAFailureRequestAttributes struct {
 	// A list of user-defined tags. The tags must follow the `key:value` pattern. Up to 100 may be added per event.
 	CustomTags datadog.NullableList[string] `json:"custom_tags,omitempty"`
-	// Environment name that was impacted by the incident.
+	// Environment name that was impacted by the failure.
 	Env *string `json:"env,omitempty"`
-	// Unix timestamp when the incident finished. It must be in nanoseconds, milliseconds, or seconds.
+	// Unix timestamp when the failure finished. It must be in nanoseconds, milliseconds, or seconds, and it should not be older than 1 hour.
 	FinishedAt *int64 `json:"finished_at,omitempty"`
 	// Git info for DORA Metrics events.
 	Git *DORAGitInfo `json:"git,omitempty"`
-	// Incident ID. Must be 16-128 characters and contain only alphanumeric characters, hyphens, underscores, periods, and colons (a-z, A-Z, 0-9, -, _, ., :).
+	// Failure ID. Must have at least 16 characters. Required to update a previously sent failure.
 	Id *string `json:"id,omitempty"`
-	// Incident name.
+	// Failure name.
 	Name *string `json:"name,omitempty"`
-	// Service names impacted by the incident. If possible, use names registered in the Service Catalog. Required when the team field is not provided.
+	// Service names impacted by the failure. If possible, use names registered in the Service Catalog. Required when the team field is not provided.
 	Services []string `json:"services,omitempty"`
-	// Incident severity.
+	// Failure severity.
 	Severity *string `json:"severity,omitempty"`
-	// Unix timestamp when the incident started. It must be in nanoseconds, milliseconds, or seconds.
+	// Unix timestamp when the failure started. It must be in nanoseconds, milliseconds, or seconds.
 	StartedAt int64 `json:"started_at"`
 	// Name of the team owning the services impacted. If possible, use team handles registered in Datadog. Required when the services field is not provided.
 	Team *string `json:"team,omitempty"`
@@ -437,7 +437,7 @@ func (o *DORAFailureRequestAttributes) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field started_at missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"custom_tags", "env", "finished_at", "git", "id", "name", "services", "severity", "started_at", "team", "version"})
 	} else {
 		return err

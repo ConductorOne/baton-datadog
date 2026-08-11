@@ -12,7 +12,7 @@ import (
 
 // MetricNotebookAsset A notebook object with title.
 type MetricNotebookAsset struct {
-	// Assets related to the object, including title, url, and tags.
+	// Assets related to the object, including title and url.
 	Attributes *MetricAssetAttributes `json:"attributes,omitempty"`
 	// The related notebook's ID.
 	Id string `json:"id"`
@@ -151,7 +151,7 @@ func (o *MetricNotebookAsset) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"attributes", "id", "type"})
 	} else {
 		return err

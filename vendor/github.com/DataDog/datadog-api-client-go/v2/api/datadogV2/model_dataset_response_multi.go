@@ -5,13 +5,15 @@
 package datadogV2
 
 import (
+	"fmt"
+
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
 // DatasetResponseMulti Response containing a list of datasets.
 type DatasetResponseMulti struct {
 	// The list of datasets returned in response.
-	Data []DatasetResponse `json:"data,omitempty"`
+	Data []Dataset `json:"data"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -21,8 +23,9 @@ type DatasetResponseMulti struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewDatasetResponseMulti() *DatasetResponseMulti {
+func NewDatasetResponseMulti(data []Dataset) *DatasetResponseMulti {
 	this := DatasetResponseMulti{}
+	this.Data = data
 	return &this
 }
 
@@ -34,31 +37,26 @@ func NewDatasetResponseMultiWithDefaults() *DatasetResponseMulti {
 	return &this
 }
 
-// GetData returns the Data field value if set, zero value otherwise.
-func (o *DatasetResponseMulti) GetData() []DatasetResponse {
-	if o == nil || o.Data == nil {
-		var ret []DatasetResponse
+// GetData returns the Data field value.
+func (o *DatasetResponseMulti) GetData() []Dataset {
+	if o == nil {
+		var ret []Dataset
 		return ret
 	}
 	return o.Data
 }
 
-// GetDataOk returns a tuple with the Data field value if set, nil otherwise
+// GetDataOk returns a tuple with the Data field value
 // and a boolean to check if the value has been set.
-func (o *DatasetResponseMulti) GetDataOk() (*[]DatasetResponse, bool) {
-	if o == nil || o.Data == nil {
+func (o *DatasetResponseMulti) GetDataOk() (*[]Dataset, bool) {
+	if o == nil {
 		return nil, false
 	}
 	return &o.Data, true
 }
 
-// HasData returns a boolean if a field has been set.
-func (o *DatasetResponseMulti) HasData() bool {
-	return o != nil && o.Data != nil
-}
-
-// SetData gets a reference to the given []DatasetResponse and assigns it to the Data field.
-func (o *DatasetResponseMulti) SetData(v []DatasetResponse) {
+// SetData sets field value.
+func (o *DatasetResponseMulti) SetData(v []Dataset) {
 	o.Data = v
 }
 
@@ -68,9 +66,7 @@ func (o DatasetResponseMulti) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.Data != nil {
-		toSerialize["data"] = o.Data
-	}
+	toSerialize["data"] = o.Data
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -81,18 +77,21 @@ func (o DatasetResponseMulti) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *DatasetResponseMulti) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Data []DatasetResponse `json:"data,omitempty"`
+		Data *[]Dataset `json:"data"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
+	if all.Data == nil {
+		return fmt.Errorf("required field data missing")
+	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err
 	}
-	o.Data = all.Data
+	o.Data = *all.Data
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties

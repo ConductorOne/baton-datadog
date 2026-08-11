@@ -10,8 +10,8 @@ import (
 
 // CIAppCreatePipelineEventRequest Request object.
 type CIAppCreatePipelineEventRequest struct {
-	// Data of the pipeline events to create.
-	Data *CIAppCreatePipelineEventRequestDataSingleOrArray `json:"data,omitempty"`
+	// Data of the pipeline event to create.
+	Data *CIAppCreatePipelineEventRequestData `json:"data,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -35,9 +35,9 @@ func NewCIAppCreatePipelineEventRequestWithDefaults() *CIAppCreatePipelineEventR
 }
 
 // GetData returns the Data field value if set, zero value otherwise.
-func (o *CIAppCreatePipelineEventRequest) GetData() CIAppCreatePipelineEventRequestDataSingleOrArray {
+func (o *CIAppCreatePipelineEventRequest) GetData() CIAppCreatePipelineEventRequestData {
 	if o == nil || o.Data == nil {
-		var ret CIAppCreatePipelineEventRequestDataSingleOrArray
+		var ret CIAppCreatePipelineEventRequestData
 		return ret
 	}
 	return *o.Data
@@ -45,7 +45,7 @@ func (o *CIAppCreatePipelineEventRequest) GetData() CIAppCreatePipelineEventRequ
 
 // GetDataOk returns a tuple with the Data field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CIAppCreatePipelineEventRequest) GetDataOk() (*CIAppCreatePipelineEventRequestDataSingleOrArray, bool) {
+func (o *CIAppCreatePipelineEventRequest) GetDataOk() (*CIAppCreatePipelineEventRequestData, bool) {
 	if o == nil || o.Data == nil {
 		return nil, false
 	}
@@ -57,8 +57,8 @@ func (o *CIAppCreatePipelineEventRequest) HasData() bool {
 	return o != nil && o.Data != nil
 }
 
-// SetData gets a reference to the given CIAppCreatePipelineEventRequestDataSingleOrArray and assigns it to the Data field.
-func (o *CIAppCreatePipelineEventRequest) SetData(v CIAppCreatePipelineEventRequestDataSingleOrArray) {
+// SetData gets a reference to the given CIAppCreatePipelineEventRequestData and assigns it to the Data field.
+func (o *CIAppCreatePipelineEventRequest) SetData(v CIAppCreatePipelineEventRequestData) {
 	o.Data = &v
 }
 
@@ -81,21 +81,30 @@ func (o CIAppCreatePipelineEventRequest) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *CIAppCreatePipelineEventRequest) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Data *CIAppCreatePipelineEventRequestDataSingleOrArray `json:"data,omitempty"`
+		Data *CIAppCreatePipelineEventRequestData `json:"data,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err
+	}
+
+	hasInvalidField := false
+	if all.Data != nil && all.Data.UnparsedObject != nil && o.UnparsedObject == nil {
+		hasInvalidField = true
 	}
 	o.Data = all.Data
 
 	if len(additionalProperties) > 0 {
 		o.AdditionalProperties = additionalProperties
+	}
+
+	if hasInvalidField {
+		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 
 	return nil

@@ -11,19 +11,15 @@ import (
 )
 
 // ObservabilityPipelineKafkaSource The `kafka` source ingests data from Apache Kafka topics.
-//
-// **Supported pipeline types:** logs
 type ObservabilityPipelineKafkaSource struct {
-	// Name of the environment variable or secret that holds the Kafka bootstrap servers list.
-	BootstrapServersKey *string `json:"bootstrap_servers_key,omitempty"`
 	// Consumer group ID used by the Kafka client.
 	GroupId string `json:"group_id"`
-	// The unique identifier for this component. Used in other parts of the pipeline to reference this component (for example, as the `input` to downstream components).
+	// The unique identifier for this component. Used to reference this component in other parts of the pipeline (e.g., as input to downstream components).
 	Id string `json:"id"`
 	// Optional list of advanced Kafka client configuration options, defined as key-value pairs.
-	LibrdkafkaOptions []ObservabilityPipelineKafkaLibrdkafkaOption `json:"librdkafka_options,omitempty"`
+	LibrdkafkaOptions []ObservabilityPipelineKafkaSourceLibrdkafkaOption `json:"librdkafka_options,omitempty"`
 	// Specifies the SASL mechanism for authenticating with a Kafka cluster.
-	Sasl *ObservabilityPipelineKafkaSasl `json:"sasl,omitempty"`
+	Sasl *ObservabilityPipelineKafkaSourceSasl `json:"sasl,omitempty"`
 	// Configuration for enabling TLS encryption between the pipeline component and external services.
 	Tls *ObservabilityPipelineTls `json:"tls,omitempty"`
 	// A list of Kafka topic names to subscribe to. The source ingests messages from each topic specified.
@@ -56,34 +52,6 @@ func NewObservabilityPipelineKafkaSourceWithDefaults() *ObservabilityPipelineKaf
 	var typeVar ObservabilityPipelineKafkaSourceType = OBSERVABILITYPIPELINEKAFKASOURCETYPE_KAFKA
 	this.Type = typeVar
 	return &this
-}
-
-// GetBootstrapServersKey returns the BootstrapServersKey field value if set, zero value otherwise.
-func (o *ObservabilityPipelineKafkaSource) GetBootstrapServersKey() string {
-	if o == nil || o.BootstrapServersKey == nil {
-		var ret string
-		return ret
-	}
-	return *o.BootstrapServersKey
-}
-
-// GetBootstrapServersKeyOk returns a tuple with the BootstrapServersKey field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineKafkaSource) GetBootstrapServersKeyOk() (*string, bool) {
-	if o == nil || o.BootstrapServersKey == nil {
-		return nil, false
-	}
-	return o.BootstrapServersKey, true
-}
-
-// HasBootstrapServersKey returns a boolean if a field has been set.
-func (o *ObservabilityPipelineKafkaSource) HasBootstrapServersKey() bool {
-	return o != nil && o.BootstrapServersKey != nil
-}
-
-// SetBootstrapServersKey gets a reference to the given string and assigns it to the BootstrapServersKey field.
-func (o *ObservabilityPipelineKafkaSource) SetBootstrapServersKey(v string) {
-	o.BootstrapServersKey = &v
 }
 
 // GetGroupId returns the GroupId field value.
@@ -133,9 +101,9 @@ func (o *ObservabilityPipelineKafkaSource) SetId(v string) {
 }
 
 // GetLibrdkafkaOptions returns the LibrdkafkaOptions field value if set, zero value otherwise.
-func (o *ObservabilityPipelineKafkaSource) GetLibrdkafkaOptions() []ObservabilityPipelineKafkaLibrdkafkaOption {
+func (o *ObservabilityPipelineKafkaSource) GetLibrdkafkaOptions() []ObservabilityPipelineKafkaSourceLibrdkafkaOption {
 	if o == nil || o.LibrdkafkaOptions == nil {
-		var ret []ObservabilityPipelineKafkaLibrdkafkaOption
+		var ret []ObservabilityPipelineKafkaSourceLibrdkafkaOption
 		return ret
 	}
 	return o.LibrdkafkaOptions
@@ -143,7 +111,7 @@ func (o *ObservabilityPipelineKafkaSource) GetLibrdkafkaOptions() []Observabilit
 
 // GetLibrdkafkaOptionsOk returns a tuple with the LibrdkafkaOptions field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineKafkaSource) GetLibrdkafkaOptionsOk() (*[]ObservabilityPipelineKafkaLibrdkafkaOption, bool) {
+func (o *ObservabilityPipelineKafkaSource) GetLibrdkafkaOptionsOk() (*[]ObservabilityPipelineKafkaSourceLibrdkafkaOption, bool) {
 	if o == nil || o.LibrdkafkaOptions == nil {
 		return nil, false
 	}
@@ -155,15 +123,15 @@ func (o *ObservabilityPipelineKafkaSource) HasLibrdkafkaOptions() bool {
 	return o != nil && o.LibrdkafkaOptions != nil
 }
 
-// SetLibrdkafkaOptions gets a reference to the given []ObservabilityPipelineKafkaLibrdkafkaOption and assigns it to the LibrdkafkaOptions field.
-func (o *ObservabilityPipelineKafkaSource) SetLibrdkafkaOptions(v []ObservabilityPipelineKafkaLibrdkafkaOption) {
+// SetLibrdkafkaOptions gets a reference to the given []ObservabilityPipelineKafkaSourceLibrdkafkaOption and assigns it to the LibrdkafkaOptions field.
+func (o *ObservabilityPipelineKafkaSource) SetLibrdkafkaOptions(v []ObservabilityPipelineKafkaSourceLibrdkafkaOption) {
 	o.LibrdkafkaOptions = v
 }
 
 // GetSasl returns the Sasl field value if set, zero value otherwise.
-func (o *ObservabilityPipelineKafkaSource) GetSasl() ObservabilityPipelineKafkaSasl {
+func (o *ObservabilityPipelineKafkaSource) GetSasl() ObservabilityPipelineKafkaSourceSasl {
 	if o == nil || o.Sasl == nil {
-		var ret ObservabilityPipelineKafkaSasl
+		var ret ObservabilityPipelineKafkaSourceSasl
 		return ret
 	}
 	return *o.Sasl
@@ -171,7 +139,7 @@ func (o *ObservabilityPipelineKafkaSource) GetSasl() ObservabilityPipelineKafkaS
 
 // GetSaslOk returns a tuple with the Sasl field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ObservabilityPipelineKafkaSource) GetSaslOk() (*ObservabilityPipelineKafkaSasl, bool) {
+func (o *ObservabilityPipelineKafkaSource) GetSaslOk() (*ObservabilityPipelineKafkaSourceSasl, bool) {
 	if o == nil || o.Sasl == nil {
 		return nil, false
 	}
@@ -183,8 +151,8 @@ func (o *ObservabilityPipelineKafkaSource) HasSasl() bool {
 	return o != nil && o.Sasl != nil
 }
 
-// SetSasl gets a reference to the given ObservabilityPipelineKafkaSasl and assigns it to the Sasl field.
-func (o *ObservabilityPipelineKafkaSource) SetSasl(v ObservabilityPipelineKafkaSasl) {
+// SetSasl gets a reference to the given ObservabilityPipelineKafkaSourceSasl and assigns it to the Sasl field.
+func (o *ObservabilityPipelineKafkaSource) SetSasl(v ObservabilityPipelineKafkaSourceSasl) {
 	o.Sasl = &v
 }
 
@@ -268,9 +236,6 @@ func (o ObservabilityPipelineKafkaSource) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.BootstrapServersKey != nil {
-		toSerialize["bootstrap_servers_key"] = o.BootstrapServersKey
-	}
 	toSerialize["group_id"] = o.GroupId
 	toSerialize["id"] = o.Id
 	if o.LibrdkafkaOptions != nil {
@@ -294,14 +259,13 @@ func (o ObservabilityPipelineKafkaSource) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *ObservabilityPipelineKafkaSource) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		BootstrapServersKey *string                                      `json:"bootstrap_servers_key,omitempty"`
-		GroupId             *string                                      `json:"group_id"`
-		Id                  *string                                      `json:"id"`
-		LibrdkafkaOptions   []ObservabilityPipelineKafkaLibrdkafkaOption `json:"librdkafka_options,omitempty"`
-		Sasl                *ObservabilityPipelineKafkaSasl              `json:"sasl,omitempty"`
-		Tls                 *ObservabilityPipelineTls                    `json:"tls,omitempty"`
-		Topics              *[]string                                    `json:"topics"`
-		Type                *ObservabilityPipelineKafkaSourceType        `json:"type"`
+		GroupId           *string                                            `json:"group_id"`
+		Id                *string                                            `json:"id"`
+		LibrdkafkaOptions []ObservabilityPipelineKafkaSourceLibrdkafkaOption `json:"librdkafka_options,omitempty"`
+		Sasl              *ObservabilityPipelineKafkaSourceSasl              `json:"sasl,omitempty"`
+		Tls               *ObservabilityPipelineTls                          `json:"tls,omitempty"`
+		Topics            *[]string                                          `json:"topics"`
+		Type              *ObservabilityPipelineKafkaSourceType              `json:"type"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
@@ -319,14 +283,13 @@ func (o *ObservabilityPipelineKafkaSource) UnmarshalJSON(bytes []byte) (err erro
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"bootstrap_servers_key", "group_id", "id", "librdkafka_options", "sasl", "tls", "topics", "type"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"group_id", "id", "librdkafka_options", "sasl", "tls", "topics", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	o.BootstrapServersKey = all.BootstrapServersKey
 	o.GroupId = *all.GroupId
 	o.Id = *all.Id
 	o.LibrdkafkaOptions = all.LibrdkafkaOptions

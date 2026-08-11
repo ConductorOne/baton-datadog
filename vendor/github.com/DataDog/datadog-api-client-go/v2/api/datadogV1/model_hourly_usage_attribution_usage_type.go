@@ -10,8 +10,8 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// HourlyUsageAttributionUsageType Supported products for hourly usage attribution requests. Usage types are in the format `<usage_type>_usage`.
-// To obtain the complete list of valid usage types, make a request to the [Get usage attribution types API](https://docs.datadoghq.com/api/latest/usage-metering/#get-usage-attribution-types).
+// HourlyUsageAttributionUsageType Supported products for hourly usage attribution requests.
+// The following values have been **deprecated**: `estimated_indexed_spans_usage`, `estimated_ingested_spans_usage`.
 type HourlyUsageAttributionUsageType string
 
 // List of HourlyUsageAttributionUsageType.
@@ -24,10 +24,7 @@ const (
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_APPSEC_USAGE                                   HourlyUsageAttributionUsageType = "appsec_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_ASM_SERVERLESS_TRACED_INVOCATIONS_USAGE        HourlyUsageAttributionUsageType = "asm_serverless_traced_invocations_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_ASM_SERVERLESS_TRACED_INVOCATIONS_PERCENTAGE   HourlyUsageAttributionUsageType = "asm_serverless_traced_invocations_percentage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_BITS_AI_INVESTIGATIONS_USAGE                   HourlyUsageAttributionUsageType = "bits_ai_investigations_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_BROWSER_USAGE                                  HourlyUsageAttributionUsageType = "browser_usage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_CODE_COVERAGE_COMMITTERS_PERCENTAGE         HourlyUsageAttributionUsageType = "ci_code_coverage_committers_percentage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_CODE_COVERAGE_COMMITTERS_USAGE              HourlyUsageAttributionUsageType = "ci_code_coverage_committers_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_PIPELINE_INDEXED_SPANS_USAGE                HourlyUsageAttributionUsageType = "ci_pipeline_indexed_spans_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_TEST_INDEXED_SPANS_USAGE                    HourlyUsageAttributionUsageType = "ci_test_indexed_spans_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_VISIBILITY_ITR_USAGE                        HourlyUsageAttributionUsageType = "ci_visibility_itr_usage"
@@ -52,19 +49,15 @@ const (
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_ESTIMATED_INDEXED_SPANS_USAGE                  HourlyUsageAttributionUsageType = "estimated_indexed_spans_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_ESTIMATED_INGESTED_SPANS_USAGE                 HourlyUsageAttributionUsageType = "estimated_ingested_spans_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_FARGATE_USAGE                                  HourlyUsageAttributionUsageType = "fargate_usage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_FLEX_LOGS_STARTER                              HourlyUsageAttributionUsageType = "flex_logs_starter"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_FLEX_STORED_LOGS                               HourlyUsageAttributionUsageType = "flex_stored_logs"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_FUNCTIONS_USAGE                                HourlyUsageAttributionUsageType = "functions_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INCIDENT_MANAGEMENT_MONTHLY_ACTIVE_USERS_USAGE HourlyUsageAttributionUsageType = "incident_management_monthly_active_users_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INDEXED_SPANS_USAGE                            HourlyUsageAttributionUsageType = "indexed_spans_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INFRA_HOST_USAGE                               HourlyUsageAttributionUsageType = "infra_host_usage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INFRA_HOST_BASIC_USAGE                         HourlyUsageAttributionUsageType = "infra_host_basic_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INGESTED_LOGS_BYTES_USAGE                      HourlyUsageAttributionUsageType = "ingested_logs_bytes_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INGESTED_SPANS_BYTES_USAGE                     HourlyUsageAttributionUsageType = "ingested_spans_bytes_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INVOCATIONS_USAGE                              HourlyUsageAttributionUsageType = "invocations_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LAMBDA_TRACED_INVOCATIONS_USAGE                HourlyUsageAttributionUsageType = "lambda_traced_invocations_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LLM_OBSERVABILITY_USAGE                        HourlyUsageAttributionUsageType = "llm_observability_usage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LLM_SPANS_USAGE                                HourlyUsageAttributionUsageType = "llm_spans_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LOGS_INDEXED_15DAY_USAGE                       HourlyUsageAttributionUsageType = "logs_indexed_15day_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LOGS_INDEXED_180DAY_USAGE                      HourlyUsageAttributionUsageType = "logs_indexed_180day_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LOGS_INDEXED_1DAY_USAGE                        HourlyUsageAttributionUsageType = "logs_indexed_1day_usage"
@@ -96,9 +89,6 @@ const (
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SCA_FARGATE_USAGE                              HourlyUsageAttributionUsageType = "sca_fargate_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SDS_SCANNED_BYTES_USAGE                        HourlyUsageAttributionUsageType = "sds_scanned_bytes_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SERVERLESS_APPS_USAGE                          HourlyUsageAttributionUsageType = "serverless_apps_usage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SERVERLESS_APPS_APM_USAGE                      HourlyUsageAttributionUsageType = "serverless_apps_apm_usage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SIEM_12MO_RETENTION_USAGE                      HourlyUsageAttributionUsageType = "siem_12mo_retention_usage"
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SIEM_6MO_RETENTION_USAGE                       HourlyUsageAttributionUsageType = "siem_6mo_retention_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SIEM_ANALYZED_LOGS_ADD_ON_USAGE                HourlyUsageAttributionUsageType = "siem_analyzed_logs_add_on_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SIEM_INGESTED_BYTES_USAGE                      HourlyUsageAttributionUsageType = "siem_ingested_bytes_usage"
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SNMP_USAGE                                     HourlyUsageAttributionUsageType = "snmp_usage"
@@ -116,10 +106,7 @@ var allowedHourlyUsageAttributionUsageTypeEnumValues = []HourlyUsageAttributionU
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_APPSEC_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_ASM_SERVERLESS_TRACED_INVOCATIONS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_ASM_SERVERLESS_TRACED_INVOCATIONS_PERCENTAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_BITS_AI_INVESTIGATIONS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_BROWSER_USAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_CODE_COVERAGE_COMMITTERS_PERCENTAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_CODE_COVERAGE_COMMITTERS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_PIPELINE_INDEXED_SPANS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_TEST_INDEXED_SPANS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_CI_VISIBILITY_ITR_USAGE,
@@ -144,19 +131,15 @@ var allowedHourlyUsageAttributionUsageTypeEnumValues = []HourlyUsageAttributionU
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_ESTIMATED_INDEXED_SPANS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_ESTIMATED_INGESTED_SPANS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_FARGATE_USAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_FLEX_LOGS_STARTER,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_FLEX_STORED_LOGS,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_FUNCTIONS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INCIDENT_MANAGEMENT_MONTHLY_ACTIVE_USERS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INDEXED_SPANS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INFRA_HOST_USAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INFRA_HOST_BASIC_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INGESTED_LOGS_BYTES_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INGESTED_SPANS_BYTES_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_INVOCATIONS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LAMBDA_TRACED_INVOCATIONS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LLM_OBSERVABILITY_USAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LLM_SPANS_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LOGS_INDEXED_15DAY_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LOGS_INDEXED_180DAY_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_LOGS_INDEXED_1DAY_USAGE,
@@ -188,9 +171,6 @@ var allowedHourlyUsageAttributionUsageTypeEnumValues = []HourlyUsageAttributionU
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SCA_FARGATE_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SDS_SCANNED_BYTES_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SERVERLESS_APPS_USAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SERVERLESS_APPS_APM_USAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SIEM_12MO_RETENTION_USAGE,
-	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SIEM_6MO_RETENTION_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SIEM_ANALYZED_LOGS_ADD_ON_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SIEM_INGESTED_BYTES_USAGE,
 	HOURLYUSAGEATTRIBUTIONUSAGETYPE_SNMP_USAGE,

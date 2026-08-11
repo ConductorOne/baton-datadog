@@ -18,9 +18,7 @@ type SyntheticsTestRequest struct {
 	Body *string `json:"body,omitempty"`
 	// Type of the request body.
 	BodyType *SyntheticsTestRequestBodyType `json:"bodyType,omitempty"`
-	// The type of call to perform. Used by gRPC steps (`healthcheck`, `unary`)
-	// and MCP steps (`init`, `tool_list`, `tool_call`). Valid values depend on
-	// the parent step's `subtype`.
+	// The type of gRPC call to perform.
 	CallType *SyntheticsTestCallType `json:"callType,omitempty"`
 	// Client certificate to use when performing the test request.
 	Certificate *SyntheticsTestRequestCertificate `json:"certificate,omitempty"`
@@ -32,8 +30,6 @@ type SyntheticsTestRequest struct {
 	CompressedJsonDescriptor *string `json:"compressedJsonDescriptor,omitempty"`
 	// A protobuf file that needs to be gzipped first then base64 encoded.
 	CompressedProtoFile *string `json:"compressedProtoFile,omitempty"`
-	// Disable fetching intermediate certificates from AIA.
-	DisableAiaIntermediateFetching *bool `json:"disableAiaIntermediateFetching,omitempty"`
 	// DNS server to use for DNS tests.
 	DnsServer *string `json:"dnsServer,omitempty"`
 	// DNS server port to use for DNS tests.
@@ -52,8 +48,6 @@ type SyntheticsTestRequest struct {
 	HttpVersion *SyntheticsTestOptionsHTTPVersion `json:"httpVersion,omitempty"`
 	// Whether the message is base64 encoded.
 	IsMessageBase64Encoded *bool `json:"isMessageBase64Encoded,omitempty"`
-	// The MCP protocol version used by the step. See https://modelcontextprotocol.io/specification.
-	McpProtocolVersion *SyntheticsMCPProtocolVersion `json:"mcpProtocolVersion,omitempty"`
 	// Message to send for UDP or WebSocket tests.
 	Message *string `json:"message,omitempty"`
 	// Metadata to include when performing the gRPC test.
@@ -82,10 +76,6 @@ type SyntheticsTestRequest struct {
 	ShouldTrackHops *bool `json:"shouldTrackHops,omitempty"`
 	// Timeout in seconds for the test.
 	Timeout *float64 `json:"timeout,omitempty"`
-	// Arguments to pass to the MCP tool. Free-form object whose shape depends on the tool. Used when `callType` is `tool_call`.
-	ToolArgs map[string]interface{} `json:"toolArgs,omitempty"`
-	// The name of the MCP tool to call. Required when `callType` is `tool_call`.
-	ToolName *string `json:"toolName,omitempty"`
 	// URL to perform the test with.
 	Url *string `json:"url,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
@@ -390,34 +380,6 @@ func (o *SyntheticsTestRequest) SetCompressedProtoFile(v string) {
 	o.CompressedProtoFile = &v
 }
 
-// GetDisableAiaIntermediateFetching returns the DisableAiaIntermediateFetching field value if set, zero value otherwise.
-func (o *SyntheticsTestRequest) GetDisableAiaIntermediateFetching() bool {
-	if o == nil || o.DisableAiaIntermediateFetching == nil {
-		var ret bool
-		return ret
-	}
-	return *o.DisableAiaIntermediateFetching
-}
-
-// GetDisableAiaIntermediateFetchingOk returns a tuple with the DisableAiaIntermediateFetching field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SyntheticsTestRequest) GetDisableAiaIntermediateFetchingOk() (*bool, bool) {
-	if o == nil || o.DisableAiaIntermediateFetching == nil {
-		return nil, false
-	}
-	return o.DisableAiaIntermediateFetching, true
-}
-
-// HasDisableAiaIntermediateFetching returns a boolean if a field has been set.
-func (o *SyntheticsTestRequest) HasDisableAiaIntermediateFetching() bool {
-	return o != nil && o.DisableAiaIntermediateFetching != nil
-}
-
-// SetDisableAiaIntermediateFetching gets a reference to the given bool and assigns it to the DisableAiaIntermediateFetching field.
-func (o *SyntheticsTestRequest) SetDisableAiaIntermediateFetching(v bool) {
-	o.DisableAiaIntermediateFetching = &v
-}
-
 // GetDnsServer returns the DnsServer field value if set, zero value otherwise.
 func (o *SyntheticsTestRequest) GetDnsServer() string {
 	if o == nil || o.DnsServer == nil {
@@ -668,34 +630,6 @@ func (o *SyntheticsTestRequest) HasIsMessageBase64Encoded() bool {
 // SetIsMessageBase64Encoded gets a reference to the given bool and assigns it to the IsMessageBase64Encoded field.
 func (o *SyntheticsTestRequest) SetIsMessageBase64Encoded(v bool) {
 	o.IsMessageBase64Encoded = &v
-}
-
-// GetMcpProtocolVersion returns the McpProtocolVersion field value if set, zero value otherwise.
-func (o *SyntheticsTestRequest) GetMcpProtocolVersion() SyntheticsMCPProtocolVersion {
-	if o == nil || o.McpProtocolVersion == nil {
-		var ret SyntheticsMCPProtocolVersion
-		return ret
-	}
-	return *o.McpProtocolVersion
-}
-
-// GetMcpProtocolVersionOk returns a tuple with the McpProtocolVersion field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SyntheticsTestRequest) GetMcpProtocolVersionOk() (*SyntheticsMCPProtocolVersion, bool) {
-	if o == nil || o.McpProtocolVersion == nil {
-		return nil, false
-	}
-	return o.McpProtocolVersion, true
-}
-
-// HasMcpProtocolVersion returns a boolean if a field has been set.
-func (o *SyntheticsTestRequest) HasMcpProtocolVersion() bool {
-	return o != nil && o.McpProtocolVersion != nil
-}
-
-// SetMcpProtocolVersion gets a reference to the given SyntheticsMCPProtocolVersion and assigns it to the McpProtocolVersion field.
-func (o *SyntheticsTestRequest) SetMcpProtocolVersion(v SyntheticsMCPProtocolVersion) {
-	o.McpProtocolVersion = &v
 }
 
 // GetMessage returns the Message field value if set, zero value otherwise.
@@ -1062,62 +996,6 @@ func (o *SyntheticsTestRequest) SetTimeout(v float64) {
 	o.Timeout = &v
 }
 
-// GetToolArgs returns the ToolArgs field value if set, zero value otherwise.
-func (o *SyntheticsTestRequest) GetToolArgs() map[string]interface{} {
-	if o == nil || o.ToolArgs == nil {
-		var ret map[string]interface{}
-		return ret
-	}
-	return o.ToolArgs
-}
-
-// GetToolArgsOk returns a tuple with the ToolArgs field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SyntheticsTestRequest) GetToolArgsOk() (*map[string]interface{}, bool) {
-	if o == nil || o.ToolArgs == nil {
-		return nil, false
-	}
-	return &o.ToolArgs, true
-}
-
-// HasToolArgs returns a boolean if a field has been set.
-func (o *SyntheticsTestRequest) HasToolArgs() bool {
-	return o != nil && o.ToolArgs != nil
-}
-
-// SetToolArgs gets a reference to the given map[string]interface{} and assigns it to the ToolArgs field.
-func (o *SyntheticsTestRequest) SetToolArgs(v map[string]interface{}) {
-	o.ToolArgs = v
-}
-
-// GetToolName returns the ToolName field value if set, zero value otherwise.
-func (o *SyntheticsTestRequest) GetToolName() string {
-	if o == nil || o.ToolName == nil {
-		var ret string
-		return ret
-	}
-	return *o.ToolName
-}
-
-// GetToolNameOk returns a tuple with the ToolName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SyntheticsTestRequest) GetToolNameOk() (*string, bool) {
-	if o == nil || o.ToolName == nil {
-		return nil, false
-	}
-	return o.ToolName, true
-}
-
-// HasToolName returns a boolean if a field has been set.
-func (o *SyntheticsTestRequest) HasToolName() bool {
-	return o != nil && o.ToolName != nil
-}
-
-// SetToolName gets a reference to the given string and assigns it to the ToolName field.
-func (o *SyntheticsTestRequest) SetToolName(v string) {
-	o.ToolName = &v
-}
-
 // GetUrl returns the Url field value if set, zero value otherwise.
 func (o *SyntheticsTestRequest) GetUrl() string {
 	if o == nil || o.Url == nil {
@@ -1182,9 +1060,6 @@ func (o SyntheticsTestRequest) MarshalJSON() ([]byte, error) {
 	if o.CompressedProtoFile != nil {
 		toSerialize["compressedProtoFile"] = o.CompressedProtoFile
 	}
-	if o.DisableAiaIntermediateFetching != nil {
-		toSerialize["disableAiaIntermediateFetching"] = o.DisableAiaIntermediateFetching
-	}
 	if o.DnsServer != nil {
 		toSerialize["dnsServer"] = o.DnsServer
 	}
@@ -1211,9 +1086,6 @@ func (o SyntheticsTestRequest) MarshalJSON() ([]byte, error) {
 	}
 	if o.IsMessageBase64Encoded != nil {
 		toSerialize["isMessageBase64Encoded"] = o.IsMessageBase64Encoded
-	}
-	if o.McpProtocolVersion != nil {
-		toSerialize["mcpProtocolVersion"] = o.McpProtocolVersion
 	}
 	if o.Message != nil {
 		toSerialize["message"] = o.Message
@@ -1254,12 +1126,6 @@ func (o SyntheticsTestRequest) MarshalJSON() ([]byte, error) {
 	if o.Timeout != nil {
 		toSerialize["timeout"] = o.Timeout
 	}
-	if o.ToolArgs != nil {
-		toSerialize["toolArgs"] = o.ToolArgs
-	}
-	if o.ToolName != nil {
-		toSerialize["toolName"] = o.ToolName
-	}
 	if o.Url != nil {
 		toSerialize["url"] = o.Url
 	}
@@ -1273,50 +1139,46 @@ func (o SyntheticsTestRequest) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *SyntheticsTestRequest) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		AllowInsecure                  *bool                               `json:"allow_insecure,omitempty"`
-		BasicAuth                      *SyntheticsBasicAuth                `json:"basicAuth,omitempty"`
-		Body                           *string                             `json:"body,omitempty"`
-		BodyType                       *SyntheticsTestRequestBodyType      `json:"bodyType,omitempty"`
-		CallType                       *SyntheticsTestCallType             `json:"callType,omitempty"`
-		Certificate                    *SyntheticsTestRequestCertificate   `json:"certificate,omitempty"`
-		CertificateDomains             []string                            `json:"certificateDomains,omitempty"`
-		CheckCertificateRevocation     *bool                               `json:"checkCertificateRevocation,omitempty"`
-		CompressedJsonDescriptor       *string                             `json:"compressedJsonDescriptor,omitempty"`
-		CompressedProtoFile            *string                             `json:"compressedProtoFile,omitempty"`
-		DisableAiaIntermediateFetching *bool                               `json:"disableAiaIntermediateFetching,omitempty"`
-		DnsServer                      *string                             `json:"dnsServer,omitempty"`
-		DnsServerPort                  *SyntheticsTestRequestDNSServerPort `json:"dnsServerPort,omitempty"`
-		Files                          []SyntheticsTestRequestBodyFile     `json:"files,omitempty"`
-		FollowRedirects                *bool                               `json:"follow_redirects,omitempty"`
-		Form                           map[string]string                   `json:"form,omitempty"`
-		Headers                        map[string]string                   `json:"headers,omitempty"`
-		Host                           *string                             `json:"host,omitempty"`
-		HttpVersion                    *SyntheticsTestOptionsHTTPVersion   `json:"httpVersion,omitempty"`
-		IsMessageBase64Encoded         *bool                               `json:"isMessageBase64Encoded,omitempty"`
-		McpProtocolVersion             *SyntheticsMCPProtocolVersion       `json:"mcpProtocolVersion,omitempty"`
-		Message                        *string                             `json:"message,omitempty"`
-		Metadata                       map[string]string                   `json:"metadata,omitempty"`
-		Method                         *string                             `json:"method,omitempty"`
-		NoSavingResponseBody           *bool                               `json:"noSavingResponseBody,omitempty"`
-		NumberOfPackets                *int32                              `json:"numberOfPackets,omitempty"`
-		PersistCookies                 *bool                               `json:"persistCookies,omitempty"`
-		Port                           *SyntheticsTestRequestPort          `json:"port,omitempty"`
-		Proxy                          *SyntheticsTestRequestProxy         `json:"proxy,omitempty"`
-		Query                          interface{}                         `json:"query,omitempty"`
-		Servername                     *string                             `json:"servername,omitempty"`
-		Service                        *string                             `json:"service,omitempty"`
-		ShouldTrackHops                *bool                               `json:"shouldTrackHops,omitempty"`
-		Timeout                        *float64                            `json:"timeout,omitempty"`
-		ToolArgs                       map[string]interface{}              `json:"toolArgs,omitempty"`
-		ToolName                       *string                             `json:"toolName,omitempty"`
-		Url                            *string                             `json:"url,omitempty"`
+		AllowInsecure              *bool                               `json:"allow_insecure,omitempty"`
+		BasicAuth                  *SyntheticsBasicAuth                `json:"basicAuth,omitempty"`
+		Body                       *string                             `json:"body,omitempty"`
+		BodyType                   *SyntheticsTestRequestBodyType      `json:"bodyType,omitempty"`
+		CallType                   *SyntheticsTestCallType             `json:"callType,omitempty"`
+		Certificate                *SyntheticsTestRequestCertificate   `json:"certificate,omitempty"`
+		CertificateDomains         []string                            `json:"certificateDomains,omitempty"`
+		CheckCertificateRevocation *bool                               `json:"checkCertificateRevocation,omitempty"`
+		CompressedJsonDescriptor   *string                             `json:"compressedJsonDescriptor,omitempty"`
+		CompressedProtoFile        *string                             `json:"compressedProtoFile,omitempty"`
+		DnsServer                  *string                             `json:"dnsServer,omitempty"`
+		DnsServerPort              *SyntheticsTestRequestDNSServerPort `json:"dnsServerPort,omitempty"`
+		Files                      []SyntheticsTestRequestBodyFile     `json:"files,omitempty"`
+		FollowRedirects            *bool                               `json:"follow_redirects,omitempty"`
+		Form                       map[string]string                   `json:"form,omitempty"`
+		Headers                    map[string]string                   `json:"headers,omitempty"`
+		Host                       *string                             `json:"host,omitempty"`
+		HttpVersion                *SyntheticsTestOptionsHTTPVersion   `json:"httpVersion,omitempty"`
+		IsMessageBase64Encoded     *bool                               `json:"isMessageBase64Encoded,omitempty"`
+		Message                    *string                             `json:"message,omitempty"`
+		Metadata                   map[string]string                   `json:"metadata,omitempty"`
+		Method                     *string                             `json:"method,omitempty"`
+		NoSavingResponseBody       *bool                               `json:"noSavingResponseBody,omitempty"`
+		NumberOfPackets            *int32                              `json:"numberOfPackets,omitempty"`
+		PersistCookies             *bool                               `json:"persistCookies,omitempty"`
+		Port                       *SyntheticsTestRequestPort          `json:"port,omitempty"`
+		Proxy                      *SyntheticsTestRequestProxy         `json:"proxy,omitempty"`
+		Query                      interface{}                         `json:"query,omitempty"`
+		Servername                 *string                             `json:"servername,omitempty"`
+		Service                    *string                             `json:"service,omitempty"`
+		ShouldTrackHops            *bool                               `json:"shouldTrackHops,omitempty"`
+		Timeout                    *float64                            `json:"timeout,omitempty"`
+		Url                        *string                             `json:"url,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
-		datadog.DeleteKeys(additionalProperties, &[]string{"allow_insecure", "basicAuth", "body", "bodyType", "callType", "certificate", "certificateDomains", "checkCertificateRevocation", "compressedJsonDescriptor", "compressedProtoFile", "disableAiaIntermediateFetching", "dnsServer", "dnsServerPort", "files", "follow_redirects", "form", "headers", "host", "httpVersion", "isMessageBase64Encoded", "mcpProtocolVersion", "message", "metadata", "method", "noSavingResponseBody", "numberOfPackets", "persistCookies", "port", "proxy", "query", "servername", "service", "shouldTrackHops", "timeout", "toolArgs", "toolName", "url"})
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
+		datadog.DeleteKeys(additionalProperties, &[]string{"allow_insecure", "basicAuth", "body", "bodyType", "callType", "certificate", "certificateDomains", "checkCertificateRevocation", "compressedJsonDescriptor", "compressedProtoFile", "dnsServer", "dnsServerPort", "files", "follow_redirects", "form", "headers", "host", "httpVersion", "isMessageBase64Encoded", "message", "metadata", "method", "noSavingResponseBody", "numberOfPackets", "persistCookies", "port", "proxy", "query", "servername", "service", "shouldTrackHops", "timeout", "url"})
 	} else {
 		return err
 	}
@@ -1343,7 +1205,6 @@ func (o *SyntheticsTestRequest) UnmarshalJSON(bytes []byte) (err error) {
 	o.CheckCertificateRevocation = all.CheckCertificateRevocation
 	o.CompressedJsonDescriptor = all.CompressedJsonDescriptor
 	o.CompressedProtoFile = all.CompressedProtoFile
-	o.DisableAiaIntermediateFetching = all.DisableAiaIntermediateFetching
 	o.DnsServer = all.DnsServer
 	o.DnsServerPort = all.DnsServerPort
 	o.Files = all.Files
@@ -1357,11 +1218,6 @@ func (o *SyntheticsTestRequest) UnmarshalJSON(bytes []byte) (err error) {
 		o.HttpVersion = all.HttpVersion
 	}
 	o.IsMessageBase64Encoded = all.IsMessageBase64Encoded
-	if all.McpProtocolVersion != nil && !all.McpProtocolVersion.IsValid() {
-		hasInvalidField = true
-	} else {
-		o.McpProtocolVersion = all.McpProtocolVersion
-	}
 	o.Message = all.Message
 	o.Metadata = all.Metadata
 	o.Method = all.Method
@@ -1378,8 +1234,6 @@ func (o *SyntheticsTestRequest) UnmarshalJSON(bytes []byte) (err error) {
 	o.Service = all.Service
 	o.ShouldTrackHops = all.ShouldTrackHops
 	o.Timeout = all.Timeout
-	o.ToolArgs = all.ToolArgs
-	o.ToolName = all.ToolName
 	o.Url = all.Url
 
 	if len(additionalProperties) > 0 {

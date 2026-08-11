@@ -15,14 +15,13 @@ type SecurityMonitoringRuleDetectionMethod string
 
 // List of SecurityMonitoringRuleDetectionMethod.
 const (
-	SECURITYMONITORINGRULEDETECTIONMETHOD_THRESHOLD          SecurityMonitoringRuleDetectionMethod = "threshold"
-	SECURITYMONITORINGRULEDETECTIONMETHOD_NEW_VALUE          SecurityMonitoringRuleDetectionMethod = "new_value"
-	SECURITYMONITORINGRULEDETECTIONMETHOD_ANOMALY_DETECTION  SecurityMonitoringRuleDetectionMethod = "anomaly_detection"
-	SECURITYMONITORINGRULEDETECTIONMETHOD_IMPOSSIBLE_TRAVEL  SecurityMonitoringRuleDetectionMethod = "impossible_travel"
-	SECURITYMONITORINGRULEDETECTIONMETHOD_HARDCODED          SecurityMonitoringRuleDetectionMethod = "hardcoded"
-	SECURITYMONITORINGRULEDETECTIONMETHOD_THIRD_PARTY        SecurityMonitoringRuleDetectionMethod = "third_party"
-	SECURITYMONITORINGRULEDETECTIONMETHOD_ANOMALY_THRESHOLD  SecurityMonitoringRuleDetectionMethod = "anomaly_threshold"
-	SECURITYMONITORINGRULEDETECTIONMETHOD_SEQUENCE_DETECTION SecurityMonitoringRuleDetectionMethod = "sequence_detection"
+	SECURITYMONITORINGRULEDETECTIONMETHOD_THRESHOLD         SecurityMonitoringRuleDetectionMethod = "threshold"
+	SECURITYMONITORINGRULEDETECTIONMETHOD_NEW_VALUE         SecurityMonitoringRuleDetectionMethod = "new_value"
+	SECURITYMONITORINGRULEDETECTIONMETHOD_ANOMALY_DETECTION SecurityMonitoringRuleDetectionMethod = "anomaly_detection"
+	SECURITYMONITORINGRULEDETECTIONMETHOD_IMPOSSIBLE_TRAVEL SecurityMonitoringRuleDetectionMethod = "impossible_travel"
+	SECURITYMONITORINGRULEDETECTIONMETHOD_HARDCODED         SecurityMonitoringRuleDetectionMethod = "hardcoded"
+	SECURITYMONITORINGRULEDETECTIONMETHOD_THIRD_PARTY       SecurityMonitoringRuleDetectionMethod = "third_party"
+	SECURITYMONITORINGRULEDETECTIONMETHOD_ANOMALY_THRESHOLD SecurityMonitoringRuleDetectionMethod = "anomaly_threshold"
 )
 
 var allowedSecurityMonitoringRuleDetectionMethodEnumValues = []SecurityMonitoringRuleDetectionMethod{
@@ -33,7 +32,6 @@ var allowedSecurityMonitoringRuleDetectionMethodEnumValues = []SecurityMonitorin
 	SECURITYMONITORINGRULEDETECTIONMETHOD_HARDCODED,
 	SECURITYMONITORINGRULEDETECTIONMETHOD_THIRD_PARTY,
 	SECURITYMONITORINGRULEDETECTIONMETHOD_ANOMALY_THRESHOLD,
-	SECURITYMONITORINGRULEDETECTIONMETHOD_SEQUENCE_DETECTION,
 }
 
 // GetAllowedValues reeturns the list of possible values.

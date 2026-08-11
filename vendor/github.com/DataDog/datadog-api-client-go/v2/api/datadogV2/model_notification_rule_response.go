@@ -14,6 +14,7 @@ type NotificationRuleResponse struct {
 	// They allow users to define the conditions under which a notification should be generated (based on rule severities,
 	// rule types, rule tags, and so on), and the targets to notify.
 	// A notification rule is composed of a rule ID, a rule type, and the rule attributes. All fields are required.
+	//
 	Data *NotificationRule `json:"data,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -90,7 +91,7 @@ func (o *NotificationRuleResponse) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err

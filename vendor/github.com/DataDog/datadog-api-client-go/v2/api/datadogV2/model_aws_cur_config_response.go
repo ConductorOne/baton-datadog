@@ -8,36 +8,36 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// AwsCurConfigResponse The definition of `AwsCurConfigResponse` object.
-type AwsCurConfigResponse struct {
-	// The definition of `AwsCurConfigResponseData` object.
-	Data *AwsCurConfigResponseData `json:"data,omitempty"`
+// AwsCURConfigResponse Response of AWS CUR config.
+type AwsCURConfigResponse struct {
+	// AWS CUR config.
+	Data *AwsCURConfig `json:"data,omitempty"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
-// NewAwsCurConfigResponse instantiates a new AwsCurConfigResponse object.
+// NewAwsCURConfigResponse instantiates a new AwsCURConfigResponse object.
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewAwsCurConfigResponse() *AwsCurConfigResponse {
-	this := AwsCurConfigResponse{}
+func NewAwsCURConfigResponse() *AwsCURConfigResponse {
+	this := AwsCURConfigResponse{}
 	return &this
 }
 
-// NewAwsCurConfigResponseWithDefaults instantiates a new AwsCurConfigResponse object.
+// NewAwsCURConfigResponseWithDefaults instantiates a new AwsCURConfigResponse object.
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set.
-func NewAwsCurConfigResponseWithDefaults() *AwsCurConfigResponse {
-	this := AwsCurConfigResponse{}
+func NewAwsCURConfigResponseWithDefaults() *AwsCURConfigResponse {
+	this := AwsCURConfigResponse{}
 	return &this
 }
 
 // GetData returns the Data field value if set, zero value otherwise.
-func (o *AwsCurConfigResponse) GetData() AwsCurConfigResponseData {
+func (o *AwsCURConfigResponse) GetData() AwsCURConfig {
 	if o == nil || o.Data == nil {
-		var ret AwsCurConfigResponseData
+		var ret AwsCURConfig
 		return ret
 	}
 	return *o.Data
@@ -45,7 +45,7 @@ func (o *AwsCurConfigResponse) GetData() AwsCurConfigResponseData {
 
 // GetDataOk returns a tuple with the Data field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AwsCurConfigResponse) GetDataOk() (*AwsCurConfigResponseData, bool) {
+func (o *AwsCURConfigResponse) GetDataOk() (*AwsCURConfig, bool) {
 	if o == nil || o.Data == nil {
 		return nil, false
 	}
@@ -53,17 +53,17 @@ func (o *AwsCurConfigResponse) GetDataOk() (*AwsCurConfigResponseData, bool) {
 }
 
 // HasData returns a boolean if a field has been set.
-func (o *AwsCurConfigResponse) HasData() bool {
+func (o *AwsCURConfigResponse) HasData() bool {
 	return o != nil && o.Data != nil
 }
 
-// SetData gets a reference to the given AwsCurConfigResponseData and assigns it to the Data field.
-func (o *AwsCurConfigResponse) SetData(v AwsCurConfigResponseData) {
+// SetData gets a reference to the given AwsCURConfig and assigns it to the Data field.
+func (o *AwsCURConfigResponse) SetData(v AwsCURConfig) {
 	o.Data = &v
 }
 
 // MarshalJSON serializes the struct using spec logic.
-func (o AwsCurConfigResponse) MarshalJSON() ([]byte, error) {
+func (o AwsCURConfigResponse) MarshalJSON() ([]byte, error) {
 	toSerialize := map[string]interface{}{}
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
@@ -79,15 +79,15 @@ func (o AwsCurConfigResponse) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON deserializes the given payload.
-func (o *AwsCurConfigResponse) UnmarshalJSON(bytes []byte) (err error) {
+func (o *AwsCURConfigResponse) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Data *AwsCurConfigResponseData `json:"data,omitempty"`
+		Data *AwsCURConfig `json:"data,omitempty"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"data"})
 	} else {
 		return err

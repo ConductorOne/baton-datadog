@@ -50,11 +50,11 @@ type ServiceLevelObjective struct {
 	MonitorTags []string `json:"monitor_tags,omitempty"`
 	// The name of the service level objective object.
 	Name string `json:"name"`
-	// A count-based (metric) SLO query. This field is superseded by `sli_specification` but is retained for backwards compatibility. Note that Datadog only allows the sum by aggregator
+	// A metric-based SLO. **Required if type is `metric`**. Note that Datadog only allows the sum by aggregator
 	// to be used because this will sum up all request counts instead of averaging them, or taking the max or
 	// min of all of those requests.
 	Query *ServiceLevelObjectiveQuery `json:"query,omitempty"`
-	// A generic SLI specification. This is used for time-slice and count-based (metric) SLOs only.
+	// A generic SLI specification. This is currently used for time-slice SLOs only.
 	SliSpecification *SLOSliSpec `json:"sli_specification,omitempty"`
 	// A list of tags associated with this service level objective.
 	// Always included in service level objective responses (but may be empty).
@@ -665,7 +665,7 @@ func (o *ServiceLevelObjective) UnmarshalJSON(bytes []byte) (err error) {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"created_at", "creator", "description", "groups", "id", "modified_at", "monitor_ids", "monitor_tags", "name", "query", "sli_specification", "tags", "target_threshold", "thresholds", "timeframe", "type", "warning_threshold"})
 	} else {
 		return err

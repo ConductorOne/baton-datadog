@@ -10,11 +10,11 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// GCPUsageCostConfigPostData Google Cloud Usage Cost config post data.
+// GCPUsageCostConfigPostData GCP Usage Cost config post data.
 type GCPUsageCostConfigPostData struct {
-	// Attributes for Google Cloud Usage Cost config post request.
-	Attributes *GCPUsageCostConfigPostRequestAttributes `json:"attributes,omitempty"`
-	// Type of Google Cloud Usage Cost config post request.
+	// Attributes for GCP Usage Cost config post request.
+	Attributes GCPUsageCostConfigPostRequestAttributes `json:"attributes"`
+	// Type of GCP Usage Cost config post request.
 	Type GCPUsageCostConfigPostRequestType `json:"type"`
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject       map[string]interface{} `json:"-"`
@@ -25,8 +25,9 @@ type GCPUsageCostConfigPostData struct {
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed.
-func NewGCPUsageCostConfigPostData(typeVar GCPUsageCostConfigPostRequestType) *GCPUsageCostConfigPostData {
+func NewGCPUsageCostConfigPostData(attributes GCPUsageCostConfigPostRequestAttributes, typeVar GCPUsageCostConfigPostRequestType) *GCPUsageCostConfigPostData {
 	this := GCPUsageCostConfigPostData{}
+	this.Attributes = attributes
 	this.Type = typeVar
 	return &this
 }
@@ -41,32 +42,27 @@ func NewGCPUsageCostConfigPostDataWithDefaults() *GCPUsageCostConfigPostData {
 	return &this
 }
 
-// GetAttributes returns the Attributes field value if set, zero value otherwise.
+// GetAttributes returns the Attributes field value.
 func (o *GCPUsageCostConfigPostData) GetAttributes() GCPUsageCostConfigPostRequestAttributes {
-	if o == nil || o.Attributes == nil {
+	if o == nil {
 		var ret GCPUsageCostConfigPostRequestAttributes
 		return ret
 	}
-	return *o.Attributes
+	return o.Attributes
 }
 
-// GetAttributesOk returns a tuple with the Attributes field value if set, nil otherwise
+// GetAttributesOk returns a tuple with the Attributes field value
 // and a boolean to check if the value has been set.
 func (o *GCPUsageCostConfigPostData) GetAttributesOk() (*GCPUsageCostConfigPostRequestAttributes, bool) {
-	if o == nil || o.Attributes == nil {
+	if o == nil {
 		return nil, false
 	}
-	return o.Attributes, true
+	return &o.Attributes, true
 }
 
-// HasAttributes returns a boolean if a field has been set.
-func (o *GCPUsageCostConfigPostData) HasAttributes() bool {
-	return o != nil && o.Attributes != nil
-}
-
-// SetAttributes gets a reference to the given GCPUsageCostConfigPostRequestAttributes and assigns it to the Attributes field.
+// SetAttributes sets field value.
 func (o *GCPUsageCostConfigPostData) SetAttributes(v GCPUsageCostConfigPostRequestAttributes) {
-	o.Attributes = &v
+	o.Attributes = v
 }
 
 // GetType returns the Type field value.
@@ -98,9 +94,7 @@ func (o GCPUsageCostConfigPostData) MarshalJSON() ([]byte, error) {
 	if o.UnparsedObject != nil {
 		return datadog.Marshal(o.UnparsedObject)
 	}
-	if o.Attributes != nil {
-		toSerialize["attributes"] = o.Attributes
-	}
+	toSerialize["attributes"] = o.Attributes
 	toSerialize["type"] = o.Type
 
 	for key, value := range o.AdditionalProperties {
@@ -112,27 +106,30 @@ func (o GCPUsageCostConfigPostData) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON deserializes the given payload.
 func (o *GCPUsageCostConfigPostData) UnmarshalJSON(bytes []byte) (err error) {
 	all := struct {
-		Attributes *GCPUsageCostConfigPostRequestAttributes `json:"attributes,omitempty"`
+		Attributes *GCPUsageCostConfigPostRequestAttributes `json:"attributes"`
 		Type       *GCPUsageCostConfigPostRequestType       `json:"type"`
 	}{}
 	if err = datadog.Unmarshal(bytes, &all); err != nil {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
+	if all.Attributes == nil {
+		return fmt.Errorf("required field attributes missing")
+	}
 	if all.Type == nil {
 		return fmt.Errorf("required field type missing")
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"attributes", "type"})
 	} else {
 		return err
 	}
 
 	hasInvalidField := false
-	if all.Attributes != nil && all.Attributes.UnparsedObject != nil && o.UnparsedObject == nil {
+	if all.Attributes.UnparsedObject != nil && o.UnparsedObject == nil {
 		hasInvalidField = true
 	}
-	o.Attributes = all.Attributes
+	o.Attributes = *all.Attributes
 	if !all.Type.IsValid() {
 		hasInvalidField = true
 	} else {

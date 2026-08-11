@@ -8,10 +8,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// MonitorNotificationRuleFilter - Specifies the matching criteria for monitor notifications.
+// MonitorNotificationRuleFilter - Filter used to associate the notification rule with monitors.
 type MonitorNotificationRuleFilter struct {
-	MonitorNotificationRuleFilterTags  *MonitorNotificationRuleFilterTags
-	MonitorNotificationRuleFilterScope *MonitorNotificationRuleFilterScope
+	MonitorNotificationRuleFilterTags *MonitorNotificationRuleFilterTags
 
 	// UnparsedObject contains the raw value of the object if there was an error when deserializing into the struct
 	UnparsedObject interface{}
@@ -20,11 +19,6 @@ type MonitorNotificationRuleFilter struct {
 // MonitorNotificationRuleFilterTagsAsMonitorNotificationRuleFilter is a convenience function that returns MonitorNotificationRuleFilterTags wrapped in MonitorNotificationRuleFilter.
 func MonitorNotificationRuleFilterTagsAsMonitorNotificationRuleFilter(v *MonitorNotificationRuleFilterTags) MonitorNotificationRuleFilter {
 	return MonitorNotificationRuleFilter{MonitorNotificationRuleFilterTags: v}
-}
-
-// MonitorNotificationRuleFilterScopeAsMonitorNotificationRuleFilter is a convenience function that returns MonitorNotificationRuleFilterScope wrapped in MonitorNotificationRuleFilter.
-func MonitorNotificationRuleFilterScopeAsMonitorNotificationRuleFilter(v *MonitorNotificationRuleFilterScope) MonitorNotificationRuleFilter {
-	return MonitorNotificationRuleFilter{MonitorNotificationRuleFilterScope: v}
 }
 
 // UnmarshalJSON turns data into one of the pointers in the struct.
@@ -48,27 +42,9 @@ func (obj *MonitorNotificationRuleFilter) UnmarshalJSON(data []byte) error {
 		obj.MonitorNotificationRuleFilterTags = nil
 	}
 
-	// try to unmarshal data into MonitorNotificationRuleFilterScope
-	err = datadog.Unmarshal(data, &obj.MonitorNotificationRuleFilterScope)
-	if err == nil {
-		if obj.MonitorNotificationRuleFilterScope != nil && obj.MonitorNotificationRuleFilterScope.UnparsedObject == nil {
-			jsonMonitorNotificationRuleFilterScope, _ := datadog.Marshal(obj.MonitorNotificationRuleFilterScope)
-			if string(jsonMonitorNotificationRuleFilterScope) == "{}" { // empty struct
-				obj.MonitorNotificationRuleFilterScope = nil
-			} else {
-				match++
-			}
-		} else {
-			obj.MonitorNotificationRuleFilterScope = nil
-		}
-	} else {
-		obj.MonitorNotificationRuleFilterScope = nil
-	}
-
 	if match != 1 { // more than 1 match
 		// reset to nil
 		obj.MonitorNotificationRuleFilterTags = nil
-		obj.MonitorNotificationRuleFilterScope = nil
 		return datadog.Unmarshal(data, &obj.UnparsedObject)
 	}
 	return nil // exactly one match
@@ -78,10 +54,6 @@ func (obj *MonitorNotificationRuleFilter) UnmarshalJSON(data []byte) error {
 func (obj MonitorNotificationRuleFilter) MarshalJSON() ([]byte, error) {
 	if obj.MonitorNotificationRuleFilterTags != nil {
 		return datadog.Marshal(&obj.MonitorNotificationRuleFilterTags)
-	}
-
-	if obj.MonitorNotificationRuleFilterScope != nil {
-		return datadog.Marshal(&obj.MonitorNotificationRuleFilterScope)
 	}
 
 	if obj.UnparsedObject != nil {
@@ -94,10 +66,6 @@ func (obj MonitorNotificationRuleFilter) MarshalJSON() ([]byte, error) {
 func (obj *MonitorNotificationRuleFilter) GetActualInstance() interface{} {
 	if obj.MonitorNotificationRuleFilterTags != nil {
 		return obj.MonitorNotificationRuleFilterTags
-	}
-
-	if obj.MonitorNotificationRuleFilterScope != nil {
-		return obj.MonitorNotificationRuleFilterScope
 	}
 
 	// all schemas are nil

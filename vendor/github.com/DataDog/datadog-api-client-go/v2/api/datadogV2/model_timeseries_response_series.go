@@ -8,7 +8,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// TimeseriesResponseSeries A single series in a timeseries query response, containing the query index, unit information, and group tags.
+// TimeseriesResponseSeries
 type TimeseriesResponseSeries struct {
 	// List of tags that apply to a single response value.
 	GroupTags []string `json:"group_tags,omitempty"`
@@ -159,7 +159,7 @@ func (o *TimeseriesResponseSeries) UnmarshalJSON(bytes []byte) (err error) {
 		return datadog.Unmarshal(bytes, &o.UnparsedObject)
 	}
 	additionalProperties := make(map[string]interface{})
-	if err = datadog.UnmarshalUseNumber(bytes, &additionalProperties); err == nil {
+	if err = datadog.Unmarshal(bytes, &additionalProperties); err == nil {
 		datadog.DeleteKeys(additionalProperties, &[]string{"group_tags", "query_index", "unit"})
 	} else {
 		return err
