@@ -8,6 +8,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -20,6 +21,17 @@ type apiTokenBuilder struct {
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
+var _ connectorbuilder.ResourceDeleterV2Limited = &apiTokenBuilder{}
+
+func (o *apiTokenBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId, _ *v2.ResourceId) (annotations.Annotations, error) {
+	if resourceID == nil || resourceID.GetResource() == "" {
+		return nil, fmt.Errorf("baton-datadog: API key id is required")
+	}
+	if err := o.wrapper.DeleteAPIKey(ctx, resourceID.GetResource()); err != nil {
+		return nil, fmt.Errorf("baton-datadog: delete API key: %w", err)
+	}
+	return nil, nil
+}
 
 func (o *apiTokenBuilder) Entitlements(_ context.Context, _ *v2.Resource, _ resource.SyncOpAttrs) ([]*v2.Entitlement, *resource.SyncOpResults, error) {
 	// API Token secrets do not have entitlements

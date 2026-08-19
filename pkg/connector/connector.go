@@ -34,8 +34,12 @@ type Datadog struct {
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
+	userSyncer := connectorbuilder.ResourceSyncerV2(newUserBuilder(d.wrapper))
+	if d.SyncSecrets {
+		userSyncer = newCredentialUserBuilder(d.wrapper)
+	}
 	resourceSyncers := []connectorbuilder.ResourceSyncerV2{
-		newUserBuilder(d.wrapper),
+		userSyncer,
 		newTeamBuilder(d.wrapper),
 		newRoleBuilder(d.wrapper),
 	}
