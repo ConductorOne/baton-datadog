@@ -19,6 +19,41 @@ type userBuilder struct {
 	wrapper      *client.DatadogClient
 }
 
+type credentialUserBuilder struct{ *userBuilder }
+
+func newCredentialUserBuilder(wrapper *client.DatadogClient) *credentialUserBuilder {
+	return &credentialUserBuilder{userBuilder: newUserBuilder(wrapper)}
+}
+
+func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.CredentialDetailsCredentialIssue, annotations.Annotations, error) {
+	return v2.CredentialDetailsCredentialIssue_builder{
+		Options: []*v2.CredentialIssueOptionDescriptor{v2.CredentialIssueOptionDescriptor_builder{
+			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+			SecretResourceTypeId: apiTokenResourceType.Id,
+		}.Build()},
+		PreferredOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+	}.Build(), nil, nil
+}
+
+func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
+	if input == nil || input.IdentityID == nil || input.IdentityID.GetResourceType() != userResourceType.Id {
+		return nil, fmt.Errorf("baton-datadog: a Datadog user identity is required")
+	}
+	name := "c1-" + input.RequestID
+	key, err := u.wrapper.CreateAPIKey(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: create API key: %w", err)
+	}
+	secret, err := rs.NewSecretResource(name, apiTokenResourceType, key.ID,
+		[]rs.SecretTraitOption{rs.WithSecretCreatedByID(input.IdentityID), rs.WithSecretIdentityID(input.IdentityID), rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET), rs.WithSecretDetail("datadog.api_key")},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &connectorbuilder.CredentialIssueOutput{Secret: secret, PlaintextData: []*v2.PlaintextData{v2.PlaintextData_builder{Name: "api_key", Bytes: []byte(key.Secret)}.Build()}, ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE}, nil
+}
+
 var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
 var _ connectorbuilder.AccountManagerV2 = &userBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &userBuilder{}

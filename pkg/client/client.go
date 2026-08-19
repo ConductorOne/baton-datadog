@@ -179,6 +179,42 @@ func (w *DatadogClient) ListAPIKeys(ctx context.Context, params *datadogV2.ListA
 	return &resp, nil
 }
 
+type IssuedAPIKey struct {
+	ID     string
+	Secret string
+}
+
+func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedAPIKey, error) {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewKeyManagementApi(w.officialClient)
+	attrs := *datadogV2.NewAPIKeyCreateAttributes(name)
+	data := *datadogV2.NewAPIKeyCreateData(attrs, datadogV2.APIKEYSTYPE_API_KEYS)
+	response, httpRes, err := api.CreateAPIKey(ctx, *datadogV2.NewAPIKeyCreateRequest(data))
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, wrapOfficialClientError("create API key", httpRes, err)
+	}
+	if response.Data.Id == nil || response.Data.Attributes == nil || response.Data.Attributes.Key == nil || *response.Data.Attributes.Key == "" {
+		return nil, fmt.Errorf("create API key response omitted id or key")
+	}
+	return &IssuedAPIKey{ID: *response.Data.Id, Secret: *response.Data.Attributes.Key}, nil
+}
+
+func (w *DatadogClient) DeleteAPIKey(ctx context.Context, id string) error {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewKeyManagementApi(w.officialClient)
+	httpRes, err := api.DeleteAPIKey(ctx, id)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return wrapOfficialClientError("delete API key", httpRes, err)
+	}
+	return nil
+}
+
 // Wrapper methods that handle HTTP response body closing automatically
 
 // ListRoleUsers lists users for a specific role and automatically handles HTTP response body closing.
