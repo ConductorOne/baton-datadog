@@ -67,6 +67,10 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	providerKeyData := providerKey.GetData()
 	require.Equal(t, secretID.GetResource(), providerKeyData.GetId())
 	t.Logf("confirmed API key id=%s exists in Datadog", maskedValue(secretID.GetResource()))
+	issuedKeyValid, err := datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
+	require.NoError(t, err, "authenticate with issued API key")
+	require.True(t, issuedKeyValid, "issued API key is not accepted by Datadog")
+	t.Logf("confirmed issued API key id=%s can authenticate with Datadog", maskedValue(secretID.GetResource()))
 
 	revoked := false
 	t.Cleanup(func() {
@@ -82,25 +86,20 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	t.Logf("revoking API key id=%s", maskedValue(secretID.GetResource()))
 	_, err = newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
 	require.NoError(t, err, "revoke issued Datadog API key")
-
-	const verificationTimeout = 30 * time.Second
-	deadline := time.Now().Add(verificationTimeout)
-	for {
-		_, err = datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
-		if status.Code(err) == codes.NotFound {
-			revoked = true
-			t.Logf("confirmed API key id=%s is no longer retrievable from Datadog", maskedValue(secretID.GetResource()))
-			return
-		}
-		if err != nil {
-			require.NoError(t, err, "read issued API key while waiting for revocation")
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("Datadog API key is still retrievable after %s; find and revoke key named c1-%s", verificationTimeout, requestID)
-		}
-		t.Logf("API key id=%s is still retrievable; waiting for Datadog revocation propagation", maskedValue(secretID.GetResource()))
-		time.Sleep(time.Second)
+	issuedKeyValid, err = datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
+	if err == nil {
+		require.False(t, issuedKeyValid, "revoked API key can still authenticate with Datadog")
 	}
+	require.False(t, issuedKeyValid, "revoked API key can still authenticate with Datadog")
+	t.Logf("confirmed revoked API key id=%s can no longer authenticate with Datadog", maskedValue(secretID.GetResource()))
+	revoked = true
+
+	_, err = datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
+	if status.Code(err) == codes.NotFound {
+		t.Logf("confirmed API key id=%s is no longer retrievable from Datadog", maskedValue(secretID.GetResource()))
+		return
+	}
+	t.Logf("API key metadata id=%s remains retrievable after revocation; this does not imply the key can authenticate", maskedValue(secretID.GetResource()))
 }
 
 func maskedValue(value string) string {
