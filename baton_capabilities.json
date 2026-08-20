@@ -17,10 +17,17 @@
             "permissions": [
               {
                 "permission": "api_keys_read"
+              },
+              {
+                "permission": "api_keys_write"
+              },
+              {
+                "permission": "api_keys_delete"
               }
             ]
           }
-        ]
+        ],
+        "description": "Credential issuance creates keys owned by the connector's Datadog principal, not the selected Datadog user."
       },
       "capabilities": [
         "CAPABILITY_SYNC",
@@ -30,6 +37,12 @@
         "permissions": [
           {
             "permission": "api_keys_read"
+          },
+          {
+            "permission": "api_keys_write"
+          },
+          {
+            "permission": "api_keys_delete"
           }
         ]
       }
@@ -138,6 +151,9 @@
             "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
             "permissions": [
               {
+                "permission": "api_keys_write"
+              },
+              {
                 "permission": "user_access_invite"
               },
               {
@@ -154,6 +170,9 @@
       ],
       "permissions": {
         "permissions": [
+          {
+            "permission": "api_keys_write"
+          },
           {
             "permission": "user_access_invite"
           },

@@ -22,9 +22,13 @@ sidebarTitle: "Datadog"
 
 [This connector can sync secrets](/product/admin/inventory) and display them on the **Inventory** page.
 
-API keys can be issued and revoked through C1. Datadog does not support an expiration date when creating an API key.
+API keys can be issued and revoked through C1 when **Sync secrets** is enabled. Datadog does not support an expiration date when creating an API key.
 
-*Schedules are not synced by default, but you can opt into syncing them when configuring the connector.
+<Warning>
+Datadog creates issued API keys under the connector's authenticated Datadog user or service account. The selected Datadog user is recorded in C1 for tracking, but does not become the provider-side API-key owner or limit the key's provider-side scope.
+</Warning>
+
+*Schedules and API-key issuance are not enabled by default. Enable **Sync schedules** or **Sync secrets**, respectively, when configuring the connector.
 
 ### Connector actions
 
@@ -43,7 +47,7 @@ Configuring the connector requires you to pass in credentials generated in Datad
 <Warning>
 A user with the **Connector Administrator** or **Super Administrator** role in C1 and the **Datadog Admin** or **Datadog standard** role in Datadog must perform this task.
 
-If your user has a custom Datadog role, make sure it includes the **User App Keys** and **API Keys Read** permissions, plus **User Access Invite** and **User Access Manage** to create, update, enable, and disable users from C1.
+If your user has a custom Datadog role, make sure it includes the **User App Keys**, **API Keys Read**, **API Keys Write**, and **API Keys Delete** permissions, plus **User Access Invite** and **User Access Manage** to create, update, enable, and disable users from C1.
 </Warning>
 
 ### Locate your Datadog site

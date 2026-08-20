@@ -22,6 +22,7 @@ var (
 		Annotations: annotations.New(
 			&v2.SkipEntitlementsAndGrants{},
 			capabilityPermissions(
+				"api_keys_write",
 				"user_access_invite",
 				"user_access_manage",
 			),
@@ -46,10 +47,11 @@ var (
 	apiTokenResourceType = &v2.ResourceType{
 		Id:          "api-key",
 		DisplayName: "API Key",
+		Description: "Credential issuance creates keys owned by the connector's Datadog principal, not the selected Datadog user.",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
 		Annotations: annotations.New(
 			&v2.SkipEntitlementsAndGrants{},
-			capabilityPermissions("api_keys_read"),
+			capabilityPermissions("api_keys_read", "api_keys_write", "api_keys_delete"),
 		),
 	}
 	scheduleResourceType = &v2.ResourceType{

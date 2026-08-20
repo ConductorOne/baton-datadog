@@ -13,6 +13,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type apiTokenBuilder struct {
@@ -28,6 +30,9 @@ func (o *apiTokenBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId,
 		return nil, fmt.Errorf("baton-datadog: API key id is required")
 	}
 	if err := o.wrapper.DeleteAPIKey(ctx, resourceID.GetResource()); err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("baton-datadog: delete API key: %w", err)
 	}
 	return nil, nil
