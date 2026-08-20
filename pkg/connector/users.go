@@ -43,6 +43,13 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 		return nil, fmt.Errorf("baton-datadog: a Datadog user identity is required")
 	}
 	name := "c1-" + input.RequestID
+	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: look up API key for request %q: %w", input.RequestID, err)
+	}
+	if existing != nil {
+		return nil, fmt.Errorf("baton-datadog: API key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
+	}
 	key, err := u.wrapper.CreateAPIKey(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create API key: %w", err)
@@ -61,7 +68,7 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 				zap.Error(deleteErr),
 			)
 		}
-		return nil, err
+		return nil, fmt.Errorf("baton-datadog: build API key secret resource: %w", err)
 	}
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret: secret,
@@ -76,6 +83,8 @@ var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
 var _ connectorbuilder.AccountManagerV2 = &userBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &userBuilder{}
 var _ connectorbuilder.CredentialIssuerLimited = &credentialUserBuilder{}
+var _ connectorbuilder.AccountManagerV2 = &credentialUserBuilder{}
+var _ connectorbuilder.ResourceActionProvider = &credentialUserBuilder{}
 
 // ResourceActions registers user-scoped actions. Only update_user lives here: it is
 // reached through the generic "Perform connector action" step (which supplies a resource

@@ -9,6 +9,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Helper function to check if two strings are equal.
@@ -17,6 +21,55 @@ func assertEqual(t *testing.T, expected, actual string, message string) {
 	if expected != actual {
 		t.Errorf("%s: expected %q, got %q", message, expected, actual)
 	}
+}
+
+func newOfficialTestClient(serverURL string) *DatadogClient {
+	cfg := datadog.NewConfiguration()
+	cfg.Servers = datadog.ServerConfigurations{{URL: serverURL}}
+	return NewDatadogClient(nil, datadog.NewAPIClient(cfg), "example.com", testAPIKey, testAppKey)
+}
+
+func TestAPIKeyManagement(t *testing.T) {
+	t.Run("create returns issued material", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodPost, r.Method, "HTTP method should match")
+			assertEqual(t, "/api/v2/api_keys", r.URL.Path, "request path should match")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"key-id","type":"api_keys","attributes":{"key":"plaintext-key","name":"c1-request"}}}`))
+		}))
+		defer server.Close()
+
+		issued, err := newOfficialTestClient(server.URL).CreateAPIKey(context.Background(), "c1-request")
+		assertNoError(t, err, "create API key should succeed")
+		assertEqual(t, "key-id", issued.ID, "issued key ID should match")
+		assertEqual(t, "plaintext-key", issued.Secret, "issued key material should match")
+	})
+
+	t.Run("create rejects a response without plaintext material", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"key-id","type":"api_keys","attributes":{}}}`))
+		}))
+		defer server.Close()
+
+		_, err := newOfficialTestClient(server.URL).CreateAPIKey(context.Background(), "c1-request")
+		assertError(t, err, "create API key should reject missing plaintext material")
+	})
+
+	t.Run("delete maps a provider 404 to not found", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodDelete, r.Method, "HTTP method should match")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"errors":["Not found"]}`))
+		}))
+		defer server.Close()
+
+		err := newOfficialTestClient(server.URL).DeleteAPIKey(context.Background(), "missing-key")
+		if status.Code(err) != codes.NotFound {
+			t.Fatalf("DeleteAPIKey() error code = %s, want %s; error = %v", status.Code(err), codes.NotFound, err)
+		}
+	})
 }
 
 // Helper function to check if a value is not nil.

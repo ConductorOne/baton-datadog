@@ -103,11 +103,6 @@ func (w *DatadogClient) ListUsers(ctx context.Context, params *datadogV2.ListUse
 	return &resp, nil
 }
 
-// Validate validates API credentials using the REST client.
-func (w *DatadogClient) Validate(ctx context.Context) (*datadogV1.AuthenticationValidationResponse, error) {
-	return w.validateAPIKey(w.withAuthContext(ctx))
-}
-
 // ListTeams lists teams using the REST client.
 func (w *DatadogClient) ListTeams(ctx context.Context, params *datadogV2.ListTeamsOptionalParameters) (*datadogV2.TeamsResponse, error) {
 	ctx = w.withAuthContext(ctx)
@@ -200,6 +195,27 @@ func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedA
 	return &IssuedAPIKey{ID: *response.Data.Id, Secret: *response.Data.Attributes.Key}, nil
 }
 
+// FindAPIKeyByName returns an exact name match, if one exists. Datadog's filter
+// is a string search, so compare the returned name exactly before treating it as
+// an existing issuance.
+func (w *DatadogClient) FindAPIKeyByName(ctx context.Context, name string) (*datadogV2.PartialAPIKey, error) {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewKeyManagementApi(w.officialClient)
+	response, httpRes, err := api.ListAPIKeys(ctx, *datadogV2.NewListAPIKeysOptionalParameters().WithFilter(name).WithPageSize(100))
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, wrapOfficialClientError("find API key by name", httpRes, err)
+	}
+	for _, key := range response.GetData() {
+		if key.Attributes != nil && key.Attributes.GetName() == name {
+			return &key, nil
+		}
+	}
+	return nil, nil
+}
+
 func (w *DatadogClient) GetAPIKey(ctx context.Context, id string) (*datadogV2.APIKeyResponse, error) {
 	// GET /api/v2/api_keys/{api_key_id}. Requires the api_keys_read permission.
 	ctx = w.withAuthContext(ctx)
@@ -223,24 +239,16 @@ func (w *DatadogClient) ValidateAPIKey(ctx context.Context, apiKey string) (bool
 		},
 	)
 	ctx = context.WithValue(ctx, datadog.ContextServerVariables, map[string]string{"site": w.site})
-	response, err := w.validateAPIKey(ctx)
-	if err != nil {
-		return false, err
-	}
-	return response.GetValid(), nil
-}
-
-// validateAPIKey calls GET /api/v1/validate. It requires an API key and does not require an application key.
-func (w *DatadogClient) validateAPIKey(ctx context.Context) (*datadogV1.AuthenticationValidationResponse, error) {
+	// GET /api/v1/validate requires an API key and does not require an application key.
 	api := datadogV1.NewAuthenticationApi(w.officialClient)
 	response, httpRes, err := api.Validate(ctx)
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
 	if err != nil {
-		return nil, wrapOfficialClientError("validate API key", httpRes, err)
+		return false, wrapOfficialClientError("validate API key", httpRes, err)
 	}
-	return &response, nil
+	return response.GetValid(), nil
 }
 
 func (w *DatadogClient) DeleteAPIKey(ctx context.Context, id string) error {

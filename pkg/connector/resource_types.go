@@ -22,7 +22,6 @@ var (
 		Annotations: annotations.New(
 			&v2.SkipEntitlementsAndGrants{},
 			capabilityPermissions(
-				"api_keys_write",
 				"user_access_invite",
 				"user_access_manage",
 			),
