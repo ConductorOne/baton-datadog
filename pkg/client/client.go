@@ -105,9 +105,7 @@ func (w *DatadogClient) ListUsers(ctx context.Context, params *datadogV2.ListUse
 
 // Validate validates API credentials using the REST client.
 func (w *DatadogClient) Validate(ctx context.Context) (*datadogV1.AuthenticationValidationResponse, error) {
-	// TODO: Implement in DatadogRestClient
-	// For now, return error indicating this needs to be implemented
-	return nil, fmt.Errorf("Validate not yet implemented in REST client")
+	return w.validateAPIKey(w.withAuthContext(ctx))
 }
 
 // ListTeams lists teams using the REST client.
@@ -203,6 +201,7 @@ func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedA
 }
 
 func (w *DatadogClient) GetAPIKey(ctx context.Context, id string) (*datadogV2.APIKeyResponse, error) {
+	// GET /api/v2/api_keys/{api_key_id}. Requires the api_keys_read permission.
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewKeyManagementApi(w.officialClient)
 	response, httpRes, err := api.GetAPIKey(ctx, id)
@@ -224,15 +223,24 @@ func (w *DatadogClient) ValidateAPIKey(ctx context.Context, apiKey string) (bool
 		},
 	)
 	ctx = context.WithValue(ctx, datadog.ContextServerVariables, map[string]string{"site": w.site})
+	response, err := w.validateAPIKey(ctx)
+	if err != nil {
+		return false, err
+	}
+	return response.GetValid(), nil
+}
+
+// validateAPIKey calls GET /api/v1/validate. It requires an API key and does not require an application key.
+func (w *DatadogClient) validateAPIKey(ctx context.Context) (*datadogV1.AuthenticationValidationResponse, error) {
 	api := datadogV1.NewAuthenticationApi(w.officialClient)
 	response, httpRes, err := api.Validate(ctx)
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
 	if err != nil {
-		return false, wrapOfficialClientError("validate API key", httpRes, err)
+		return nil, wrapOfficialClientError("validate API key", httpRes, err)
 	}
-	return response.GetValid(), nil
+	return &response, nil
 }
 
 func (w *DatadogClient) DeleteAPIKey(ctx context.Context, id string) error {
