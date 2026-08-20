@@ -67,9 +67,11 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	providerKeyData := providerKey.GetData()
 	require.Equal(t, secretID.GetResource(), providerKeyData.GetId())
 	t.Logf("confirmed API key id=%s exists in Datadog", maskedValue(secretID.GetResource()))
-	issuedKeyValid, err := datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
-	require.NoError(t, err, "authenticate with issued API key")
-	require.True(t, issuedKeyValid, "issued API key is not accepted by Datadog")
+	t.Logf("waiting for issued API key id=%s to propagate", maskedValue(secretID.GetResource()))
+	require.Eventually(t, func() bool {
+		issuedKeyValid, validateErr := datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
+		return validateErr == nil && issuedKeyValid
+	}, 30*time.Second, time.Second, "issued API key did not become usable")
 	t.Logf("confirmed issued API key id=%s can authenticate with Datadog", maskedValue(secretID.GetResource()))
 
 	revoked := false
@@ -86,12 +88,11 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	t.Logf("revoking API key id=%s", maskedValue(secretID.GetResource()))
 	_, err = newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
 	require.NoError(t, err, "revoke issued Datadog API key")
-	issuedKeyValid, err = datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
-	if err != nil {
-		require.Contains(t, []codes.Code{codes.Unauthenticated, codes.PermissionDenied}, status.Code(err), "validate revoked API key")
-	} else {
-		require.False(t, issuedKeyValid, "revoked API key can still authenticate with Datadog")
-	}
+	t.Logf("waiting for revoked API key id=%s to stop authenticating", maskedValue(secretID.GetResource()))
+	require.Eventually(t, func() bool {
+		issuedKeyValid, validateErr := datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
+		return !issuedKeyValid && (validateErr == nil || status.Code(validateErr) == codes.Unauthenticated || status.Code(validateErr) == codes.PermissionDenied)
+	}, 30*time.Second, time.Second, "revoked API key can still authenticate with Datadog")
 	t.Logf("confirmed revoked API key id=%s can no longer authenticate with Datadog", maskedValue(secretID.GetResource()))
 	revoked = true
 
