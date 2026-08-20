@@ -87,10 +87,11 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	_, err = newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
 	require.NoError(t, err, "revoke issued Datadog API key")
 	issuedKeyValid, err = datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
-	if err == nil {
+	if err != nil {
+		require.Contains(t, []codes.Code{codes.Unauthenticated, codes.PermissionDenied}, status.Code(err), "validate revoked API key")
+	} else {
 		require.False(t, issuedKeyValid, "revoked API key can still authenticate with Datadog")
 	}
-	require.False(t, issuedKeyValid, "revoked API key can still authenticate with Datadog")
 	t.Logf("confirmed revoked API key id=%s can no longer authenticate with Datadog", maskedValue(secretID.GetResource()))
 	revoked = true
 
