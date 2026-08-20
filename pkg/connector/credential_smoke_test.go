@@ -11,6 +11,8 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // TestCredentialIssueLifecycle is an opt-in live-provider smoke test. It creates
@@ -81,7 +83,7 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	deleted = true
 
 	_, err = datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
-	require.Error(t, err, "revoked API key is still retrievable")
+	require.Equal(t, codes.NotFound, status.Code(err), "revoked API key is still retrievable")
 	t.Logf("confirmed API key id=%s is no longer retrievable from Datadog", maskedValue(secretID.GetResource()))
 }
 
