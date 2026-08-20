@@ -221,7 +221,6 @@ func (w *DatadogClient) ValidateAPIKey(ctx context.Context, apiKey string) (bool
 		datadog.ContextAPIKeys,
 		map[string]datadog.APIKey{
 			"apiKeyAuth": {Key: apiKey},
-			"appKeyAuth": {Key: w.appKey},
 		},
 	)
 	ctx = context.WithValue(ctx, datadog.ContextServerVariables, map[string]string{"site": w.site})
