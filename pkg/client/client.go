@@ -215,6 +215,27 @@ func (w *DatadogClient) GetAPIKey(ctx context.Context, id string) (*datadogV2.AP
 	return &response, nil
 }
 
+func (w *DatadogClient) ValidateAPIKey(ctx context.Context, apiKey string) (bool, error) {
+	ctx = context.WithValue(
+		ctx,
+		datadog.ContextAPIKeys,
+		map[string]datadog.APIKey{
+			"apiKeyAuth": {Key: apiKey},
+			"appKeyAuth": {Key: w.appKey},
+		},
+	)
+	ctx = context.WithValue(ctx, datadog.ContextServerVariables, map[string]string{"site": w.site})
+	api := datadogV1.NewAuthenticationApi(w.officialClient)
+	response, httpRes, err := api.Validate(ctx)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return false, wrapOfficialClientError("validate API key", httpRes, err)
+	}
+	return response.GetValid(), nil
+}
+
 func (w *DatadogClient) DeleteAPIKey(ctx context.Context, id string) error {
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewKeyManagementApi(w.officialClient)
