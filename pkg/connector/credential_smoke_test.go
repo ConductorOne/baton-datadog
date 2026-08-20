@@ -68,23 +68,39 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	require.Equal(t, secretID.GetResource(), providerKeyData.GetId())
 	t.Logf("confirmed API key id=%s exists in Datadog", maskedValue(secretID.GetResource()))
 
-	deleted := false
+	revoked := false
 	t.Cleanup(func() {
-		if deleted {
+		if revoked {
 			return
 		}
 		_, deleteErr := newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
-		require.NoError(t, deleteErr, "Datadog API key cleanup failed: %s", secretID.GetResource())
+		if status.Code(deleteErr) != codes.NotFound {
+			require.NoError(t, deleteErr, "Datadog API key cleanup failed: %s", secretID.GetResource())
+		}
 	})
 
 	t.Logf("revoking API key id=%s", maskedValue(secretID.GetResource()))
 	_, err = newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
 	require.NoError(t, err, "revoke issued Datadog API key")
-	deleted = true
 
-	_, err = datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
-	require.Equal(t, codes.NotFound, status.Code(err), "revoked API key is still retrievable")
-	t.Logf("confirmed API key id=%s is no longer retrievable from Datadog", maskedValue(secretID.GetResource()))
+	const verificationTimeout = 30 * time.Second
+	deadline := time.Now().Add(verificationTimeout)
+	for {
+		_, err = datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
+		if status.Code(err) == codes.NotFound {
+			revoked = true
+			t.Logf("confirmed API key id=%s is no longer retrievable from Datadog", maskedValue(secretID.GetResource()))
+			return
+		}
+		if err != nil {
+			require.NoError(t, err, "read issued API key while waiting for revocation")
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Datadog API key is still retrievable after %s; find and revoke key named c1-%s", verificationTimeout, requestID)
+		}
+		t.Logf("API key id=%s is still retrievable; waiting for Datadog revocation propagation", maskedValue(secretID.GetResource()))
+		time.Sleep(time.Second)
+	}
 }
 
 func maskedValue(value string) string {
