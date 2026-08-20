@@ -97,11 +97,15 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	revoked = true
 
 	_, err = datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
+	if err == nil {
+		t.Logf("API key metadata id=%s remains retrievable after revocation; this does not imply the key can authenticate", maskedValue(secretID.GetResource()))
+		return
+	}
 	if status.Code(err) == codes.NotFound {
 		t.Logf("confirmed API key id=%s is no longer retrievable from Datadog", maskedValue(secretID.GetResource()))
 		return
 	}
-	t.Logf("API key metadata id=%s remains retrievable after revocation; this does not imply the key can authenticate", maskedValue(secretID.GetResource()))
+	t.Logf("could not read API key metadata id=%s after revocation: %v", maskedValue(secretID.GetResource()), err)
 }
 
 func maskedValue(value string) string {
