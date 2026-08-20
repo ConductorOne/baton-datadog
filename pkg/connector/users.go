@@ -45,13 +45,23 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create API key: %w", err)
 	}
-	secret, err := rs.NewSecretResource(name, apiTokenResourceType, key.ID,
-		[]rs.SecretTraitOption{rs.WithSecretCreatedByID(input.IdentityID), rs.WithSecretIdentityID(input.IdentityID), rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET), rs.WithSecretDetail("datadog.api_key")},
-	)
+	secretTraitOptions := []rs.SecretTraitOption{
+		rs.WithSecretCreatedByID(input.IdentityID),
+		rs.WithSecretIdentityID(input.IdentityID),
+		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
+		rs.WithSecretDetail("datadog.api_key"),
+	}
+	secret, err := rs.NewSecretResource(name, apiTokenResourceType, key.ID, secretTraitOptions)
 	if err != nil {
 		return nil, err
 	}
-	return &connectorbuilder.CredentialIssueOutput{Secret: secret, PlaintextData: []*v2.PlaintextData{v2.PlaintextData_builder{Name: "api_key", Bytes: []byte(key.Secret)}.Build()}, ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE}, nil
+	return &connectorbuilder.CredentialIssueOutput{
+		Secret: secret,
+		PlaintextData: []*v2.PlaintextData{
+			v2.PlaintextData_builder{Name: "api_key", Bytes: []byte(key.Secret)}.Build(),
+		},
+		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+	}, nil
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}

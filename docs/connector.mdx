@@ -12,15 +12,17 @@ sidebarTitle: "Datadog"
 
 ## Capabilities
 
-| Resource | Sync | Provision |
-| :--- | :--- | :--- |
-| Accounts | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
-| Roles | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
-| Teams | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
-| Schedules | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>* | |
-| Secrets - API keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | |
+| Resource | Sync | Provision | Issue | Revoke |
+| :--- | :--- | :--- | :--- | :--- |
+| Accounts | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | |
+| Roles | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | |
+| Teams | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | |
+| Schedules | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>* | | | |
+| Secrets - API keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
 
 [This connector can sync secrets](/product/admin/inventory) and display them on the **Inventory** page.
+
+API keys can be issued and revoked through C1. Datadog does not support an expiration date when creating an API key.
 
 *Schedules are not synced by default, but you can opt into syncing them when configuring the connector.
 

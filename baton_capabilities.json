@@ -23,7 +23,8 @@
         ]
       },
       "capabilities": [
-        "CAPABILITY_SYNC"
+        "CAPABILITY_SYNC",
+        "CAPABILITY_RESOURCE_DELETE"
       ],
       "permissions": {
         "permissions": [
@@ -148,7 +149,8 @@
       },
       "capabilities": [
         "CAPABILITY_SYNC",
-        "CAPABILITY_ACCOUNT_PROVISIONING"
+        "CAPABILITY_ACCOUNT_PROVISIONING",
+        "CAPABILITY_CREDENTIAL_ISSUE"
       ],
       "permissions": {
         "permissions": [
@@ -159,6 +161,16 @@
             "permission": "user_access_manage"
           }
         ]
+      },
+      "credentialIssue": {
+        "options": [
+          {
+            "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
+            "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
+            "secretResourceTypeId": "api-key"
+          }
+        ],
+        "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"
       }
     }
   ],
@@ -166,7 +178,9 @@
     "CAPABILITY_PROVISION",
     "CAPABILITY_SYNC",
     "CAPABILITY_ACCOUNT_PROVISIONING",
-    "CAPABILITY_ACTIONS"
+    "CAPABILITY_RESOURCE_DELETE",
+    "CAPABILITY_ACTIONS",
+    "CAPABILITY_CREDENTIAL_ISSUE"
   ],
   "credentialDetails": {
     "capabilityAccountProvisioning": {
