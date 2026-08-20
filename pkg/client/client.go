@@ -196,7 +196,7 @@ func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedA
 	if err != nil {
 		return nil, wrapOfficialClientError("create API key", httpRes, err)
 	}
-	if response.Data.Id == nil || response.Data.Attributes == nil || response.Data.Attributes.Key == nil || *response.Data.Attributes.Key == "" {
+	if response.Data == nil || response.Data.Id == nil || response.Data.Attributes == nil || response.Data.Attributes.Key == nil || *response.Data.Attributes.Key == "" {
 		return nil, fmt.Errorf("create API key response omitted id or key")
 	}
 	return &IssuedAPIKey{ID: *response.Data.Id, Secret: *response.Data.Attributes.Key}, nil
