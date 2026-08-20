@@ -19,19 +19,19 @@ import (
 // a real Datadog API key and always attempts to revoke it before returning.
 // Run it only in a disposable Datadog organization:
 //
-// DATADOG_CREDENTIAL_SMOKE=1 BATON_SITE=datadoghq.com BATON_API_KEY=... BATON_APP_KEY=... \
-//   go test ./pkg/connector -run TestCredentialIssueLifecycle -count=1
+//	DATADOG_CREDENTIAL_SMOKE=1 DATADOG_SMOKE_SITE=datadoghq.com DATADOG_SMOKE_API_KEY=... DATADOG_SMOKE_APP_KEY=... \
+//	  go test ./pkg/connector -run TestCredentialIssueLifecycle -count=1
 func TestCredentialIssueLifecycle(t *testing.T) {
 	if os.Getenv("DATADOG_CREDENTIAL_SMOKE") != "1" {
 		t.Skip("set DATADOG_CREDENTIAL_SMOKE=1 to run against Datadog")
 	}
 
-	site := os.Getenv("BATON_SITE")
-	apiKey := os.Getenv("BATON_API_KEY")
-	appKey := os.Getenv("BATON_APP_KEY")
-	require.NotEmpty(t, site, "BATON_SITE is required")
-	require.NotEmpty(t, apiKey, "BATON_API_KEY is required")
-	require.NotEmpty(t, appKey, "BATON_APP_KEY is required")
+	site := os.Getenv("DATADOG_SMOKE_SITE")
+	apiKey := os.Getenv("DATADOG_SMOKE_API_KEY")
+	appKey := os.Getenv("DATADOG_SMOKE_APP_KEY")
+	require.NotEmpty(t, site, "DATADOG_SMOKE_SITE is required")
+	require.NotEmpty(t, apiKey, "DATADOG_SMOKE_API_KEY is required")
+	require.NotEmpty(t, appKey, "DATADOG_SMOKE_APP_KEY is required")
 
 	ctx := context.Background()
 	builder, _, err := New(ctx, &cfg.Datadog{
@@ -55,9 +55,20 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 		RequestID: requestID,
 	})
 	require.NoError(t, err)
+	revoked := false
+	t.Cleanup(func() {
+		if revoked || issued == nil || issued.Secret == nil || issued.Secret.GetId() == nil || issued.Secret.GetId().GetResource() == "" {
+			return
+		}
+		secretID := issued.Secret.GetId()
+		_, deleteErr := newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
+		if status.Code(deleteErr) != codes.NotFound {
+			require.NoError(t, deleteErr, "Datadog API key cleanup failed: %s", secretID.GetResource())
+		}
+	})
 	require.NotNil(t, issued.Secret)
 	require.NotEmpty(t, issued.Secret.GetId().GetResource())
-	require.Len(t, issued.PlaintextData, 1)
+	require.Equal(t, 1, len(issued.PlaintextData))
 	require.NotEmpty(t, issued.PlaintextData[0].GetBytes())
 
 	secretID := issued.Secret.GetId()
@@ -73,17 +84,6 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 		return validateErr == nil && issuedKeyValid
 	}, 30*time.Second, time.Second, "issued API key did not become usable")
 	t.Logf("confirmed issued API key id=%s can authenticate with Datadog", maskedValue(secretID.GetResource()))
-
-	revoked := false
-	t.Cleanup(func() {
-		if revoked {
-			return
-		}
-		_, deleteErr := newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
-		if status.Code(deleteErr) != codes.NotFound {
-			require.NoError(t, deleteErr, "Datadog API key cleanup failed: %s", secretID.GetResource())
-		}
-	})
 
 	t.Logf("revoking API key id=%s", maskedValue(secretID.GetResource()))
 	_, err = newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)

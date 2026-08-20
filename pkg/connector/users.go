@@ -12,6 +12,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
 
 type userBuilder struct {
@@ -53,6 +55,12 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 	}
 	secret, err := rs.NewSecretResource(name, apiTokenResourceType, key.ID, secretTraitOptions)
 	if err != nil {
+		if deleteErr := u.wrapper.DeleteAPIKey(ctx, key.ID); deleteErr != nil {
+			ctxzap.Extract(ctx).Warn("failed to clean up Datadog API key after resource construction error",
+				zap.String("api_key_id", key.ID),
+				zap.Error(deleteErr),
+			)
+		}
 		return nil, err
 	}
 	return &connectorbuilder.CredentialIssueOutput{
@@ -67,6 +75,7 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
 var _ connectorbuilder.AccountManagerV2 = &userBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &userBuilder{}
+var _ connectorbuilder.CredentialIssuerLimited = &credentialUserBuilder{}
 
 // ResourceActions registers user-scoped actions. Only update_user lives here: it is
 // reached through the generic "Perform connector action" step (which supplies a resource
