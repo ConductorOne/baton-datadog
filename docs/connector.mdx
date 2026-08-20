@@ -47,7 +47,7 @@ Configuring the connector requires you to pass in credentials generated in Datad
 <Warning>
 A user with the **Connector Administrator** or **Super Administrator** role in C1 and the **Datadog Admin** or **Datadog standard** role in Datadog must perform this task.
 
-If your user has a custom Datadog role, make sure it includes the **User App Keys**, **API Keys Read**, **API Keys Write**, and **API Keys Delete** permissions, plus **User Access Invite** and **User Access Manage** to create, update, enable, and disable users from C1.
+If your user has a custom Datadog role, make sure it includes **User App Keys**, **User Access Invite**, and **User Access Manage** to create, update, enable, and disable users from C1. If you enable **Sync secrets** to issue or revoke API keys, also add **API Keys Read**, **API Keys Write**, and **API Keys Delete**.
 </Warning>
 
 ### Locate your Datadog site
