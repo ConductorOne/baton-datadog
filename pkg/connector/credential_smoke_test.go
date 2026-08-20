@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,6 +44,7 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 
 	issuer := newCredentialUserBuilder(datadogConnector.wrapper)
 	requestID := "smoke-" + time.Now().UTC().Format("20060102T150405")
+	t.Logf("issuing Datadog API key with request id %q", requestID)
 	issued, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{
 			ResourceType: userResourceType.Id,
@@ -57,6 +59,13 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	require.NotEmpty(t, issued.PlaintextData[0].GetBytes())
 
 	secretID := issued.Secret.GetId()
+	t.Logf("issued API key id=%s; plaintext material returned but not logged", maskedValue(secretID.GetResource()))
+	providerKey, err := datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
+	require.NoError(t, err, "read issued API key from Datadog")
+	providerKeyData := providerKey.GetData()
+	require.Equal(t, secretID.GetResource(), providerKeyData.GetId())
+	t.Logf("confirmed API key id=%s exists in Datadog", maskedValue(secretID.GetResource()))
+
 	deleted := false
 	t.Cleanup(func() {
 		if deleted {
@@ -66,13 +75,19 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 		require.NoError(t, deleteErr, "Datadog API key cleanup failed: %s", secretID.GetResource())
 	})
 
+	t.Logf("revoking API key id=%s", maskedValue(secretID.GetResource()))
 	_, err = newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
 	require.NoError(t, err, "revoke issued Datadog API key")
 	deleted = true
 
-	keys, err := datadogConnector.wrapper.ListAPIKeys(ctx, nil)
-	require.NoError(t, err, "list API keys after revocation")
-	for _, key := range keys.GetData() {
-		require.NotEqual(t, secretID.GetResource(), key.GetId(), "revoked API key is still listed")
+	_, err = datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
+	require.Error(t, err, "revoked API key is still retrievable")
+	t.Logf("confirmed API key id=%s is no longer retrievable from Datadog", maskedValue(secretID.GetResource()))
+}
+
+func maskedValue(value string) string {
+	if len(value) <= 4 {
+		return "***"
 	}
+	return value[:2] + strings.Repeat("*", len(value)-4) + value[len(value)-2:]
 }

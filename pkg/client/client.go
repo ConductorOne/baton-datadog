@@ -202,6 +202,19 @@ func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedA
 	return &IssuedAPIKey{ID: *response.Data.Id, Secret: *response.Data.Attributes.Key}, nil
 }
 
+func (w *DatadogClient) GetAPIKey(ctx context.Context, id string) (*datadogV2.APIKeyResponse, error) {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewKeyManagementApi(w.officialClient)
+	response, httpRes, err := api.GetAPIKey(ctx, id)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, wrapOfficialClientError("get API key", httpRes, err)
+	}
+	return &response, nil
+}
+
 func (w *DatadogClient) DeleteAPIKey(ctx context.Context, id string) error {
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewKeyManagementApi(w.officialClient)
