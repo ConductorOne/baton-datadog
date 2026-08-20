@@ -151,9 +151,6 @@
             "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
             "permissions": [
               {
-                "permission": "api_keys_write"
-              },
-              {
                 "permission": "user_access_invite"
               },
               {
@@ -170,9 +167,6 @@
       ],
       "permissions": {
         "permissions": [
-          {
-            "permission": "api_keys_write"
-          },
           {
             "permission": "user_access_invite"
           },
