@@ -90,6 +90,34 @@ func TestAPIKeyManagement(t *testing.T) {
 		}
 	})
 
+	t.Run("find by name returns the exact match from a later page", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodGet, r.Method, "HTTP method should match")
+			q := r.URL.Query()
+			page := q.Get("page[number]")
+			w.Header().Set("Content-Type", "application/json")
+			if page == "" || page == "0" {
+				// Page 0: 100 filler keys, none matching.
+				entries := make([]string, 100)
+				for i := range entries {
+					entries[i] = fmt.Sprintf(`{"id":"key-%d","type":"api_keys","attributes":{"name":"c1-other-%d"}}`, i, i)
+				}
+				_, _ = fmt.Fprintf(w, `{"data":[%s],"meta":{"page":{"total_filtered_count":101}}}`, strings.Join(entries, ","))
+				return
+			}
+			// Page 1: one exact match.
+			_, _ = w.Write([]byte(`{"data":[{"id":"key-match","type":"api_keys","attributes":{"name":"c1-request"}}],"meta":{"page":{"total_filtered_count":101}}}`))
+		}))
+		defer server.Close()
+
+		found, err := newOfficialTestClient(server.URL).FindAPIKeyByName(context.Background(), "c1-request")
+		assertNoError(t, err, "find API key by name should succeed")
+		assertNotNil(t, found, "expected an exact match across pages")
+		if found != nil {
+			assertEqual(t, "key-match", found.GetId(), "should find the key on page 1, not page 0")
+		}
+	})
+
 	t.Run("delete maps a provider 404 to not found", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assertEqual(t, http.MethodDelete, r.Method, "HTTP method should match")

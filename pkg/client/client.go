@@ -201,19 +201,25 @@ func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedA
 func (w *DatadogClient) FindAPIKeyByName(ctx context.Context, name string) (*datadogV2.PartialAPIKey, error) {
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewKeyManagementApi(w.officialClient)
-	response, httpRes, err := api.ListAPIKeys(ctx, *datadogV2.NewListAPIKeysOptionalParameters().WithFilter(name).WithPageSize(100))
-	if httpRes != nil {
-		defer httpRes.Body.Close()
-	}
-	if err != nil {
-		return nil, wrapOfficialClientError("find API key by name", httpRes, err)
-	}
-	for _, key := range response.GetData() {
-		if key.Attributes != nil && key.Attributes.GetName() == name {
-			return &key, nil
+	const pageSize = int64(100)
+	for page := int64(0); ; page++ {
+		params := *datadogV2.NewListAPIKeysOptionalParameters().WithFilter(name).WithPageSize(pageSize).WithPageNumber(page)
+		response, httpRes, err := api.ListAPIKeys(ctx, params)
+		if httpRes != nil {
+			httpRes.Body.Close()
+		}
+		if err != nil {
+			return nil, wrapOfficialClientError("find API key by name", httpRes, err)
+		}
+		for _, key := range response.GetData() {
+			if key.Attributes != nil && key.Attributes.GetName() == name {
+				return &key, nil
+			}
+		}
+		if int64(len(response.GetData())) < pageSize {
+			return nil, nil
 		}
 	}
-	return nil, nil
 }
 
 func (w *DatadogClient) GetAPIKey(ctx context.Context, id string) (*datadogV2.APIKeyResponse, error) {
