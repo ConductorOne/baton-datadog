@@ -14,6 +14,8 @@ import (
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type userBuilder struct {
@@ -40,7 +42,7 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 
 func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	if input == nil || input.IdentityID == nil || input.IdentityID.GetResourceType() != userResourceType.Id {
-		return nil, fmt.Errorf("baton-datadog: a Datadog user identity is required")
+		return nil, status.Error(codes.InvalidArgument, "baton-datadog: a Datadog user identity is required")
 	}
 	name := "c1-" + input.RequestID
 	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
@@ -48,7 +50,7 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 		return nil, fmt.Errorf("baton-datadog: look up API key for request %q: %w", input.RequestID, err)
 	}
 	if existing != nil {
-		return nil, fmt.Errorf("baton-datadog: API key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
+		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: API key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
 	}
 	key, err := u.wrapper.CreateAPIKey(ctx, name)
 	if err != nil {

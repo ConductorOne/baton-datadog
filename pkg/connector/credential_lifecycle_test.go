@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // newCredentialLifecycleServer stands in for Datadog across an Issue+Delete
@@ -209,4 +211,40 @@ func TestIssueAndDeleteNeverLogSecret(t *testing.T) {
 	if strings.Contains(logBuf.String(), secret) {
 		t.Fatalf("captured logs leaked the plaintext secret:\n%s", logBuf.String())
 	}
+}
+
+// TestIssueRefusesDuplicateRequest exercises the FindAPIKeyByName exact-match
+// branch as consumed by Issue: when the provider already has a key named for
+// this request, Issue must refuse with AlreadyExists and must never call
+// CreateAPIKey (POST /api/v2/api_keys).
+func TestIssueRefusesDuplicateRequest(t *testing.T) {
+	const (
+		requestID  = "req-dup-1"
+		name       = "c1-" + requestID
+		existingID = "handle-existing-1"
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/api_keys":
+			_, _ = w.Write([]byte(`{"data":[{"id":"` + existingID + `","type":"api_keys","attributes":{"name":"` + name + `"}}]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/api_keys":
+			t.Errorf("CreateAPIKey should not be called when a key for this request already exists")
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+	wrapper := newLifecycleTestWrapper(server.URL)
+
+	issuer := newCredentialUserBuilder(wrapper)
+	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
+		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: "user-1"},
+		RequestID:  requestID,
+	})
+	require.Nil(t, out)
+	require.Error(t, err)
+	require.Equal(t, codes.AlreadyExists, status.Code(err))
 }

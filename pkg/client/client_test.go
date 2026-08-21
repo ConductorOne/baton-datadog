@@ -56,6 +56,40 @@ func TestAPIKeyManagement(t *testing.T) {
 		assertError(t, err, "create API key should reject missing plaintext material")
 	})
 
+	t.Run("find by name returns the exact match", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodGet, r.Method, "HTTP method should match")
+			assertEqual(t, "/api/v2/api_keys", r.URL.Path, "request path should match")
+			w.Header().Set("Content-Type", "application/json")
+			// Datadog's filter is a substring search, so the response can contain a
+			// partial match alongside the exact one; only the exact name should win.
+			_, _ = w.Write([]byte(`{"data":[
+				{"id":"key-partial","type":"api_keys","attributes":{"name":"c1-request-old"}},
+				{"id":"key-exact","type":"api_keys","attributes":{"name":"c1-request"}}
+			]}`))
+		}))
+		defer server.Close()
+
+		found, err := newOfficialTestClient(server.URL).FindAPIKeyByName(context.Background(), "c1-request")
+		assertNoError(t, err, "find API key by name should succeed")
+		assertNotNil(t, found, "expected an exact match")
+		assertEqual(t, "key-exact", found.GetId(), "exact match should be the id whose name matches exactly")
+	})
+
+	t.Run("find by name ignores a non-exact partial match", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"id":"key-partial","type":"api_keys","attributes":{"name":"c1-request-old"}}]}`))
+		}))
+		defer server.Close()
+
+		found, err := newOfficialTestClient(server.URL).FindAPIKeyByName(context.Background(), "c1-request")
+		assertNoError(t, err, "find API key by name should succeed even with no exact match")
+		if found != nil {
+			t.Fatalf("expected no exact match, got %+v", found)
+		}
+	})
+
 	t.Run("delete maps a provider 404 to not found", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assertEqual(t, http.MethodDelete, r.Method, "HTTP method should match")
