@@ -18,6 +18,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const defaultV2PageSize = 100
+
 type apiTokenBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
@@ -86,7 +88,7 @@ func (o *apiTokenBuilder) List(
 		return nil, nil, err
 	}
 
-	res, err := o.wrapper.ListAPIKeys(ctx, datadogV2.NewListAPIKeysOptionalParameters().WithPageNumber(page))
+	res, err := o.wrapper.ListAPIKeys(ctx, datadogV2.NewListAPIKeysOptionalParameters().WithPageNumber(page).WithPageSize(defaultV2PageSize))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing api tokens: %w", err)
 	}
@@ -146,10 +148,10 @@ func (o *apiTokenBuilder) List(
 			return nil, nil, err
 		}
 		ret = append(ret, rv)
-	}
+}
 
 	nextPageToken := ""
-	if len(apiTokens) != 0 {
+	if hasMoreAPIKeyPages(res, page, int64(len(apiTokens)), defaultV2PageSize) {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
 			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
