@@ -28,11 +28,11 @@ var _ connectorbuilder.ResourceDeleterV2Limited = &apiTokenBuilder{}
 
 func (o *apiTokenBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId, _ *v2.ResourceId) (annotations.Annotations, error) {
 	if resourceID == nil {
-		return nil, fmt.Errorf("baton-datadog: API key id is required")
+		return nil, status.Error(codes.InvalidArgument, "baton-datadog: API key id is required")
 	}
 	handle := resourceID.GetResource()
 	if isMalformedAPIKeyHandle(handle) {
-		return nil, fmt.Errorf("baton-datadog: API key id %q is malformed", handle)
+		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: API key id %q is malformed", handle)
 	}
 	if err := o.wrapper.DeleteAPIKey(ctx, handle); err != nil {
 		if status.Code(err) == codes.NotFound {
