@@ -126,8 +126,9 @@ func TestApiTokenBuilderDeleteUsesHandleNotSecret(t *testing.T) {
 }
 
 // (b) Malformed/missing handle must fail closed before any provider request.
-// Only nil ResourceId and an empty ResourceId.Resource are validated by
-// pkg/connector/api_token.go:29-31; both are exercised here.
+// nil ResourceId, an empty ResourceId.Resource, and a non-empty malformed
+// handle (whitespace-only or containing a control character) are all
+// validated by pkg/connector/api_token.go:29-36 / isMalformedAPIKeyHandle.
 func TestApiTokenBuilderDeleteRejectsMissingHandle(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -135,6 +136,8 @@ func TestApiTokenBuilderDeleteRejectsMissingHandle(t *testing.T) {
 	}{
 		{name: "nil ResourceId", resourceID: nil},
 		{name: "empty ResourceId.Resource", resourceID: &v2.ResourceId{ResourceType: apiTokenResourceType.Id, Resource: ""}},
+		{name: "whitespace-only handle", resourceID: &v2.ResourceId{ResourceType: apiTokenResourceType.Id, Resource: "   "}},
+		{name: "handle with control character", resourceID: &v2.ResourceId{ResourceType: apiTokenResourceType.Id, Resource: "handle-\n123"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

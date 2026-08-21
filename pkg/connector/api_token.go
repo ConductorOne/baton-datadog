@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
@@ -26,16 +27,39 @@ var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
 var _ connectorbuilder.ResourceDeleterV2Limited = &apiTokenBuilder{}
 
 func (o *apiTokenBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId, _ *v2.ResourceId) (annotations.Annotations, error) {
-	if resourceID == nil || resourceID.GetResource() == "" {
+	if resourceID == nil {
 		return nil, fmt.Errorf("baton-datadog: API key id is required")
 	}
-	if err := o.wrapper.DeleteAPIKey(ctx, resourceID.GetResource()); err != nil {
+	handle := resourceID.GetResource()
+	if isMalformedAPIKeyHandle(handle) {
+		return nil, fmt.Errorf("baton-datadog: API key id %q is malformed", handle)
+	}
+	if err := o.wrapper.DeleteAPIKey(ctx, handle); err != nil {
 		if status.Code(err) == codes.NotFound {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("baton-datadog: delete API key: %w", err)
 	}
 	return nil, nil
+}
+
+// isMalformedAPIKeyHandle reports whether handle cannot be a valid Datadog API
+// key id: empty (including whitespace-only), or containing a control
+// character that has no place in an id and is unsafe to embed in a request
+// path or log line. The vendored v2 client passes this id through as an
+// opaque string with no documented length or charset constraint, so this
+// deliberately stays conservative instead of enforcing e.g. UUID shape --
+// rejecting a handle Datadog considers valid would break real deletes.
+func isMalformedAPIKeyHandle(handle string) bool {
+	if strings.TrimSpace(handle) == "" {
+		return true
+	}
+	for _, r := range handle {
+		if r < 0x20 || r == 0x7f {
+			return true
+		}
+	}
+	return false
 }
 
 func (o *apiTokenBuilder) Entitlements(_ context.Context, _ *v2.Resource, _ resource.SyncOpAttrs) ([]*v2.Entitlement, *resource.SyncOpResults, error) {
