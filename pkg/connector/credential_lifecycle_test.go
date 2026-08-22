@@ -672,3 +672,85 @@ func TestApplicationKeyBuilderListFailsHardOnUnexpectedError(t *testing.T) {
 	}
 	t.Fatal("List never surfaced the provider 5xx")
 }
+
+// TestShouldLogSampled: the L7 schedule is the 1st, 10th and 100th occurrence,
+// then every 1000th, and nothing else.
+func TestShouldLogSampled(t *testing.T) {
+	logged := map[int64]bool{}
+	for n := int64(1); n <= 3000; n++ {
+		if shouldLogSampled(n) {
+			logged[n] = true
+		}
+	}
+	for _, want := range []int64{1, 10, 100, 1000, 2000, 3000} {
+		require.Truef(t, logged[want], "occurrence %d should be logged", want)
+	}
+	for _, notWant := range []int64{2, 9, 11, 99, 101, 999, 1001, 1999} {
+		require.Falsef(t, logged[notWant], "occurrence %d should not be logged", notWant)
+	}
+	require.Len(t, logged, 6, "exactly 1, 10, 100, 1000, 2000, 3000 in the first 3000")
+	require.False(t, shouldLogSampled(0), "a zero count is not an occurrence")
+	require.False(t, shouldLogSampled(-1), "a negative count is not an occurrence")
+}
+
+// TestApplicationKeyBuilderListSamplesSkipWarning: when the configured Datadog
+// role cannot read application keys org-wide, the skip warning must not fire
+// once per service account (criteria L7). With 12 forbidden service accounts
+// only the 1st and 10th are logged, and each surviving line carries
+// total_occurrences so the real count is still visible.
+func TestApplicationKeyBuilderListSamplesSkipWarning(t *testing.T) {
+	const serviceAccounts = 12
+	entries := make([]string, 0, serviceAccounts)
+	forbidden := map[string]bool{}
+	for i := 0; i < serviceAccounts; i++ {
+		id := fmt.Sprintf("sa-%02d", i)
+		entries = append(entries, fmt.Sprintf(`{"id":"%s","type":"users","attributes":{"service_account":true}}`, id))
+		forbidden[id] = true
+	}
+	usersPages := []string{"[" + strings.Join(entries, ",") + "]"}
+
+	server, requests := newAppKeyListServer(t, usersPages, nil, forbidden)
+	defer server.Close()
+
+	var logBuf bytes.Buffer
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.AddSync(&logBuf),
+		zapcore.DebugLevel,
+	)
+	logger := zap.New(core)
+	ctx := ctxzap.ToContext(context.Background(), logger)
+
+	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	token := ""
+	for call := 0; call < 100; call++ {
+		_, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		require.NoError(t, err, "a 403 must never fail the sync")
+		require.NotNil(t, results)
+		if results.NextPageToken == "" {
+			break
+		}
+		token = results.NextPageToken
+	}
+	require.NoError(t, logger.Sync())
+
+	// Every service account was still attempted and skipped.
+	attempted := 0
+	for _, req := range *requests {
+		if strings.Contains(req.path, "/application_keys") {
+			attempted++
+		}
+	}
+	require.Equal(t, serviceAccounts, attempted, "every service account must still be attempted")
+
+	skipLines := 0
+	for _, line := range strings.Split(strings.TrimSpace(logBuf.String()), "\n") {
+		if line == "" || !strings.Contains(line, "skipping application keys for service account") {
+			continue
+		}
+		skipLines++
+		require.Contains(t, line, "total_occurrences", "a sampled warning must report the real count")
+	}
+	require.Equal(t, 2, skipLines, "12 skips must log only the 1st and 10th, not one line each")
+	require.Contains(t, logBuf.String(), `"total_occurrences":10`, "the 10th occurrence must be the second logged line")
+}
