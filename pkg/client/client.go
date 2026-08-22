@@ -202,7 +202,8 @@ func (w *DatadogClient) FindAPIKeyByName(ctx context.Context, name string) (*dat
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewKeyManagementApi(w.officialClient)
 	const pageSize = int64(100)
-	for page := int64(0); ; page++ {
+	const maxPages = int64(10000)
+	for page := int64(0); page < maxPages; page++ {
 		params := *datadogV2.NewListAPIKeysOptionalParameters().WithFilter(name).WithPageSize(pageSize).WithPageNumber(page)
 		response, httpRes, err := api.ListAPIKeys(ctx, params)
 		if httpRes != nil {
@@ -220,6 +221,7 @@ func (w *DatadogClient) FindAPIKeyByName(ctx context.Context, name string) (*dat
 			return nil, nil
 		}
 	}
+	return nil, fmt.Errorf("find API key by name: exceeded %d pages", maxPages)
 }
 
 func (w *DatadogClient) GetAPIKey(ctx context.Context, id string) (*datadogV2.APIKeyResponse, error) {

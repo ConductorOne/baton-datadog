@@ -19,6 +19,9 @@
                 "permission": "api_keys_read"
               },
               {
+                "permission": "api_keys_write"
+              },
+              {
                 "permission": "api_keys_delete"
               }
             ]
@@ -34,6 +37,9 @@
         "permissions": [
           {
             "permission": "api_keys_read"
+          },
+          {
+            "permission": "api_keys_write"
           },
           {
             "permission": "api_keys_delete"

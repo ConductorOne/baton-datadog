@@ -120,9 +120,13 @@ func hasMoreAPIKeyPages(res *datadogV2.APIKeysResponse, page int64, count int64,
 	if !ok || meta == nil {
 		return count != 0
 	}
-	pageMeta := meta.GetPage()
-	total := pageMeta.GetTotalFilteredCount()
-	return page*pageSize+count < total
+	m := meta.GetPage()
+	if m.HasTotalFilteredCount() {
+		total := m.GetTotalFilteredCount()
+		if total == 0 {
+			return count != 0
+		}
+		return page*pageSize+count < total
+	}
+	return count != 0
 }
-
-
