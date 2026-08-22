@@ -111,6 +111,7 @@ var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
 var _ connectorbuilder.AccountManagerV2 = &userBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &userBuilder{}
 var _ connectorbuilder.CredentialIssuerLimited = &credentialUserBuilder{}
+var _ connectorbuilder.CredentialIssuerV2 = &credentialUserBuilder{}
 var _ connectorbuilder.AccountManagerV2 = &credentialUserBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &credentialUserBuilder{}
 

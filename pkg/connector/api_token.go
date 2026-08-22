@@ -147,8 +147,8 @@ func (o *apiTokenBuilder) List(
 		if err != nil {
 			return nil, nil, err
 		}
-		ret = append(ret, rv)
-}
+ret = append(ret, rv)
+	}
 
 	nextPageToken := ""
 	if hasMoreAPIKeyPages(res, page, int64(len(apiTokens)), defaultV2PageSize) {
