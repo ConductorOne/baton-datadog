@@ -284,6 +284,57 @@ func (o *applicationKeyBuilder) listApplicationKeyPage(
 	return ret, &resource.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
+// applicationKeyScopesProfileKey is the resource-profile field carrying a
+// credential's provider-granted scopes.
+//
+// The name is deliberately generic rather than "datadog_scopes" or
+// "application_key_scopes". Resource.Profile is free-form, this connector is
+// the first V2 credential-issuance implementation, and whatever it picks
+// becomes the de-facto convention for the connectors that follow. A consumer
+// should be able to read one field to learn what a synced credential is
+// allowed to do without knowing which provider minted it, and per-provider
+// prefixes would force exactly the special-casing that defeats. It also
+// matches this repo's existing profile naming, which is unprefixed
+// (userResource uses first_name, login, user_id).
+const applicationKeyScopesProfileKey = "scopes"
+
+// applicationKeyProfileOptions returns the resource options carrying an
+// application key's scopes, or nothing when Datadog did not report them.
+//
+// The representation is chosen so a consumer can tell three provider states
+// apart using only two profile states, without a type switch:
+//
+//   - Datadog did not report scopes (nil): the profile key is ABSENT. Emitting
+//     an empty list here would assert the key is unscoped, which the response
+//     never said, and that is the one error a consumer cannot detect.
+//   - Datadog reported an unscoped key (explicit null, or an empty list): the
+//     key is present and EMPTY. That positively states "no scope restrictions
+//     -- this key carries its owner's full permissions", which is a fact, not
+//     missing data.
+//   - Datadog reported scopes: the key is present and holds them.
+//
+// So the value is always a list when present, never null. Reserving absence
+// for "not reported" keeps the distinction that matters, and reserving null
+// for nothing avoids a key whose type varies between resources -- Profile is
+// rendered generically, and a field that is sometimes null and sometimes an
+// array is a burden on every reader of it.
+func applicationKeyProfileOptions(scopes *[]string) []resource.ResourceOption {
+	if scopes == nil {
+		return nil
+	}
+	// structpb rejects []string outright ("proto: invalid type: []string"), so
+	// the list has to be widened element by element.
+	values := make([]interface{}, 0, len(*scopes))
+	for _, scope := range *scopes {
+		values = append(values, scope)
+	}
+	return []resource.ResourceOption{
+		resource.WithResourceProfile(map[string]interface{}{
+			applicationKeyScopesProfileKey: values,
+		}),
+	}
+}
+
 // applicationKeyResource builds the synced resource for one service-account
 // application key. The type is unambiguous through two structured signals a
 // reader (or a future requester-selection surface) can consume without
@@ -296,8 +347,12 @@ func (o *applicationKeyBuilder) listApplicationKeyPage(
 // field this connector's delete path relies on.
 func applicationKeyResource(appKeyID string, serviceAccountResourceID *v2.ResourceId, attrs *datadogV2.PartialApplicationKeyAttributes) (*v2.Resource, error) {
 	name := appKeyID
-	if attrs != nil && attrs.Name != nil {
-		name = *attrs.Name
+	var scopes *[]string
+	if attrs != nil {
+		if attrs.Name != nil {
+			name = *attrs.Name
+		}
+		scopes = client.ScopesFromNullableList(attrs.GetScopesOk())
 	}
 
 	options := []resource.SecretTraitOption{
@@ -310,6 +365,12 @@ func applicationKeyResource(appKeyID string, serviceAccountResourceID *v2.Resour
 	resourceOptions := []resource.ResourceOption{
 		resource.WithParentResourceID(serviceAccountResourceID),
 	}
+	// Scopes ride on the resource profile: SecretTrait has no scopes field.
+	// This is safe to set alongside the secret trait because NewSecretResource
+	// appends WithSecretTrait after the caller's options, and
+	// syncSecretTraitToResource only copies a trait profile up when the
+	// resource has none -- so the profile set here is never clobbered.
+	resourceOptions = append(resourceOptions, applicationKeyProfileOptions(scopes)...)
 	if attrs != nil && attrs.CreatedAt != nil {
 		createdAt, err := time.Parse(time.RFC3339Nano, *attrs.CreatedAt)
 		if err != nil {

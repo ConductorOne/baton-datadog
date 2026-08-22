@@ -11,8 +11,10 @@ import (
 	"testing"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -822,4 +824,236 @@ func TestApplicationKeyBuilderListSamplesSkipWarning(t *testing.T) {
 		}
 	}
 	require.Equal(t, serviceAccounts*2, attempted, "every service account must be attempted on every walk")
+}
+
+// --- application-key scopes on the resource profile -----------------------
+
+// profileScopes reads the scopes list out of a resource profile. The second
+// return reports whether the key was present at all, which is the distinction
+// the representation turns on: absent means Datadog never reported scopes,
+// present-and-empty means Datadog reported an unscoped key.
+func profileScopes(t *testing.T, r *v2.Resource) ([]string, bool) {
+	t.Helper()
+	profile := r.GetProfile()
+	if profile == nil {
+		return nil, false
+	}
+	value, ok := profile.GetFields()[applicationKeyScopesProfileKey]
+	if !ok {
+		return nil, false
+	}
+	list := value.GetListValue()
+	require.NotNil(t, list, "scopes must always be a list when present, never null")
+	out := make([]string, 0, len(list.GetValues()))
+	for _, item := range list.GetValues() {
+		out = append(out, item.GetStringValue())
+	}
+	return out, true
+}
+
+// TestApplicationKeyResourceScopesProfile: SecretTrait has no scopes field, so
+// scopes ride on Resource.Profile. Datadog's scopes field is a three-state
+// nullable list, and the profile must collapse it to two states without ever
+// claiming a key is unscoped when the provider did not say so. Attributes are
+// decoded from JSON rather than hand-built so the real wire shapes are what
+// gets exercised.
+func TestApplicationKeyResourceScopesProfile(t *testing.T) {
+	tests := []struct {
+		name       string
+		attrsJSON  string
+		wantScopes []string
+		wantKey    bool
+	}{
+		{
+			name:       "scopes reported",
+			attrsJSON:  `{"name":"k","scopes":["dashboards_read","dashboards_write"]}`,
+			wantScopes: []string{"dashboards_read", "dashboards_write"},
+			wantKey:    true,
+		},
+		{
+			name:       "explicit null means unscoped",
+			attrsJSON:  `{"name":"k","scopes":null}`,
+			wantScopes: []string{},
+			wantKey:    true,
+		},
+		{
+			name:       "empty list also means unscoped",
+			attrsJSON:  `{"name":"k","scopes":[]}`,
+			wantScopes: []string{},
+			wantKey:    true,
+		},
+		{
+			name:      "field absent means not reported, so no claim is made",
+			attrsJSON: `{"name":"k"}`,
+			wantKey:   false,
+		},
+	}
+	parent := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var attrs datadogV2.PartialApplicationKeyAttributes
+			require.NoError(t, json.Unmarshal([]byte(tc.attrsJSON), &attrs))
+
+			res, err := applicationKeyResource("appkey-1", parent, &attrs)
+			require.NoError(t, err)
+
+			got, present := profileScopes(t, res)
+			require.Equalf(t, tc.wantKey, present, "profile key presence for %s", tc.attrsJSON)
+			if tc.wantKey {
+				require.Equal(t, tc.wantScopes, got)
+			}
+
+			// Setting the profile must not cost the secret trait:
+			// NewSecretResource applies WithSecretTrait after the caller's
+			// resource options, and its trait-to-resource copy is guarded on
+			// the resource having no profile.
+			trait := &v2.SecretTrait{}
+			annos := annotations.Annotations(res.GetAnnotations())
+			found, err := annos.Pick(trait)
+			require.NoError(t, err)
+			require.True(t, found, "secret trait must survive alongside the profile")
+			require.Equal(t, "datadog.service_account_application_key", trait.GetCredentialDetail())
+		})
+	}
+}
+
+// TestApplicationKeyListCarriesScopes: the scopes reach the resources the sync
+// actually emits, not just the constructor, and a key whose scopes change
+// between syncs reports the new value rather than a cached one.
+func TestApplicationKeyListCarriesScopes(t *testing.T) {
+	scoped := `{"id":"k-scoped","type":"application_keys","attributes":{"name":"scoped","scopes":["logs_read"]}}`
+	unscoped := `{"id":"k-unscoped","type":"application_keys","attributes":{"name":"unscoped","scopes":null}}`
+	usersPages := []string{`[{"id":"sa-1","type":"users","attributes":{"service_account":true}}]`}
+
+	// currentKeys is swapped between drains to simulate a scope change upstream.
+	currentKeys := "[" + scoped + "," + unscoped + "]"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		page := 0
+		if raw := r.URL.Query().Get("page[number]"); raw != "" {
+			_, _ = fmt.Sscanf(raw, "%d", &page)
+		}
+		switch {
+		case r.URL.Path == "/api/v2/users":
+			body := "[]"
+			if page < len(usersPages) {
+				body = usersPages[page]
+			}
+			_, _ = w.Write([]byte(`{"data":` + body + `}`))
+		case strings.HasSuffix(r.URL.Path, "/application_keys"):
+			body := "[]"
+			if page == 0 {
+				body = currentKeys
+			}
+			_, _ = w.Write([]byte(`{"data":` + body + `}`))
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	drain := func() map[string][]string {
+		t.Helper()
+		out := map[string][]string{}
+		token := ""
+		for call := 0; call < 50; call++ {
+			got, results, err := builder.List(context.Background(), nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+			require.NoError(t, err)
+			for _, r := range got {
+				scopes, present := profileScopes(t, r)
+				require.True(t, present, "synced key %s must report scopes", r.GetId().GetResource())
+				out[r.GetId().GetResource()] = scopes
+			}
+			require.NotNil(t, results)
+			if results.NextPageToken == "" {
+				return out
+			}
+			token = results.NextPageToken
+		}
+		t.Fatal("List did not terminate")
+		return nil
+	}
+
+	first := drain()
+	require.Equal(t, []string{"logs_read"}, first["k-scoped"])
+	require.Equal(t, []string{}, first["k-unscoped"], "an unscoped key reports an empty list, not a missing key")
+
+	// The same key, rescoped upstream.
+	currentKeys = `[{"id":"k-scoped","type":"application_keys","attributes":{"name":"scoped","scopes":["logs_read","metrics_read"]}}]`
+	second := drain()
+	require.Equal(t, []string{"logs_read", "metrics_read"}, second["k-scoped"], "a rescoped key must report its new scopes")
+}
+
+// TestIssuePassesScopesToProviderAndProfile: the requested scopes must actually
+// reach Datadog's create call -- a pass-through that no test exercised before --
+// and the issued resource must carry the scopes the provider echoed back, so a
+// freshly vended key agrees with what the next sync will report for it.
+func TestIssuePassesScopesToProviderAndProfile(t *testing.T) {
+	const handle = "handle-scoped-1"
+	requested := []string{"logs_read", "metrics_read"}
+
+	var createBody string
+	appKeysPath := "/api/v2/service_accounts/" + testServiceAccountID + "/application_keys"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/users/"+testServiceAccountID:
+			_, _ = w.Write([]byte(`{"data":{"id":"` + testServiceAccountID + `","type":"users","attributes":{"service_account":true}}}`))
+		case r.Method == http.MethodGet && r.URL.Path == appKeysPath:
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == appKeysPath:
+			buf := new(bytes.Buffer)
+			_, _ = buf.ReadFrom(r.Body)
+			createBody = buf.String()
+			// Echo the scopes back, as Datadog does.
+			_, _ = w.Write([]byte(`{"data":{"id":"` + handle + `","type":"application_keys","attributes":{"key":"plaintext","name":"c1-req-scoped","scopes":["logs_read","metrics_read"]}}}`))
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL))
+	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
+		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
+		RequestID:  "req-scoped",
+		CredentialOptions: v2.CredentialIssueOptions_builder{
+			ApiKey: v2.CredentialIssueOptions_ApiKey_builder{Scopes: requested}.Build(),
+		}.Build(),
+	})
+	require.NoError(t, err)
+
+	// The pass-through into the provider request.
+	require.NotEmpty(t, createBody, "create request body must have been captured")
+	var sent struct {
+		Data struct {
+			Attributes struct {
+				Scopes *[]string `json:"scopes"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(createBody), &sent))
+	require.NotNil(t, sent.Data.Attributes.Scopes, "requested scopes must be sent to Datadog")
+	require.Equal(t, requested, *sent.Data.Attributes.Scopes)
+
+	// And onto the issued resource.
+	scopes, present := profileScopes(t, out.Secret)
+	require.True(t, present, "an issued key must report its scopes immediately")
+	require.Equal(t, requested, scopes)
+}
+
+// TestIssueOmitsScopesProfileWhenProviderSilent: when the create response says
+// nothing about scopes, the issued resource must not claim the key is unscoped.
+func TestIssueOmitsScopesProfileWhenProviderSilent(t *testing.T) {
+	const handle = "handle-silent-1"
+	server, _ := newServiceAccountAppKeyServer(t, testServiceAccountID, handle, "plaintext", "c1-req-silent")
+	defer server.Close()
+
+	out := issueServiceAccountAppKey(t, context.Background(), newLifecycleTestWrapper(server.URL), testServiceAccountID, "req-silent")
+
+	_, present := profileScopes(t, out.Secret)
+	require.False(t, present, "a silent provider response must not be reported as an unscoped key")
 }

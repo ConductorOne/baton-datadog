@@ -87,7 +87,14 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
 		rs.WithSecretDetail("datadog.service_account_application_key"),
 	}
-	secret, err := rs.NewSecretResource(name, serviceAccountApplicationKeyResourceType, key.ID, secretTraitOptions, rs.WithParentResourceID(input.IdentityID))
+	// Carry the key's scopes on the freshly issued resource so a vended key
+	// reports what it can do immediately, rather than only after the next sync
+	// rebuilds it. key.Scopes is what Datadog echoed back rather than what was
+	// requested, so this agrees with what the syncer will later produce for the
+	// same key instead of drifting from it.
+	resourceOptions := append([]rs.ResourceOption{rs.WithParentResourceID(input.IdentityID)},
+		applicationKeyProfileOptions(key.Scopes)...)
+	secret, err := rs.NewSecretResource(name, serviceAccountApplicationKeyResourceType, key.ID, secretTraitOptions, resourceOptions...)
 	if err != nil {
 		if deleteErr := u.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, key.ID); deleteErr != nil {
 			ctxzap.Extract(ctx).Warn("failed to clean up Datadog service account application key after resource construction error",

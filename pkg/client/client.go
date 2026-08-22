@@ -248,6 +248,31 @@ type IssuedApplicationKey struct {
 	ID               string
 	Secret           string
 	ServiceAccountID string
+	// Scopes is what the provider echoed back for the created key, which is
+	// authoritative over what was requested: Datadog is free to normalize the
+	// list. nil means Datadog did not report scopes at all, which is distinct
+	// from a non-nil empty slice -- Datadog represents an unscoped key (one
+	// carrying its owner's full permissions) as an explicit JSON null, and
+	// collapsing "not reported" into "unscoped" would assert something the
+	// response never said. See scopesFromNullableList.
+	Scopes *[]string
+}
+
+// ScopesFromNullableList reads Datadog's three-state nullable scopes list into
+// two states a caller can act on. Datadog distinguishes unset (field absent
+// from the response), explicit null (the documented shape for an unscoped key)
+// and a list. Explicit null and a list both mean "Datadog told us the scopes",
+// so they collapse to a non-nil slice -- empty for unscoped. Unset stays nil so
+// callers can tell "no scope restrictions" from "the provider did not say".
+func ScopesFromNullableList(raw *[]string, isSet bool) *[]string {
+	if !isSet {
+		return nil
+	}
+	granted := []string{}
+	if raw != nil {
+		granted = *raw
+	}
+	return &granted
 }
 
 // CreateServiceAccountApplicationKey issues a new application key scoped to
@@ -272,7 +297,12 @@ func (w *DatadogClient) CreateServiceAccountApplicationKey(ctx context.Context, 
 	if appKey.Id == nil || appKey.Attributes == nil || appKey.Attributes.Key == nil || *appKey.Attributes.Key == "" {
 		return nil, fmt.Errorf("create service account application key response omitted id or key")
 	}
-	return &IssuedApplicationKey{ID: *appKey.Id, Secret: *appKey.Attributes.Key, ServiceAccountID: serviceAccountID}, nil
+	return &IssuedApplicationKey{
+		ID:               *appKey.Id,
+		Secret:           *appKey.Attributes.Key,
+		ServiceAccountID: serviceAccountID,
+		Scopes:           ScopesFromNullableList(appKey.Attributes.GetScopesOk()),
+	}, nil
 }
 
 // FindServiceAccountApplicationKeyByName returns an exact name match among a
