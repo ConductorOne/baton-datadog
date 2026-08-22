@@ -4,7 +4,7 @@
     {
       "resourceType": {
         "id": "api-key",
-        "displayName": "API Key",
+        "displayName": "Organization API Key",
         "traits": [
           "TRAIT_SECRET"
         ],
@@ -27,7 +27,7 @@
             ]
           }
         ],
-        "description": "Credential issuance creates keys owned by the connector's Datadog principal, not the selected Datadog user."
+        "description": "A Datadog organization API key. Owned by the org, not by any single Datadog identity; not used for credential issuance by this connector."
       },
       "capabilities": [
         "CAPABILITY_SYNC",
@@ -108,6 +108,40 @@
     },
     {
       "resourceType": {
+        "id": "service-account-application-key",
+        "displayName": "Service Account Application Key",
+        "traits": [
+          "TRAIT_SECRET"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+          },
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
+            "permissions": [
+              {
+                "permission": "user_access_manage"
+              }
+            ]
+          }
+        ],
+        "description": "A Datadog application key owned by one service-account identity. Distinct from an org API key (\"api-key\"): scoped to, and deleted through, its owning service account."
+      },
+      "capabilities": [
+        "CAPABILITY_SYNC",
+        "CAPABILITY_RESOURCE_DELETE"
+      ],
+      "permissions": {
+        "permissions": [
+          {
+            "permission": "user_access_manage"
+          }
+        ]
+      }
+    },
+    {
+      "resourceType": {
         "id": "team",
         "displayName": "Team",
         "traits": [
@@ -179,8 +213,9 @@
         "options": [
           {
             "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
+            "customScopesAllowed": true,
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
-            "secretResourceTypeId": "api-key"
+            "secretResourceTypeId": "service-account-application-key"
           }
         ],
         "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"

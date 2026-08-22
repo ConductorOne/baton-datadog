@@ -43,14 +43,38 @@ var (
 			capabilityPermissions("user_access_manage"),
 		),
 	}
+	// apiTokenResourceType covers organization-scoped API keys (Datadog's
+	// "API keys", /api/v2/api_keys): org-wide credentials not owned by any
+	// single Datadog identity. This connector still syncs and can delete
+	// them, but Issue no longer targets this type -- an org-scoped key
+	// issued on behalf of a selected user is not an honest mapping of who
+	// holds it. See serviceAccountApplicationKeyResourceType for the type
+	// Issue does target.
 	apiTokenResourceType = &v2.ResourceType{
 		Id:          "api-key",
-		DisplayName: "API Key",
-		Description: "Credential issuance creates keys owned by the connector's Datadog principal, not the selected Datadog user.",
+		DisplayName: "Organization API Key",
+		Description: "A Datadog organization API key. Owned by the org, not by any single Datadog identity; not used for credential issuance by this connector.",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
 		Annotations: annotations.New(
 			&v2.SkipEntitlementsAndGrants{},
 			capabilityPermissions("api_keys_read", "api_keys_write", "api_keys_delete"),
+		),
+	}
+	// serviceAccountApplicationKeyResourceType covers application keys owned
+	// by a Datadog service-account user (/api/v2/service_accounts/{id}/application_keys).
+	// This is the resource type credential issuance targets: the key is
+	// scoped to and owned by one service-account identity, so a synced
+	// resource of this type is distinguishable from an apiTokenResourceType
+	// (organization API key) by resource type id, display name, and the
+	// underlying SecretTrait's credential_detail (see application_key.go).
+	serviceAccountApplicationKeyResourceType = &v2.ResourceType{
+		Id:          "service-account-application-key",
+		DisplayName: "Service Account Application Key",
+		Description: "A Datadog application key owned by one service-account identity. Distinct from an org API key (\"api-key\"): scoped to, and deleted through, its owning service account.",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
+		Annotations: annotations.New(
+			&v2.SkipEntitlementsAndGrants{},
+			capabilityPermissions("user_access_manage"),
 		),
 	}
 	scheduleResourceType = &v2.ResourceType{

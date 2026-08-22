@@ -270,6 +270,105 @@ func (w *DatadogClient) DeleteAPIKey(ctx context.Context, id string) error {
 	return nil
 }
 
+// IssuedApplicationKey is the result of issuing a Datadog service-account
+// application key: the provider handle (ID), the one-time plaintext secret,
+// and the service-account id that owns it. ServiceAccountID is required at
+// delete time -- DeleteServiceAccountApplicationKey has no lookup-by-id-alone
+// form -- so callers must retain it (see application_key.go's Delete doc
+// comment: it travels via ResourceDeleterV2Limited.Delete's parentResourceID
+// parameter, not a packed handle string).
+type IssuedApplicationKey struct {
+	ID               string
+	Secret           string
+	ServiceAccountID string
+}
+
+// CreateServiceAccountApplicationKey issues a new application key scoped to
+// and owned by the given Datadog service account. Scopes may be empty (an
+// unscoped application key).
+func (w *DatadogClient) CreateServiceAccountApplicationKey(ctx context.Context, serviceAccountID, name string, scopes []string) (*IssuedApplicationKey, error) {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewServiceAccountsApi(w.officialClient)
+	attrs := *datadogV2.NewApplicationKeyCreateAttributes(name)
+	if len(scopes) > 0 {
+		attrs.SetScopes(scopes)
+	}
+	data := *datadogV2.NewApplicationKeyCreateData(attrs, datadogV2.APPLICATIONKEYSTYPE_APPLICATION_KEYS)
+	response, httpRes, err := api.CreateServiceAccountApplicationKey(ctx, serviceAccountID, *datadogV2.NewApplicationKeyCreateRequest(data))
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, wrapOfficialClientError("create service account application key", httpRes, err)
+	}
+	appKey := response.GetData()
+	if appKey.Id == nil || appKey.Attributes == nil || appKey.Attributes.Key == nil || *appKey.Attributes.Key == "" {
+		return nil, fmt.Errorf("create service account application key response omitted id or key")
+	}
+	return &IssuedApplicationKey{ID: *appKey.Id, Secret: *appKey.Attributes.Key, ServiceAccountID: serviceAccountID}, nil
+}
+
+// FindServiceAccountApplicationKeyByName returns an exact name match among a
+// single service account's application keys, if one exists. Mirrors
+// FindAPIKeyByName's exact-match-after-filter, paginated pattern, scoped to
+// one service account instead of the whole org.
+func (w *DatadogClient) FindServiceAccountApplicationKeyByName(ctx context.Context, serviceAccountID, name string) (*datadogV2.PartialApplicationKey, error) {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewServiceAccountsApi(w.officialClient)
+	const pageSize = int64(100)
+	for page := int64(0); ; page++ {
+		params := *datadogV2.NewListServiceAccountApplicationKeysOptionalParameters().WithFilter(name).WithPageSize(pageSize).WithPageNumber(page)
+		response, httpRes, err := api.ListServiceAccountApplicationKeys(ctx, serviceAccountID, params)
+		if httpRes != nil {
+			httpRes.Body.Close()
+		}
+		if err != nil {
+			return nil, wrapOfficialClientError("find service account application key by name", httpRes, err)
+		}
+		for _, key := range response.GetData() {
+			if key.Attributes != nil && key.Attributes.GetName() == name {
+				return &key, nil
+			}
+		}
+		if int64(len(response.GetData())) < pageSize {
+			return nil, nil
+		}
+	}
+}
+
+// ListServiceAccountApplicationKeys lists every application key owned by the
+// given service account, one page at a time via pageNumber/pageSize.
+func (w *DatadogClient) ListServiceAccountApplicationKeys(ctx context.Context, serviceAccountID string, pageNumber, pageSize int64) (*datadogV2.ListApplicationKeysResponse, error) {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewServiceAccountsApi(w.officialClient)
+	params := *datadogV2.NewListServiceAccountApplicationKeysOptionalParameters().WithPageSize(pageSize).WithPageNumber(pageNumber)
+	resp, httpRes, err := api.ListServiceAccountApplicationKeys(ctx, serviceAccountID, params)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, wrapOfficialClientError("list service account application keys", httpRes, err)
+	}
+	return &resp, nil
+}
+
+// DeleteServiceAccountApplicationKey deletes an application key owned by the
+// given service account. Unlike DeleteAPIKey, Datadog's API requires both the
+// owning service-account id and the key id -- there is no delete-by-key-id-alone
+// form for this credential type.
+func (w *DatadogClient) DeleteServiceAccountApplicationKey(ctx context.Context, serviceAccountID, appKeyID string) error {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewServiceAccountsApi(w.officialClient)
+	httpRes, err := api.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, appKeyID)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return wrapOfficialClientError("delete service account application key", httpRes, err)
+	}
+	return nil
+}
+
 // Wrapper methods that handle HTTP response body closing automatically
 
 // ListRoleUsers lists users for a specific role and automatically handles HTTP response body closing.

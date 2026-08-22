@@ -34,48 +34,71 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 		Options: []*v2.CredentialIssueOptionDescriptor{v2.CredentialIssueOptionDescriptor_builder{
 			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
-			SecretResourceTypeId: apiTokenResourceType.Id,
+			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
+			CustomScopesAllowed:  true,
 		}.Build()},
 		PreferredOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
 	}.Build(), nil, nil
 }
 
+// Issue mints a Datadog service-account application key scoped to and owned
+// by the target identity. Per SPEC-07 (the judged Datadog credential-issuance
+// design), this is the only honest issuance mapping this connector supports:
+// an organization API key or a current-user application key has no reliable
+// non-human owner, so Issue targets a service-account application key
+// instead, gated on a live re-check that the target is actually a Datadog
+// service account (its user record may have changed since it was last
+// synced).
 func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	if input == nil || input.IdentityID == nil || input.IdentityID.GetResourceType() != userResourceType.Id {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: a Datadog user identity is required")
 	}
-	name := "c1-" + input.RequestID
-	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	serviceAccountID := input.IdentityID.GetResource()
+
+	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: look up API key for request %q: %w", input.RequestID, err)
+		return nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
+	}
+	if !userResp.GetData().Attributes.GetServiceAccount() {
+		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account; credential issuance only targets service accounts", serviceAccountID)
+	}
+
+	name := "c1-" + input.RequestID
+	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", input.RequestID, err)
 	}
 	if existing != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: API key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
+		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
 	}
-	key, err := u.wrapper.CreateAPIKey(ctx, name)
+
+	scopes := input.CredentialOptions.GetApiKey().GetScopes()
+	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: create API key: %w", err)
+		return nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
 	}
+
 	secretTraitOptions := []rs.SecretTraitOption{
 		rs.WithSecretCreatedByID(input.IdentityID),
 		rs.WithSecretIdentityID(input.IdentityID),
 		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
-		rs.WithSecretDetail("datadog.api_key"),
+		rs.WithSecretDetail("datadog.service_account_application_key"),
 	}
-	secret, err := rs.NewSecretResource(name, apiTokenResourceType, key.ID, secretTraitOptions)
+	secret, err := rs.NewSecretResource(name, serviceAccountApplicationKeyResourceType, key.ID, secretTraitOptions, rs.WithParentResourceID(input.IdentityID))
 	if err != nil {
-		if deleteErr := u.wrapper.DeleteAPIKey(ctx, key.ID); deleteErr != nil {
-			ctxzap.Extract(ctx).Warn("failed to clean up Datadog API key after resource construction error",
-				zap.String("api_key_id", key.ID),
+		if deleteErr := u.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, key.ID); deleteErr != nil {
+			ctxzap.Extract(ctx).Warn("failed to clean up Datadog service account application key after resource construction error",
+				zap.String("service_account_id", serviceAccountID),
+				zap.String("application_key_id", key.ID),
 				zap.Error(deleteErr),
 			)
 		}
-		return nil, fmt.Errorf("baton-datadog: build API key secret resource: %w", err)
+		return nil, fmt.Errorf("baton-datadog: build service account application key secret resource: %w", err)
 	}
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret: secret,
 		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{Name: "api_key", Bytes: []byte(key.Secret)}.Build(),
+			v2.PlaintextData_builder{Name: "application_key", Bytes: []byte(key.Secret)}.Build(),
 		},
 		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
