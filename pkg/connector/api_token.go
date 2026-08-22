@@ -147,7 +147,7 @@ func (o *apiTokenBuilder) List(
 		if err != nil {
 			return nil, nil, err
 		}
-ret = append(ret, rv)
+		ret = append(ret, rv)
 	}
 
 	nextPageToken := ""
