@@ -183,9 +183,6 @@
               },
               {
                 "permission": "user_access_manage"
-              },
-              {
-                "permission": "service_account_write"
               }
             ]
           }
@@ -203,9 +200,6 @@
           },
           {
             "permission": "user_access_manage"
-          },
-          {
-            "permission": "service_account_write"
           }
         ]
       },

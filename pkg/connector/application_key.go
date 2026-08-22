@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
@@ -22,6 +23,13 @@ import (
 type applicationKeyBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
+
+	// skippedServiceAccounts counts how many service accounts this syncer has
+	// skipped because their application keys could not be read. The warning
+	// that reports a skip is sampled (L7): the case it exists for is a role
+	// missing service_account_write org-wide, which makes it fire for every
+	// service account on every sync.
+	skippedServiceAccounts atomic.Int64
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &applicationKeyBuilder{}
@@ -203,12 +211,19 @@ func (o *applicationKeyBuilder) listApplicationKeyPage(
 		// skip that one service account rather than failing the whole sync
 		// (criteria R7); every other provider error still fails hard.
 		if code := status.Code(err); code == codes.PermissionDenied || code == codes.NotFound {
-			ctxzap.Extract(ctx).Warn(
-				"baton-datadog: skipping application keys for service account",
-				zap.String("service_account_id", serviceAccountID),
-				zap.String("code", code.String()),
-				zap.Error(err),
-			)
+			// Sampled, not per-service-account: an org-wide missing
+			// service_account_write would otherwise emit one line per service
+			// account on every sync. total_occurrences keeps the real count
+			// visible on the lines that do get through.
+			if total := o.skippedServiceAccounts.Add(1); shouldLogSampled(total) {
+				ctxzap.Extract(ctx).Warn(
+					"baton-datadog: skipping application keys for service account",
+					zap.String("service_account_id", serviceAccountID),
+					zap.String("code", code.String()),
+					zap.Int64("total_occurrences", total),
+					zap.Error(err),
+				)
+			}
 			bag.Pop()
 			nextPageToken, marshalErr := bag.Marshal()
 			if marshalErr != nil {

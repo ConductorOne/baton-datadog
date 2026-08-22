@@ -130,3 +130,24 @@ func hasMoreAPIKeyPages(res *datadogV2.APIKeysResponse, page int64, count int64,
 	}
 	return count != 0
 }
+
+// shouldLogSampled reports whether the nth occurrence (1-based) of a repeating
+// event should be logged, on the logarithmic schedule the repo's review
+// criteria require for warnings that can fire once per resource (L7): the 1st,
+// 10th and 100th occurrence, then every 1000th. Callers pass the running total
+// and put it on the record as total_occurrences, so a sampled line still says
+// how many times the event really happened.
+//
+// Neither this repo nor the vendored baton-sdk ships a sampling helper, so this
+// is the smallest thing that satisfies the criteria; it is deliberately a pure
+// function of the count, with the counter owned by the caller.
+func shouldLogSampled(n int64) bool {
+	switch {
+	case n <= 0:
+		return false
+	case n == 1, n == 10, n == 100:
+		return true
+	default:
+		return n%1000 == 0
+	}
+}
