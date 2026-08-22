@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
@@ -10,7 +11,10 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -92,13 +96,27 @@ func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.Resou
 	return nil, nil
 }
 
-// List syncs every application key owned by a Datadog service account. It
-// pages through users (the same page cursor shape apiTokenBuilder/userBuilder
-// use), and for each service account found in a page, fully drains that
-// service account's own application-key pages via the dedicated
+// maxApplicationKeyPages bounds one service account's application-key paging
+// so a provider that ignores page[number] and keeps returning full pages
+// fails closed instead of paging forever. 10_000 pages (1M keys) is far
+// beyond any real service account's application-key count.
+const maxApplicationKeyPages = int64(10_000)
+
+// List returns at most one provider page per call. The sync walks two levels:
+// the users pages, to discover which users are service accounts, and then each
+// service account's own application-key pages, read through the dedicated
 // service-account-scoped list API SPEC-07 requires -- not the org-wide
-// application-key list, which would include human-owned keys this
-// connector's issuance mapping deliberately never targets.
+// application-key list, which would include human-owned keys this connector's
+// issuance mapping deliberately never targets.
+//
+// Both levels live in the pagination bag: a users-level state at the bottom,
+// and one child state per discovered service account pushed above it. Because
+// the bag is a stack, a users page's service accounts are fully drained before
+// the next users page is fetched, and every call issues exactly one provider
+// list request. Draining every application-key page for every service account
+// inside a single List call is the F2 pattern the connector criteria forbid --
+// it denies the SDK any chance to checkpoint, respect rate limits, or cancel,
+// and buffers the whole org's keys in memory first.
 func (o *applicationKeyBuilder) List(
 	ctx context.Context,
 	_ *v2.ResourceId,
@@ -109,13 +127,38 @@ func (o *applicationKeyBuilder) List(
 		return nil, nil, err
 	}
 
+	// A child state names the service account whose application keys it is
+	// paging; the users-level state carries no resource id.
+	if current := bag.Current(); current != nil &&
+		current.ResourceTypeID == userResourceType.Id && current.ResourceID != "" {
+		return o.listApplicationKeyPage(ctx, bag, current.ResourceID, page)
+	}
+	return o.listServiceAccountsPage(ctx, bag, page)
+}
+
+// listServiceAccountsPage consumes one users page and pushes a child state for
+// every service account on it. It returns no resources of its own -- the
+// application keys are produced by those child states on subsequent calls.
+func (o *applicationKeyBuilder) listServiceAccountsPage(
+	ctx context.Context,
+	bag *pagination.Bag,
+	page int64,
+) ([]*v2.Resource, *resource.SyncOpResults, error) {
 	users, err := o.wrapper.ListUsers(ctx, datadogV2.NewListUsersOptionalParameters().WithPageNumber(page))
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-datadog: list users while syncing service account application keys: %w", err)
 	}
 
-	var ret []*v2.Resource
-	for _, user := range users.GetData() {
+	data := users.GetData()
+	if len(data) == 0 {
+		// Users are exhausted: drop the users-level state so the sync ends
+		// once the child states pushed by earlier pages are drained.
+		bag.Pop()
+	} else if err := bag.Next(strconv.FormatInt(page+1, 10)); err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: advance users page: %w", err)
+	}
+
+	for _, user := range data {
 		if user.Attributes == nil || !user.Attributes.GetServiceAccount() {
 			continue
 		}
@@ -123,48 +166,84 @@ func (o *applicationKeyBuilder) List(
 		if serviceAccountID == "" {
 			continue
 		}
-		serviceAccountResourceID := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: serviceAccountID}
-
-		// maxApplicationKeyPages bounds the inner drain so a provider that
-		// ignores page[number] and keeps returning full pages fails closed
-		// (an error, not an infinite request loop that never lets the SDK
-		// checkpoint). 10_000 pages (1M keys) is far beyond any real service
-		// account's application-key count.
-		const maxApplicationKeyPages = int64(10_000)
-		appKeyPage := int64(0)
-		for ; appKeyPage < maxApplicationKeyPages; appKeyPage++ {
-			resp, err := o.wrapper.ListServiceAccountApplicationKeys(ctx, serviceAccountID, appKeyPage, defaultV2PageSize)
-			if err != nil {
-				return nil, nil, fmt.Errorf("baton-datadog: list application keys for service account %q: %w", serviceAccountID, err)
-			}
-			keys := resp.GetData()
-			for _, key := range keys {
-				if key.Id == nil {
-					continue
-				}
-				rv, err := applicationKeyResource(*key.Id, serviceAccountResourceID, key.Attributes)
-				if err != nil {
-					return nil, nil, err
-				}
-				ret = append(ret, rv)
-			}
-			if int64(len(keys)) < defaultV2PageSize {
-				break
-			}
-		}
-		if appKeyPage >= maxApplicationKeyPages {
-			return nil, nil, fmt.Errorf("baton-datadog: exceeded %d application-key pages for service account %q without a short page", maxApplicationKeyPages, serviceAccountID)
-		}
+		bag.Push(pagination.PageState{
+			ResourceTypeID: userResourceType.Id,
+			ResourceID:     serviceAccountID,
+		})
 	}
 
-	nextPageToken := ""
-	if len(users.GetData()) != 0 {
-		nextPageToken, err = getPageTokenFromPage(bag, page+1)
+	nextPageToken, err := bag.Marshal()
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: marshal pagination bag: %w", err)
+	}
+	return nil, &resource.SyncOpResults{NextPageToken: nextPageToken}, nil
+}
+
+// listApplicationKeyPage returns one page of a single service account's
+// application keys.
+func (o *applicationKeyBuilder) listApplicationKeyPage(
+	ctx context.Context,
+	bag *pagination.Bag,
+	serviceAccountID string,
+	page int64,
+) ([]*v2.Resource, *resource.SyncOpResults, error) {
+	if page >= maxApplicationKeyPages {
+		return nil, nil, fmt.Errorf(
+			"baton-datadog: exceeded %d application-key pages for service account %q without a short page",
+			maxApplicationKeyPages, serviceAccountID)
+	}
+
+	resp, err := o.wrapper.ListServiceAccountApplicationKeys(ctx, serviceAccountID, page, defaultV2PageSize)
+	if err != nil {
+		// ListServiceAccountApplicationKeys requires Datadog's
+		// service_account_write permission, which this sync path is the
+		// first to need: an install that already had sync-secrets on for
+		// read-only key inventory may run a read-mostly custom role that
+		// lacks it. A service account can also be deleted mid-sync. Warn and
+		// skip that one service account rather than failing the whole sync
+		// (criteria R7); every other provider error still fails hard.
+		if code := status.Code(err); code == codes.PermissionDenied || code == codes.NotFound {
+			ctxzap.Extract(ctx).Warn(
+				"baton-datadog: skipping application keys for service account",
+				zap.String("service_account_id", serviceAccountID),
+				zap.String("code", code.String()),
+				zap.Error(err),
+			)
+			bag.Pop()
+			nextPageToken, marshalErr := bag.Marshal()
+			if marshalErr != nil {
+				return nil, nil, fmt.Errorf("baton-datadog: marshal pagination bag: %w", marshalErr)
+			}
+			return nil, &resource.SyncOpResults{NextPageToken: nextPageToken}, nil
+		}
+		return nil, nil, fmt.Errorf("baton-datadog: list application keys for service account %q: %w", serviceAccountID, err)
+	}
+
+	serviceAccountResourceID := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: serviceAccountID}
+	keys := resp.GetData()
+	ret := make([]*v2.Resource, 0, len(keys))
+	for _, key := range keys {
+		if key.Id == nil {
+			continue
+		}
+		rv, err := applicationKeyResource(*key.Id, serviceAccountResourceID, key.Attributes)
 		if err != nil {
-			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
+			return nil, nil, err
 		}
+		ret = append(ret, rv)
 	}
 
+	if int64(len(keys)) < defaultV2PageSize {
+		// Short page: this service account is done.
+		bag.Pop()
+	} else if err := bag.Next(strconv.FormatInt(page+1, 10)); err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: advance application-key page: %w", err)
+	}
+
+	nextPageToken, err := bag.Marshal()
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: marshal pagination bag: %w", err)
+	}
 	return ret, &resource.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 

@@ -3,6 +3,7 @@ package connector
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,8 @@ import (
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/pagination"
+	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -469,4 +472,203 @@ func TestApplicationKeyBuilderDeleteRejectsMalformedHandle(t *testing.T) {
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
 		})
 	}
+}
+
+// --- applicationKeyBuilder.List paging ------------------------------------
+
+// newAppKeyListServer fakes the two endpoints applicationKeyBuilder.List
+// walks. usersPages[n] is the JSON "data" array for users page n, and
+// appKeyPages[serviceAccountID][n] is that service account's application-key
+// page n. A service account id present in forbidden gets a 403 instead, which
+// is what a Datadog role without service_account_write returns.
+func newAppKeyListServer(
+	t *testing.T,
+	usersPages []string,
+	appKeyPages map[string][]string,
+	forbidden map[string]bool,
+) (*httptest.Server, *[]recordedRequest) {
+	t.Helper()
+	requests := &[]recordedRequest{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recordRequest(t, requests, r)
+		w.Header().Set("Content-Type", "application/json")
+		page := 0
+		if raw := r.URL.Query().Get("page[number]"); raw != "" {
+			if _, err := fmt.Sscanf(raw, "%d", &page); err != nil {
+				t.Errorf("unparsable page[number]=%q", raw)
+			}
+		}
+
+		if r.URL.Path == "/api/v2/users" {
+			body := "[]"
+			if page < len(usersPages) {
+				body = usersPages[page]
+			}
+			_, _ = w.Write([]byte(`{"data":` + body + `}`))
+			return
+		}
+
+		const prefix = "/api/v2/service_accounts/"
+		const suffix = "/application_keys"
+		if strings.HasPrefix(r.URL.Path, prefix) && strings.HasSuffix(r.URL.Path, suffix) {
+			serviceAccountID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, prefix), suffix)
+			if forbidden[serviceAccountID] {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"errors":["Forbidden"]}`))
+				return
+			}
+			pages := appKeyPages[serviceAccountID]
+			body := "[]"
+			if page < len(pages) {
+				body = pages[page]
+			}
+			_, _ = w.Write([]byte(`{"data":` + body + `}`))
+			return
+		}
+
+		t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	return server, requests
+}
+
+// appKeyPageJSON builds one application-key page of count keys, named by prefix.
+func appKeyPageJSON(prefix string, count int) string {
+	keys := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		keys = append(keys, fmt.Sprintf(`{"id":"%s-%d","type":"application_keys","attributes":{"name":"%s-%d"}}`, prefix, i, prefix, i))
+	}
+	return "[" + strings.Join(keys, ",") + "]"
+}
+
+// drainAppKeyList runs List to exhaustion the way the SDK does -- feeding each
+// call the previous call's NextPageToken -- and reports, per call, how many
+// provider requests that single call issued.
+func drainAppKeyList(t *testing.T, builder *applicationKeyBuilder, requests *[]recordedRequest) ([]*v2.Resource, []int) {
+	t.Helper()
+	ctx := context.Background()
+	var all []*v2.Resource
+	var requestsPerCall []int
+	token := ""
+	// The guard keeps a paging regression from hanging the suite.
+	const maxCalls = 100
+	for call := 0; ; call++ {
+		require.Less(t, call, maxCalls, "List did not terminate")
+		before := len(*requests)
+		got, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		require.NoError(t, err)
+		requestsPerCall = append(requestsPerCall, len(*requests)-before)
+		all = append(all, got...)
+		require.NotNil(t, results)
+		if results.NextPageToken == "" {
+			return all, requestsPerCall
+		}
+		token = results.NextPageToken
+	}
+}
+
+// TestApplicationKeyBuilderListReturnsOnePagePerCall: List must issue at most
+// one provider list request per call and must not drain a service account's
+// application-key pages inside a single call (criteria F2), while still
+// returning every key across the whole walk.
+func TestApplicationKeyBuilderListReturnsOnePagePerCall(t *testing.T) {
+	usersPages := []string{
+		`[{"id":"sa-1","type":"users","attributes":{"service_account":true}},` +
+			`{"id":"human-1","type":"users","attributes":{"service_account":false}},` +
+			`{"id":"sa-2","type":"users","attributes":{"service_account":true}}]`,
+	}
+	appKeyPages := map[string][]string{
+		// sa-1 spans two pages: a full page forces a second request.
+		"sa-1": {appKeyPageJSON("sa1key", defaultV2PageSize), appKeyPageJSON("sa1key-p2", 1)},
+		"sa-2": {appKeyPageJSON("sa2key", 2)},
+	}
+	server, requests := newAppKeyListServer(t, usersPages, appKeyPages, nil)
+	defer server.Close()
+
+	got, requestsPerCall := drainAppKeyList(t, newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL)), requests)
+
+	for call, n := range requestsPerCall {
+		require.LessOrEqualf(t, n, 1, "List call %d issued %d provider requests; at most one page per call is allowed", call, n)
+	}
+	// The walk needs a users page, three application-key pages (two for sa-1,
+	// one for sa-2) and a final empty users page. Spreading those over
+	// separate calls is the point: draining them inside one call is what F2
+	// forbids, and would show up here as a single call issuing them all.
+	require.GreaterOrEqual(t, len(requestsPerCall), 5, "the walk must span multiple List calls, one provider page each")
+	require.Len(t, *requests, len(requestsPerCall), "one provider request per List call")
+
+	require.Len(t, got, defaultV2PageSize+1+2, "every application key across both service accounts must be returned")
+
+	ids := make(map[string]bool, len(got))
+	for _, r := range got {
+		ids[r.GetId().GetResource()] = true
+		require.Equal(t, serviceAccountApplicationKeyResourceType.Id, r.GetId().GetResourceType())
+	}
+	require.True(t, ids["sa1key-0"], "first page of sa-1 keys must be present")
+	require.True(t, ids["sa1key-p2-0"], "second page of sa-1 keys must be present")
+	require.True(t, ids["sa2key-0"], "sa-2 keys must be present")
+
+	// A human user must never be queried for service-account application keys.
+	for _, req := range *requests {
+		require.NotContains(t, req.path, "human-1")
+	}
+}
+
+// TestApplicationKeyBuilderListSkipsForbiddenServiceAccount: a 403 from
+// ListServiceAccountApplicationKeys -- what an install whose Datadog role
+// lacks service_account_write gets -- must skip that one service account and
+// let the rest of the sync finish, not fail the whole sync (criteria R7).
+func TestApplicationKeyBuilderListSkipsForbiddenServiceAccount(t *testing.T) {
+	usersPages := []string{
+		`[{"id":"sa-forbidden","type":"users","attributes":{"service_account":true}},` +
+			`{"id":"sa-ok","type":"users","attributes":{"service_account":true}}]`,
+	}
+	appKeyPages := map[string][]string{"sa-ok": {appKeyPageJSON("okkey", 1)}}
+	server, requests := newAppKeyListServer(t, usersPages, appKeyPages, map[string]bool{"sa-forbidden": true})
+	defer server.Close()
+
+	got, _ := drainAppKeyList(t, newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL)), requests)
+
+	require.Len(t, got, 1, "the readable service account's keys must still sync")
+	require.Equal(t, "okkey-0", got[0].GetId().GetResource())
+
+	attempted := false
+	for _, req := range *requests {
+		if strings.Contains(req.path, "sa-forbidden") {
+			attempted = true
+		}
+	}
+	require.True(t, attempted, "the forbidden service account must actually have been attempted")
+}
+
+// TestApplicationKeyBuilderListFailsHardOnUnexpectedError: only
+// PermissionDenied/NotFound are skipped; any other provider error must still
+// abort the sync rather than silently under-reporting keys.
+func TestApplicationKeyBuilderListFailsHardOnUnexpectedError(t *testing.T) {
+	requests := &[]recordedRequest{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recordRequest(t, requests, r)
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/v2/users" {
+			_, _ = w.Write([]byte(`{"data":[{"id":"sa-1","type":"users","attributes":{"service_account":true}}]}`))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"errors":["boom"]}`))
+	}))
+	defer server.Close()
+
+	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	ctx := context.Background()
+	token := ""
+	for call := 0; call < 10; call++ {
+		_, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		if err != nil {
+			return // expected: the 5xx aborted the sync
+		}
+		require.NotNil(t, results)
+		require.NotEmpty(t, results.NextPageToken, "sync ended without surfacing the provider 5xx")
+		token = results.NextPageToken
+	}
+	t.Fatal("List never surfaced the provider 5xx")
 }
