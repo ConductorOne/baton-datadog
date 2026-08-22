@@ -19,7 +19,7 @@ sidebarTitle: "Datadog"
 | Teams | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | |
 | Schedules | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>* | | | |
 | Secrets - Organization API keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
-| Secrets - Service account application keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
+| Secrets - Service account application keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>† |
 
 [This connector can sync secrets](/product/admin/inventory) and display them on the **Inventory** page. Organization API keys and service account application keys are synced and shown as distinct secret kinds; only application keys owned by a Datadog service account can be issued.
 
@@ -32,6 +32,8 @@ Revoking a service account application key requires the caller to supply that ow
 </Warning>
 
 *Schedules and application-key issuance are not enabled by default. Enable **Sync schedules** or **Sync secrets**, respectively, when configuring the connector.
+
+†Revoking a service account application key requires the request to name the owning service account as well as the key, because Datadog has no delete-by-key-id-alone form for these keys. A revoke request that omits it is refused rather than guessing. Until the requesting workflow supplies it, revocation is implemented and advertised but will not complete — see the note above.
 
 ### Connector actions
 
@@ -50,7 +52,7 @@ Configuring the connector requires you to pass in credentials generated in Datad
 <Warning>
 A user with the **Connector Administrator** or **Super Administrator** role in C1 and the **Datadog Admin** or **Datadog standard** role in Datadog must perform this task.
 
-If your user has a custom Datadog role, make sure it includes **User App Keys**, **User Access Invite**, and **User Access Manage** to create, update, enable, and disable users from C1. **User Access Manage** also governs issuing, syncing, and revoking service account application keys. If you enable **Sync secrets** to sync or revoke organization API keys, also add **API Keys Read** and **API Keys Delete**.
+If your user has a custom Datadog role, make sure it includes **User App Keys**, **User Access Invite**, and **User Access Manage** to create, update, enable, and disable users from C1. If you enable **Sync secrets**, also add **Service Account Write**, which governs syncing, issuing, and revoking service account application keys, plus **API Keys Read** and **API Keys Delete** to sync and revoke organization API keys.
 </Warning>
 
 ### Locate your Datadog site

@@ -224,41 +224,6 @@ func (w *DatadogClient) FindAPIKeyByName(ctx context.Context, name string) (*dat
 	return nil, fmt.Errorf("find API key by name: exceeded %d pages", maxPages)
 }
 
-func (w *DatadogClient) GetAPIKey(ctx context.Context, id string) (*datadogV2.APIKeyResponse, error) {
-	// GET /api/v2/api_keys/{api_key_id}. Requires the api_keys_read permission.
-	ctx = w.withAuthContext(ctx)
-	api := datadogV2.NewKeyManagementApi(w.officialClient)
-	response, httpRes, err := api.GetAPIKey(ctx, id)
-	if httpRes != nil {
-		defer httpRes.Body.Close()
-	}
-	if err != nil {
-		return nil, wrapOfficialClientError("get API key", httpRes, err)
-	}
-	return &response, nil
-}
-
-func (w *DatadogClient) ValidateAPIKey(ctx context.Context, apiKey string) (bool, error) {
-	ctx = context.WithValue(
-		ctx,
-		datadog.ContextAPIKeys,
-		map[string]datadog.APIKey{
-			"apiKeyAuth": {Key: apiKey},
-		},
-	)
-	ctx = context.WithValue(ctx, datadog.ContextServerVariables, map[string]string{"site": w.site})
-	// GET /api/v1/validate requires an API key and does not require an application key.
-	api := datadogV1.NewAuthenticationApi(w.officialClient)
-	response, httpRes, err := api.Validate(ctx)
-	if httpRes != nil {
-		defer httpRes.Body.Close()
-	}
-	if err != nil {
-		return false, wrapOfficialClientError("validate API key", httpRes, err)
-	}
-	return response.GetValid(), nil
-}
-
 func (w *DatadogClient) DeleteAPIKey(ctx context.Context, id string) error {
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewKeyManagementApi(w.officialClient)

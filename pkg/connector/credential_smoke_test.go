@@ -91,7 +91,12 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 
 	t.Logf("waiting for issued application key id=%s to authenticate", maskedValue(appKeyID))
 	require.Eventually(t, func() bool {
-		return canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+		ok, err := canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+		if err != nil {
+			t.Logf("issued application key not usable yet: %v", err)
+			return false
+		}
+		return ok
 	}, 30*time.Second, time.Second, "issued application key did not become usable")
 	t.Logf("confirmed issued application key id=%s can authenticate with Datadog", maskedValue(appKeyID))
 
@@ -100,8 +105,20 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	require.NoError(t, err, "revoke issued Datadog application key")
 	t.Logf("waiting for revoked application key id=%s to stop authenticating", maskedValue(appKeyID))
 	require.Eventually(t, func() bool {
-		return !canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
-	}, 30*time.Second, time.Second, "revoked application key can still authenticate with Datadog")
+		ok, err := canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+		if err != nil {
+			// Only Datadog refusing the credentials proves revocation. Any
+			// other error means the probe did not answer the question, so
+			// keep retrying instead of reading it as success.
+			if isCredentialRejection(err) {
+				return true
+			}
+			t.Logf("revocation probe failed without a credential rejection; retrying: %v", err)
+			return false
+		}
+		return !ok
+	}, 30*time.Second, time.Second,
+		"revoked application key still authenticates with Datadog, or the revocation probe never returned a credential rejection")
 	t.Logf("confirmed revoked application key id=%s can no longer authenticate with Datadog", maskedValue(appKeyID))
 	revoked = true
 
@@ -134,16 +151,37 @@ func applicationKeyExists(t *testing.T, ctx context.Context, wrapper *client.Dat
 	return false
 }
 
-// canAuthenticate reports whether the given application key, paired with the
+// canAuthenticate probes whether the given application key, paired with the
 // smoke org's API key, can perform an authenticated read. Datadog has no
 // application-key-only validation endpoint (unlike /api/v1/validate for API
 // keys), so this performs a real authenticated request instead.
-func canAuthenticate(ctx context.Context, site, apiKey, applicationKey string) bool {
+//
+// It reports three outcomes rather than two -- authenticated, or a specific
+// failure -- so callers can tell the provider refusing the credentials apart
+// from the probe simply not completing. Collapsing those (returning err ==
+// nil) would let the post-revoke assertion below, which is this PR's headline
+// revocation evidence, pass on a transient network error, a 429 or a 5xx
+// without the key ever having been revoked.
+func canAuthenticate(ctx context.Context, site, apiKey, applicationKey string) (bool, error) {
 	cfg := datadog.NewConfiguration()
 	official := datadog.NewAPIClient(cfg)
 	probe := client.NewDatadogClient(nil, official, site, apiKey, applicationKey)
-	_, err := probe.ListTeams(ctx, nil)
-	return err == nil
+	if _, err := probe.ListTeams(ctx, nil); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// isCredentialRejection reports whether err is Datadog explicitly refusing the
+// supplied credentials (401/403, mapped to Unauthenticated/PermissionDenied by
+// wrapOfficialClientError) rather than any other failure.
+func isCredentialRejection(err error) bool {
+	switch status.Code(err) {
+	case codes.Unauthenticated, codes.PermissionDenied:
+		return true
+	default:
+		return false
+	}
 }
 
 func maskedValue(value string) string {
