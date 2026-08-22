@@ -3,6 +3,7 @@ package connector
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -693,9 +694,22 @@ func TestShouldLogSampled(t *testing.T) {
 	require.False(t, shouldLogSampled(-1), "a negative count is not an occurrence")
 }
 
-// drainForSkipWarnings runs one full List walk with its own log sink and
-// returns the skip-warning lines that walk emitted.
-func drainForSkipWarnings(t *testing.T, builder *applicationKeyBuilder) []string {
+// skipWarning is one decoded skip-warning log record.
+type skipWarning struct {
+	serviceAccountID string
+	code             string
+	totalOccurrences int64
+}
+
+// drainForSkipWarnings runs one full List walk with its own log sink and returns
+// the skip warnings that walk emitted, decoded from the JSON log records rather
+// than substring-matched: total_occurrences is compared numerically, so `1`
+// cannot be satisfied by `10`, `100` or `1000`, and the assertions do not rot if
+// zap's encoding changes.
+//
+// Requires a builder whose walk visits at least one users page with data -- it
+// asserts the walk did not end on its first call.
+func drainForSkipWarnings(t *testing.T, builder *applicationKeyBuilder) []skipWarning {
 	t.Helper()
 	var logBuf bytes.Buffer
 	core := zapcore.NewCore(
@@ -706,27 +720,53 @@ func drainForSkipWarnings(t *testing.T, builder *applicationKeyBuilder) []string
 	logger := zap.New(core)
 	ctx := ctxzap.ToContext(context.Background(), logger)
 
+	calls := 0
 	token := ""
-	for call := 0; call < 200; call++ {
-		require.Less(t, call, 199, "List did not terminate")
+	for {
+		require.Less(t, calls, 200, "List did not terminate")
 		_, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
 		require.NoError(t, err, "a 403 must never fail the sync")
 		require.NotNil(t, results)
 		if results.NextPageToken == "" {
+			// List treats an empty INCOMING token as "first call of this walk"
+			// and resets the sampling counter on it. That is only sound because
+			// a walk cannot both start and end on the same call -- otherwise an
+			// empty token would be ambiguous between the two. Assert it here,
+			// in the branch where it can actually fail; a walk that terminated
+			// on call zero never ran at all.
+			require.NotZero(t, calls, "walk ended on its first call, so an empty token is ambiguous between start and end")
 			break
 		}
-		// Only the first call of a walk may carry an empty token; the reset in
-		// List depends on that, so assert it rather than assuming it.
-		require.NotEmpty(t, results.NextPageToken, "mid-walk token must never be empty")
 		token = results.NextPageToken
+		calls++
 	}
 	require.NoError(t, logger.Sync())
 
-	var skips []string
+	var skips []skipWarning
 	for _, line := range strings.Split(strings.TrimSpace(logBuf.String()), "\n") {
-		if line != "" && strings.Contains(line, "skipping application keys for service account") {
-			skips = append(skips, line)
+		if line == "" {
+			continue
 		}
+		var rec struct {
+			Msg              string `json:"msg"`
+			ServiceAccountID string `json:"service_account_id"`
+			Code             string `json:"code"`
+			TotalOccurrences *int64 `json:"total_occurrences"`
+		}
+		require.NoErrorf(t, json.Unmarshal([]byte(line), &rec), "log line is not JSON: %s", line)
+		// Matched exactly, not by substring, so a reworded production message
+		// fails the sampling assertions loudly instead of quietly matching
+		// nothing. (Inline rather than a named constant: gosec G101 reads a
+		// const holding this sentence as a hardcoded credential.)
+		if rec.Msg != "baton-datadog: skipping application keys for service account" {
+			continue
+		}
+		require.NotNilf(t, rec.TotalOccurrences, "skip warning must carry total_occurrences: %s", line)
+		skips = append(skips, skipWarning{
+			serviceAccountID: rec.ServiceAccountID,
+			code:             rec.Code,
+			totalOccurrences: *rec.TotalOccurrences,
+		})
 	}
 	return skips
 }
@@ -742,7 +782,8 @@ func drainForSkipWarnings(t *testing.T, builder *applicationKeyBuilder) []string
 // the first sync consume the 1/10/100 slots and leave every later sync silent
 // until the running total reached 1000 -- which is worse than the noise the
 // sampling exists to prevent. Draining twice proves the second walk gets its
-// own schedule.
+// own schedule, and the occurrence numbers are compared exactly so a later
+// occurrence cannot pass as the first.
 func TestApplicationKeyBuilderListSamplesSkipWarning(t *testing.T) {
 	const serviceAccounts = 12
 	entries := make([]string, 0, serviceAccounts)
@@ -762,14 +803,18 @@ func TestApplicationKeyBuilderListSamplesSkipWarning(t *testing.T) {
 	for walk := 1; walk <= 2; walk++ {
 		skips := drainForSkipWarnings(t, builder)
 		require.Lenf(t, skips, 2, "walk %d: 12 skips must log only the 1st and 10th, not one line each", walk)
-		for _, line := range skips {
-			require.Containsf(t, line, "total_occurrences", "walk %d: a sampled warning must report the real count", walk)
+		require.Equalf(t, int64(1), skips[0].totalOccurrences, "walk %d: first logged line must be occurrence 1, not a later one", walk)
+		require.Equalf(t, int64(10), skips[1].totalOccurrences, "walk %d: second logged line must be occurrence 10", walk)
+		for i, skip := range skips {
+			require.Equalf(t, codes.PermissionDenied.String(), skip.code,
+				"walk %d line %d: a 403 must be reported as PermissionDenied", walk, i)
+			require.NotEmptyf(t, skip.serviceAccountID, "walk %d line %d: skip must name the service account", walk, i)
 		}
-		require.Containsf(t, skips[0], `"total_occurrences":1`, "walk %d: first logged line is occurrence 1", walk)
-		require.Containsf(t, skips[1], `"total_occurrences":10`, "walk %d: second logged line is occurrence 10", walk)
 	}
 
-	// Both walks attempted every service account.
+	// Both walks attempted every service account. This is also what catches a
+	// walk that terminates early: a paging change that ended the walk before
+	// draining every service account would show up here as a short count.
 	attempted := 0
 	for _, req := range *requests {
 		if strings.Contains(req.path, "/application_keys") {
