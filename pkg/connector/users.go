@@ -57,6 +57,9 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 
 	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
 	if err != nil {
+		if client.IsNotFound(err) {
+			return nil, status.Errorf(codes.NotFound, "baton-datadog: Datadog user %q not found", serviceAccountID)
+		}
 		return nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
 	}
 	if !userResp.GetData().Attributes.GetServiceAccount() {
