@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
@@ -58,8 +59,32 @@ func recordRequest(t *testing.T, requests *[]recordedRequest, r *http.Request) r
 		header: r.Header.Clone(),
 		body:   string(bodyBytes),
 	}
-	*requests = append(*requests, rec)
+	appendRequest(requests, rec)
 	return rec
+}
+
+// recordMu guards the recorded-request slices. A fake provider's handler runs on
+// the httptest server's goroutine while the test body reads what it recorded,
+// and net/http promises no happens-before edge between the two -- relying on one
+// is relying on runtime implementation detail rather than on the memory model.
+// The race detector does not currently report this shape, which is why it has to
+// be reasoned about rather than discovered.
+var recordMu sync.Mutex
+
+func appendRequest(requests *[]recordedRequest, rec recordedRequest) {
+	recordMu.Lock()
+	defer recordMu.Unlock()
+	*requests = append(*requests, rec)
+}
+
+// snapshotRequests copies the recorded requests under the lock so the test body
+// can iterate them without racing a handler still appending.
+func snapshotRequests(requests *[]recordedRequest) []recordedRequest {
+	recordMu.Lock()
+	defer recordMu.Unlock()
+	out := make([]recordedRequest, len(*requests))
+	copy(out, *requests)
+	return out
 }
 
 // --- organization API key (apiTokenBuilder) coverage -----------------------
@@ -115,9 +140,10 @@ func TestApiTokenBuilderDeleteUsesHandleNotSecret(t *testing.T) {
 	require.NoError(t, err)
 
 	var deleteReq *recordedRequest
-	for i := range *requests {
-		if (*requests)[i].method == http.MethodDelete {
-			deleteReq = &(*requests)[i]
+	recorded := snapshotRequests(requests)
+	for i := range recorded {
+		if recorded[i].method == http.MethodDelete {
+			deleteReq = &recorded[i]
 		}
 	}
 	require.NotNil(t, deleteReq, "expected a DELETE request to reach the provider")
@@ -397,9 +423,10 @@ func TestApplicationKeyBuilderDeleteUsesServiceAccountAPI(t *testing.T) {
 	require.NoError(t, err)
 
 	var deleteReq *recordedRequest
-	for i := range *requests {
-		if (*requests)[i].method == http.MethodDelete {
-			deleteReq = &(*requests)[i]
+	recorded := snapshotRequests(requests)
+	for i := range recorded {
+		if recorded[i].method == http.MethodDelete {
+			deleteReq = &recorded[i]
 		}
 	}
 	require.NotNil(t, deleteReq, "expected a DELETE request to reach the provider")
@@ -557,10 +584,10 @@ func drainAppKeyList(t *testing.T, builder *applicationKeyBuilder, requests *[]r
 	const maxCalls = 100
 	for call := 0; ; call++ {
 		require.Less(t, call, maxCalls, "List did not terminate")
-		before := len(*requests)
+		before := len(snapshotRequests(requests))
 		got, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
 		require.NoError(t, err)
-		requestsPerCall = append(requestsPerCall, len(*requests)-before)
+		requestsPerCall = append(requestsPerCall, len(snapshotRequests(requests))-before)
 		all = append(all, got...)
 		require.NotNil(t, results)
 		if results.NextPageToken == "" {
@@ -598,7 +625,7 @@ func TestApplicationKeyBuilderListReturnsOnePagePerCall(t *testing.T) {
 	// separate calls is the point: draining them inside one call is what F2
 	// forbids, and would show up here as a single call issuing them all.
 	require.GreaterOrEqual(t, len(requestsPerCall), 5, "the walk must span multiple List calls, one provider page each")
-	require.Len(t, *requests, len(requestsPerCall), "one provider request per List call")
+	require.Len(t, snapshotRequests(requests), len(requestsPerCall), "one provider request per List call")
 
 	require.Len(t, got, defaultV2PageSize+1+2, "every application key across both service accounts must be returned")
 
@@ -612,7 +639,7 @@ func TestApplicationKeyBuilderListReturnsOnePagePerCall(t *testing.T) {
 	require.True(t, ids["sa2key-0"], "sa-2 keys must be present")
 
 	// A human user must never be queried for service-account application keys.
-	for _, req := range *requests {
+	for _, req := range snapshotRequests(requests) {
 		require.NotContains(t, req.path, "human-1")
 	}
 }
@@ -636,7 +663,7 @@ func TestApplicationKeyBuilderListSkipsForbiddenServiceAccount(t *testing.T) {
 	require.Equal(t, "okkey-0", got[0].GetId().GetResource())
 
 	attempted := false
-	for _, req := range *requests {
+	for _, req := range snapshotRequests(requests) {
 		if strings.Contains(req.path, "sa-forbidden") {
 			attempted = true
 		}
@@ -818,7 +845,7 @@ func TestApplicationKeyBuilderListSamplesSkipWarning(t *testing.T) {
 	// walk that terminates early: a paging change that ended the walk before
 	// draining every service account would show up here as a short count.
 	attempted := 0
-	for _, req := range *requests {
+	for _, req := range snapshotRequests(requests) {
 		if strings.Contains(req.path, "/application_keys") {
 			attempted++
 		}
@@ -925,8 +952,23 @@ func TestApplicationKeyListCarriesScopes(t *testing.T) {
 	unscoped := `{"id":"k-unscoped","type":"application_keys","attributes":{"name":"unscoped","scopes":null}}`
 	usersPages := []string{`[{"id":"sa-1","type":"users","attributes":{"service_account":true}}]`}
 
-	// currentKeys is swapped between drains to simulate a scope change upstream.
+	// The upstream key set is swapped between drains to simulate a rescope. The
+	// handler reads it on the server's goroutine while the test body rewrites it,
+	// so it is guarded: net/http gives no happens-before edge between the two.
+	// The same server serves both drains on purpose -- giving each drain its own
+	// server would stop exercising the rescope-mid-life path this test exists for.
+	var keysMu sync.Mutex
 	currentKeys := "[" + scoped + "," + unscoped + "]"
+	setKeys := func(v string) {
+		keysMu.Lock()
+		defer keysMu.Unlock()
+		currentKeys = v
+	}
+	getKeys := func() string {
+		keysMu.Lock()
+		defer keysMu.Unlock()
+		return currentKeys
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		page := 0
@@ -943,7 +985,7 @@ func TestApplicationKeyListCarriesScopes(t *testing.T) {
 		case strings.HasSuffix(r.URL.Path, "/application_keys"):
 			body := "[]"
 			if page == 0 {
-				body = currentKeys
+				body = getKeys()
 			}
 			_, _ = w.Write([]byte(`{"data":` + body + `}`))
 		default:
@@ -980,8 +1022,8 @@ func TestApplicationKeyListCarriesScopes(t *testing.T) {
 	require.Equal(t, []string{"logs_read"}, first["k-scoped"])
 	require.Equal(t, []string{}, first["k-unscoped"], "an unscoped key reports an empty list, not a missing key")
 
-	// The same key, rescoped upstream.
-	currentKeys = `[{"id":"k-scoped","type":"application_keys","attributes":{"name":"scoped","scopes":["logs_read","metrics_read"]}}]`
+	// The same key, rescoped upstream, on the same live server.
+	setKeys(`[{"id":"k-scoped","type":"application_keys","attributes":{"name":"scoped","scopes":["logs_read","metrics_read"]}}]`)
 	second := drain()
 	require.Equal(t, []string{"logs_read", "metrics_read"}, second["k-scoped"], "a rescoped key must report its new scopes")
 }
@@ -994,7 +1036,22 @@ func TestIssuePassesScopesToProviderAndProfile(t *testing.T) {
 	const handle = "handle-scoped-1"
 	requested := []string{"logs_read", "metrics_read"}
 
-	var createBody string
+	// createBody is written on the server's goroutine and read by the test body,
+	// so it is guarded for the same reason as the key set above.
+	var (
+		bodyMu     sync.Mutex
+		createBody string
+	)
+	setCreateBody := func(v string) {
+		bodyMu.Lock()
+		defer bodyMu.Unlock()
+		createBody = v
+	}
+	getCreateBody := func() string {
+		bodyMu.Lock()
+		defer bodyMu.Unlock()
+		return createBody
+	}
 	appKeysPath := "/api/v2/service_accounts/" + testServiceAccountID + "/application_keys"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1006,7 +1063,7 @@ func TestIssuePassesScopesToProviderAndProfile(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == appKeysPath:
 			buf := new(bytes.Buffer)
 			_, _ = buf.ReadFrom(r.Body)
-			createBody = buf.String()
+			setCreateBody(buf.String())
 			// Echo the scopes back, as Datadog does.
 			_, _ = w.Write([]byte(`{"data":{"id":"` + handle + `","type":"application_keys","attributes":{"key":"plaintext","name":"c1-req-scoped","scopes":["logs_read","metrics_read"]}}}`))
 		default:
@@ -1027,7 +1084,8 @@ func TestIssuePassesScopesToProviderAndProfile(t *testing.T) {
 	require.NoError(t, err)
 
 	// The pass-through into the provider request.
-	require.NotEmpty(t, createBody, "create request body must have been captured")
+	sentBody := getCreateBody()
+	require.NotEmpty(t, sentBody, "create request body must have been captured")
 	var sent struct {
 		Data struct {
 			Attributes struct {
@@ -1035,7 +1093,7 @@ func TestIssuePassesScopesToProviderAndProfile(t *testing.T) {
 			} `json:"attributes"`
 		} `json:"data"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(createBody), &sent))
+	require.NoError(t, json.Unmarshal([]byte(sentBody), &sent))
 	require.NotNil(t, sent.Data.Attributes.Scopes, "requested scopes must be sent to Datadog")
 	require.Equal(t, requested, *sent.Data.Attributes.Scopes)
 
