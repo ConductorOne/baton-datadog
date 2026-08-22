@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/conductorone/baton-datadog/pkg/client"
 	cfg "github.com/conductorone/baton-datadog/pkg/config"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
@@ -15,11 +17,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TestCredentialIssueLifecycle is an opt-in live-provider smoke test. It creates
-// a real Datadog API key and always attempts to revoke it before returning.
-// Run it only in a disposable Datadog organization:
+// TestCredentialIssueLifecycle is an opt-in live-provider smoke test. It
+// mints a real Datadog service-account application key and always attempts
+// to revoke it before returning. Run it only in a disposable Datadog
+// organization, against a service account that already exists there:
 //
-//	DATADOG_CREDENTIAL_SMOKE=1 DATADOG_SMOKE_SITE=datadoghq.com DATADOG_SMOKE_API_KEY=... DATADOG_SMOKE_APP_KEY=... \
+//	DATADOG_CREDENTIAL_SMOKE=1 DATADOG_SMOKE_SITE=datadoghq.com \
+//	  DATADOG_SMOKE_API_KEY=... DATADOG_SMOKE_APP_KEY=... \
+//	  DATADOG_SMOKE_SERVICE_ACCOUNT_ID=<existing service account user id> \
 //	  go test ./pkg/connector -run TestCredentialIssueLifecycle -count=1
 func TestCredentialIssueLifecycle(t *testing.T) {
 	if os.Getenv("DATADOG_CREDENTIAL_SMOKE") != "1" {
@@ -29,9 +34,11 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	site := os.Getenv("DATADOG_SMOKE_SITE")
 	apiKey := os.Getenv("DATADOG_SMOKE_API_KEY")
 	appKey := os.Getenv("DATADOG_SMOKE_APP_KEY")
+	serviceAccountID := os.Getenv("DATADOG_SMOKE_SERVICE_ACCOUNT_ID")
 	require.NotEmpty(t, site, "DATADOG_SMOKE_SITE is required")
 	require.NotEmpty(t, apiKey, "DATADOG_SMOKE_API_KEY is required")
 	require.NotEmpty(t, appKey, "DATADOG_SMOKE_APP_KEY is required")
+	require.NotEmpty(t, serviceAccountID, "DATADOG_SMOKE_SERVICE_ACCOUNT_ID is required (issuance targets an existing Datadog service account)")
 
 	ctx := context.Background()
 	builder, _, err := New(ctx, &cfg.Datadog{
@@ -46,13 +53,14 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 
 	issuer := newCredentialUserBuilder(datadogConnector.wrapper)
 	requestID := "smoke-" + time.Now().UTC().Format("20060102T150405")
-	t.Logf("issuing Datadog API key with request id %q", requestID)
+	t.Logf("issuing Datadog service account application key with request id %q", requestID)
 	issued, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{
 			ResourceType: userResourceType.Id,
-			Resource:     "credential-smoke-test",
+			Resource:     serviceAccountID,
 		},
-		RequestID: requestID,
+		RequestID:         requestID,
+		CredentialOptions: v2.CredentialIssueOptions_builder{ApiKey: v2.CredentialIssueOptions_ApiKey_builder{}.Build()}.Build(),
 	})
 	require.NoError(t, err)
 	revoked := false
@@ -61,51 +69,81 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 			return
 		}
 		secretID := issued.Secret.GetId()
-		_, deleteErr := newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
+		parentID := issued.Secret.GetParentResourceId()
+		_, deleteErr := newApplicationKeyBuilder(datadogConnector.wrapper).Delete(ctx, secretID, parentID)
 		if status.Code(deleteErr) != codes.NotFound {
-			require.NoError(t, deleteErr, "Datadog API key cleanup failed: %s", secretID.GetResource())
+			require.NoError(t, deleteErr, "Datadog application key cleanup failed: %s", secretID.GetResource())
 		}
 	})
 	require.NotNil(t, issued.Secret)
 	require.NotEmpty(t, issued.Secret.GetId().GetResource())
+	require.Equal(t, serviceAccountID, issued.Secret.GetParentResourceId().GetResource(), "issued secret must record the target service account as its parent resource")
 	require.Equal(t, 1, len(issued.PlaintextData))
 	require.NotEmpty(t, issued.PlaintextData[0].GetBytes())
 
 	secretID := issued.Secret.GetId()
-	t.Logf("issued API key id=%s; plaintext material returned but not logged", maskedValue(secretID.GetResource()))
-	providerKey, err := datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
-	require.NoError(t, err, "read issued API key from Datadog")
-	providerKeyData := providerKey.GetData()
-	require.Equal(t, secretID.GetResource(), providerKeyData.GetId())
-	t.Logf("confirmed API key id=%s exists in Datadog", maskedValue(secretID.GetResource()))
-	t.Logf("waiting for issued API key id=%s to propagate", maskedValue(secretID.GetResource()))
-	require.Eventually(t, func() bool {
-		issuedKeyValid, validateErr := datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
-		return validateErr == nil && issuedKeyValid
-	}, 30*time.Second, time.Second, "issued API key did not become usable")
-	t.Logf("confirmed issued API key id=%s can authenticate with Datadog", maskedValue(secretID.GetResource()))
+	appKeyID := secretID.GetResource()
+	t.Logf("issued application key id=%s; plaintext material returned but not logged", maskedValue(appKeyID))
 
-	t.Logf("revoking API key id=%s", maskedValue(secretID.GetResource()))
-	_, err = newApiTokenBuilder(datadogConnector.wrapper).Delete(ctx, secretID, nil)
-	require.NoError(t, err, "revoke issued Datadog API key")
-	t.Logf("waiting for revoked API key id=%s to stop authenticating", maskedValue(secretID.GetResource()))
+	require.True(t, applicationKeyExists(t, ctx, datadogConnector.wrapper, serviceAccountID, appKeyID),
+		"issued application key id=%s not found via ListServiceAccountApplicationKeys", maskedValue(appKeyID))
+	t.Logf("confirmed application key id=%s exists in Datadog", maskedValue(appKeyID))
+
+	t.Logf("waiting for issued application key id=%s to authenticate", maskedValue(appKeyID))
 	require.Eventually(t, func() bool {
-		issuedKeyValid, validateErr := datadogConnector.wrapper.ValidateAPIKey(ctx, string(issued.PlaintextData[0].GetBytes()))
-		return !issuedKeyValid && (validateErr == nil || status.Code(validateErr) == codes.Unauthenticated || status.Code(validateErr) == codes.PermissionDenied)
-	}, 30*time.Second, time.Second, "revoked API key can still authenticate with Datadog")
-	t.Logf("confirmed revoked API key id=%s can no longer authenticate with Datadog", maskedValue(secretID.GetResource()))
+		return canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+	}, 30*time.Second, time.Second, "issued application key did not become usable")
+	t.Logf("confirmed issued application key id=%s can authenticate with Datadog", maskedValue(appKeyID))
+
+	t.Logf("revoking application key id=%s", maskedValue(appKeyID))
+	_, err = newApplicationKeyBuilder(datadogConnector.wrapper).Delete(ctx, secretID, issued.Secret.GetParentResourceId())
+	require.NoError(t, err, "revoke issued Datadog application key")
+	t.Logf("waiting for revoked application key id=%s to stop authenticating", maskedValue(appKeyID))
+	require.Eventually(t, func() bool {
+		return !canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+	}, 30*time.Second, time.Second, "revoked application key can still authenticate with Datadog")
+	t.Logf("confirmed revoked application key id=%s can no longer authenticate with Datadog", maskedValue(appKeyID))
 	revoked = true
 
-	_, err = datadogConnector.wrapper.GetAPIKey(ctx, secretID.GetResource())
-	if err == nil {
-		t.Logf("API key metadata id=%s remains retrievable after revocation; this does not imply the key can authenticate", maskedValue(secretID.GetResource()))
+	if applicationKeyExists(t, ctx, datadogConnector.wrapper, serviceAccountID, appKeyID) {
+		t.Logf("application key metadata id=%s remains listed after revocation; this does not imply the key can authenticate", maskedValue(appKeyID))
 		return
 	}
-	if status.Code(err) == codes.NotFound {
-		t.Logf("confirmed API key id=%s is no longer retrievable from Datadog", maskedValue(secretID.GetResource()))
-		return
+	t.Logf("confirmed application key id=%s is no longer listed for its service account", maskedValue(appKeyID))
+}
+
+// applicationKeyExists checks the live provider for appKeyID among
+// serviceAccountID's application keys, paging until found or exhausted.
+func applicationKeyExists(t *testing.T, ctx context.Context, wrapper *client.DatadogClient, serviceAccountID, appKeyID string) bool {
+	t.Helper()
+	const maxPages = int64(10_000)
+	for page := int64(0); page < maxPages; page++ {
+		resp, err := wrapper.ListServiceAccountApplicationKeys(ctx, serviceAccountID, page, defaultV2PageSize)
+		require.NoError(t, err)
+		keys := resp.GetData()
+		for _, key := range keys {
+			if key.Id != nil && *key.Id == appKeyID {
+				return true
+			}
+		}
+		if int64(len(keys)) < defaultV2PageSize {
+			return false
+		}
 	}
-	t.Logf("could not read API key metadata id=%s after revocation: %v", maskedValue(secretID.GetResource()), err)
+	t.Fatalf("exceeded %d pages listing application keys for service account %q without a short page", maxPages, serviceAccountID)
+	return false
+}
+
+// canAuthenticate reports whether the given application key, paired with the
+// smoke org's API key, can perform an authenticated read. Datadog has no
+// application-key-only validation endpoint (unlike /api/v1/validate for API
+// keys), so this performs a real authenticated request instead.
+func canAuthenticate(ctx context.Context, site, apiKey, applicationKey string) bool {
+	cfg := datadog.NewConfiguration()
+	official := datadog.NewAPIClient(cfg)
+	probe := client.NewDatadogClient(nil, official, site, apiKey, applicationKey)
+	_, err := probe.ListTeams(ctx, nil)
+	return err == nil
 }
 
 func maskedValue(value string) string {

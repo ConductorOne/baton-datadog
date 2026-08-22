@@ -125,7 +125,14 @@ func (o *applicationKeyBuilder) List(
 		}
 		serviceAccountResourceID := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: serviceAccountID}
 
-		for appKeyPage := int64(0); ; appKeyPage++ {
+		// maxApplicationKeyPages bounds the inner drain so a provider that
+		// ignores page[number] and keeps returning full pages fails closed
+		// (an error, not an infinite request loop that never lets the SDK
+		// checkpoint). 10_000 pages (1M keys) is far beyond any real service
+		// account's application-key count.
+		const maxApplicationKeyPages = int64(10_000)
+		appKeyPage := int64(0)
+		for ; appKeyPage < maxApplicationKeyPages; appKeyPage++ {
 			resp, err := o.wrapper.ListServiceAccountApplicationKeys(ctx, serviceAccountID, appKeyPage, defaultV2PageSize)
 			if err != nil {
 				return nil, nil, fmt.Errorf("baton-datadog: list application keys for service account %q: %w", serviceAccountID, err)
@@ -144,6 +151,9 @@ func (o *applicationKeyBuilder) List(
 			if int64(len(keys)) < defaultV2PageSize {
 				break
 			}
+		}
+		if appKeyPage >= maxApplicationKeyPages {
+			return nil, nil, fmt.Errorf("baton-datadog: exceeded %d application-key pages for service account %q without a short page", maxApplicationKeyPages, serviceAccountID)
 		}
 	}
 

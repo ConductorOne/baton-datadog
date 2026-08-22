@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -157,8 +158,7 @@ func TestServiceAccountApplicationKeyManagement(t *testing.T) {
 	t.Run("create sends requested scopes", func(t *testing.T) {
 		var body string
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			buf := make([]byte, r.ContentLength)
-			_, _ = r.Body.Read(buf)
+			buf, _ := io.ReadAll(r.Body)
 			body = string(buf)
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"data":{"id":"appkey-id","type":"application_keys","attributes":{"key":"plaintext-app-key","name":"c1-request"}}}`))

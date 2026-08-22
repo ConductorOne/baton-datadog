@@ -316,7 +316,12 @@ func (w *DatadogClient) FindServiceAccountApplicationKeyByName(ctx context.Conte
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewServiceAccountsApi(w.officialClient)
 	const pageSize = int64(100)
-	for page := int64(0); ; page++ {
+	// maxPages bounds this loop so a provider that ignores page[number] and
+	// keeps returning full pages fails closed instead of spinning forever on
+	// the Issue hot path. 10_000 pages (1M keys) is far beyond any real
+	// service account's application-key count.
+	const maxPages = int64(10_000)
+	for page := int64(0); page < maxPages; page++ {
 		params := *datadogV2.NewListServiceAccountApplicationKeysOptionalParameters().WithFilter(name).WithPageSize(pageSize).WithPageNumber(page)
 		response, httpRes, err := api.ListServiceAccountApplicationKeys(ctx, serviceAccountID, params)
 		if httpRes != nil {
@@ -334,6 +339,7 @@ func (w *DatadogClient) FindServiceAccountApplicationKeyByName(ctx context.Conte
 			return nil, nil
 		}
 	}
+	return nil, fmt.Errorf("find service account application key by name: exceeded %d pages without a short page", maxPages)
 }
 
 // ListServiceAccountApplicationKeys lists every application key owned by the

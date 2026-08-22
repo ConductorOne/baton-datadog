@@ -49,7 +49,11 @@ var (
 	// them, but Issue no longer targets this type -- an org-scoped key
 	// issued on behalf of a selected user is not an honest mapping of who
 	// holds it. See serviceAccountApplicationKeyResourceType for the type
-	// Issue does target.
+	// Issue does target. No production path creates an org API key anymore,
+	// so this only declares api_keys_read/api_keys_delete, not
+	// api_keys_write -- CreateAPIKey/FindAPIKeyByName remain on
+	// DatadogClient for direct callers and tests, but this connector's own
+	// registered capabilities never exercise write.
 	apiTokenResourceType = &v2.ResourceType{
 		Id:          "api-key",
 		DisplayName: "Organization API Key",
@@ -57,7 +61,7 @@ var (
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
 		Annotations: annotations.New(
 			&v2.SkipEntitlementsAndGrants{},
-			capabilityPermissions("api_keys_read", "api_keys_write", "api_keys_delete"),
+			capabilityPermissions("api_keys_read", "api_keys_delete"),
 		),
 	}
 	// serviceAccountApplicationKeyResourceType covers application keys owned

@@ -27,6 +27,8 @@ An application key can be issued and revoked through C1 when **Sync secrets** is
 
 <Warning>
 Credential issuance targets a Datadog service account only. C1 re-checks at issuance time that the selected user is still a service account, and refuses to issue against a human user. The issued application key is owned by, and scoped to, that service account.
+
+Revoking a service account application key requires the caller to supply that owning service account alongside the key itself. Until the requesting workflow threads it through, a revoke request that omits it fails rather than guessing which service account owns the key.
 </Warning>
 
 *Schedules and application-key issuance are not enabled by default. Enable **Sync schedules** or **Sync secrets**, respectively, when configuring the connector.
@@ -48,7 +50,7 @@ Configuring the connector requires you to pass in credentials generated in Datad
 <Warning>
 A user with the **Connector Administrator** or **Super Administrator** role in C1 and the **Datadog Admin** or **Datadog standard** role in Datadog must perform this task.
 
-If your user has a custom Datadog role, make sure it includes **User App Keys**, **User Access Invite**, and **User Access Manage** to create, update, enable, and disable users from C1. **User Access Manage** also governs issuing, syncing, and revoking service account application keys. If you enable **Sync secrets** to sync or revoke organization API keys, also add **API Keys Read**, **API Keys Write**, and **API Keys Delete**.
+If your user has a custom Datadog role, make sure it includes **User App Keys**, **User Access Invite**, and **User Access Manage** to create, update, enable, and disable users from C1. **User Access Manage** also governs issuing, syncing, and revoking service account application keys. If you enable **Sync secrets** to sync or revoke organization API keys, also add **API Keys Read** and **API Keys Delete**.
 </Warning>
 
 ### Locate your Datadog site
