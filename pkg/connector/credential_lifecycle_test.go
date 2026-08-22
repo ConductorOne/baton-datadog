@@ -693,11 +693,56 @@ func TestShouldLogSampled(t *testing.T) {
 	require.False(t, shouldLogSampled(-1), "a negative count is not an occurrence")
 }
 
+// drainForSkipWarnings runs one full List walk with its own log sink and
+// returns the skip-warning lines that walk emitted.
+func drainForSkipWarnings(t *testing.T, builder *applicationKeyBuilder) []string {
+	t.Helper()
+	var logBuf bytes.Buffer
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.AddSync(&logBuf),
+		zapcore.DebugLevel,
+	)
+	logger := zap.New(core)
+	ctx := ctxzap.ToContext(context.Background(), logger)
+
+	token := ""
+	for call := 0; call < 200; call++ {
+		require.Less(t, call, 199, "List did not terminate")
+		_, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		require.NoError(t, err, "a 403 must never fail the sync")
+		require.NotNil(t, results)
+		if results.NextPageToken == "" {
+			break
+		}
+		// Only the first call of a walk may carry an empty token; the reset in
+		// List depends on that, so assert it rather than assuming it.
+		require.NotEmpty(t, results.NextPageToken, "mid-walk token must never be empty")
+		token = results.NextPageToken
+	}
+	require.NoError(t, logger.Sync())
+
+	var skips []string
+	for _, line := range strings.Split(strings.TrimSpace(logBuf.String()), "\n") {
+		if line != "" && strings.Contains(line, "skipping application keys for service account") {
+			skips = append(skips, line)
+		}
+	}
+	return skips
+}
+
 // TestApplicationKeyBuilderListSamplesSkipWarning: when the configured Datadog
 // role cannot read application keys org-wide, the skip warning must not fire
 // once per service account (criteria L7). With 12 forbidden service accounts
-// only the 1st and 10th are logged, and each surviving line carries
-// total_occurrences so the real count is still visible.
+// only the 1st and 10th are logged, each carrying total_occurrences.
+//
+// The counter also has to restart per walk. applicationKeyBuilder is built once
+// per connector process (Datadog.ResourceSyncers runs inside
+// connectorbuilder.NewConnector), so a counter that only ever climbed would let
+// the first sync consume the 1/10/100 slots and leave every later sync silent
+// until the running total reached 1000 -- which is worse than the noise the
+// sampling exists to prevent. Draining twice proves the second walk gets its
+// own schedule.
 func TestApplicationKeyBuilderListSamplesSkipWarning(t *testing.T) {
 	const serviceAccounts = 12
 	entries := make([]string, 0, serviceAccounts)
@@ -712,45 +757,24 @@ func TestApplicationKeyBuilderListSamplesSkipWarning(t *testing.T) {
 	server, requests := newAppKeyListServer(t, usersPages, nil, forbidden)
 	defer server.Close()
 
-	var logBuf bytes.Buffer
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-		zapcore.AddSync(&logBuf),
-		zapcore.DebugLevel,
-	)
-	logger := zap.New(core)
-	ctx := ctxzap.ToContext(context.Background(), logger)
-
 	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
-	token := ""
-	for call := 0; call < 100; call++ {
-		_, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
-		require.NoError(t, err, "a 403 must never fail the sync")
-		require.NotNil(t, results)
-		if results.NextPageToken == "" {
-			break
-		}
-		token = results.NextPageToken
-	}
-	require.NoError(t, logger.Sync())
 
-	// Every service account was still attempted and skipped.
+	for walk := 1; walk <= 2; walk++ {
+		skips := drainForSkipWarnings(t, builder)
+		require.Lenf(t, skips, 2, "walk %d: 12 skips must log only the 1st and 10th, not one line each", walk)
+		for _, line := range skips {
+			require.Containsf(t, line, "total_occurrences", "walk %d: a sampled warning must report the real count", walk)
+		}
+		require.Containsf(t, skips[0], `"total_occurrences":1`, "walk %d: first logged line is occurrence 1", walk)
+		require.Containsf(t, skips[1], `"total_occurrences":10`, "walk %d: second logged line is occurrence 10", walk)
+	}
+
+	// Both walks attempted every service account.
 	attempted := 0
 	for _, req := range *requests {
 		if strings.Contains(req.path, "/application_keys") {
 			attempted++
 		}
 	}
-	require.Equal(t, serviceAccounts, attempted, "every service account must still be attempted")
-
-	skipLines := 0
-	for _, line := range strings.Split(strings.TrimSpace(logBuf.String()), "\n") {
-		if line == "" || !strings.Contains(line, "skipping application keys for service account") {
-			continue
-		}
-		skipLines++
-		require.Contains(t, line, "total_occurrences", "a sampled warning must report the real count")
-	}
-	require.Equal(t, 2, skipLines, "12 skips must log only the 1st and 10th, not one line each")
-	require.Contains(t, logBuf.String(), `"total_occurrences":10`, "the 10th occurrence must be the second logged line")
+	require.Equal(t, serviceAccounts*2, attempted, "every service account must be attempted on every walk")
 }

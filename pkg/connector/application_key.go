@@ -24,11 +24,12 @@ type applicationKeyBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
 
-	// skippedServiceAccounts counts how many service accounts this syncer has
-	// skipped because their application keys could not be read. The warning
+	// skippedServiceAccounts counts how many service accounts the current walk
+	// has skipped because their application keys could not be read. The warning
 	// that reports a skip is sampled (L7): the case it exists for is a role
 	// missing service_account_write org-wide, which makes it fire for every
-	// service account on every sync.
+	// service account. It is reset at the start of each walk (see List) because
+	// this builder outlives any single sync.
 	skippedServiceAccounts atomic.Int64
 }
 
@@ -130,6 +131,27 @@ func (o *applicationKeyBuilder) List(
 	_ *v2.ResourceId,
 	opts resource.SyncOpAttrs,
 ) ([]*v2.Resource, *resource.SyncOpResults, error) {
+	// An empty page token is the first call of a walk, so the skip-warning
+	// sampling counter restarts here and each sync gets its own 1/10/100
+	// schedule. The builder is constructed once per connector process --
+	// Datadog.ResourceSyncers runs inside connectorbuilder.NewConnector, whose
+	// result is reused for every sync -- so without this reset the first sync
+	// consumes the early log slots and a later sync against the same org-wide
+	// missing permission would emit nothing until the running total reached
+	// 1000.
+	//
+	// An empty token is a safe first-walk signal for this builder: List only
+	// ever returns an empty NextPageToken from bag.Marshal() with an empty
+	// bag, and the bag can only be emptied by popping the users-level state,
+	// which happens solely on an empty users page -- the end of the walk. So
+	// no mid-walk call can carry one. (parsePageToken also accepts a "page:N"
+	// seed form, which nothing produces for this resource type; if one ever
+	// did, the counter would merely carry over rather than misbehave.) A
+	// retried first page resets again, which is what a restarted walk wants.
+	if opts.PageToken.Token == "" {
+		o.skippedServiceAccounts.Store(0)
+	}
+
 	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, nil, err
