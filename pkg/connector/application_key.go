@@ -360,6 +360,12 @@ func applicationKeyProfileOptions(scopes *[]string) []resource.ResourceOption {
 	}
 }
 
+// onMalformedCreatedAt is told that an application key's Datadog created_at
+// could not be parsed: appKeyID identifies the key, raw is the value that
+// failed, and err is the parse error. The field is dropped either way -- this
+// callback only decides whether anyone hears about it.
+type onMalformedCreatedAt func(appKeyID string, raw string, err error)
+
 // applicationKeyResource builds the synced resource for one service-account
 // application key. The type is unambiguous through two structured signals a
 // reader (or a future requester-selection surface) can consume without
@@ -370,10 +376,9 @@ func applicationKeyProfileOptions(scopes *[]string) []resource.ResourceOption {
 // display-name text. WithParentResourceID records the owning service account
 // as the resource's parent; see Delete's doc comment for why that is the
 // field this connector's delete path relies on.
-// onMalformedCreatedAt is called when Datadog's created_at cannot be parsed. It
-// may be nil, in which case the field is dropped silently.
-type onMalformedCreatedAt func(appKeyID string, raw string, err error)
-
+//
+// reportMalformedCreatedAt may be nil, in which case an unparseable created_at
+// is dropped silently.
 func applicationKeyResource(
 	appKeyID string,
 	serviceAccountResourceID *v2.ResourceId,
