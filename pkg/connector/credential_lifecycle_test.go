@@ -921,7 +921,7 @@ func TestApplicationKeyResourceScopesProfile(t *testing.T) {
 			var attrs datadogV2.PartialApplicationKeyAttributes
 			require.NoError(t, json.Unmarshal([]byte(tc.attrsJSON), &attrs))
 
-			res, err := applicationKeyResource("appkey-1", parent, &attrs)
+			res, err := applicationKeyResource("appkey-1", parent, &attrs, nil)
 			require.NoError(t, err)
 
 			got, present := profileScopes(t, res)
@@ -1114,4 +1114,223 @@ func TestIssueOmitsScopesProfileWhenProviderSilent(t *testing.T) {
 
 	_, present := profileScopes(t, out.Secret)
 	require.False(t, present, "a silent provider response must not be reported as an unscoped key")
+}
+
+// --- malformed created_at, and users page size ---------------------------
+
+// TestApplicationKeyResourceMalformedCreatedAt: a created_at this connector
+// cannot parse must drop the field and still produce a usable resource, and it
+// must report the problem to its caller. Failing here would mean one bad
+// timestamp from the provider hides every application key in the organization
+// from C1, which is a worse outcome than a missing display value.
+func TestApplicationKeyResourceMalformedCreatedAt(t *testing.T) {
+	parent := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID}
+
+	t.Run("malformed value drops the field and reports", func(t *testing.T) {
+		var attrs datadogV2.PartialApplicationKeyAttributes
+		require.NoError(t, json.Unmarshal([]byte(`{"name":"k","created_at":"not-a-timestamp"}`), &attrs))
+
+		var gotID, gotRaw string
+		var gotErr error
+		res, err := applicationKeyResource("appkey-bad-ts", parent, &attrs,
+			func(appKeyID, raw string, parseErr error) {
+				gotID, gotRaw, gotErr = appKeyID, raw, parseErr
+			})
+
+		require.NoError(t, err, "a malformed created_at must not fail resource construction")
+		require.NotNil(t, res)
+		require.Equal(t, "appkey-bad-ts", res.GetId().GetResource(), "the key must still be syncable")
+		require.Nil(t, res.GetCreatedAt(), "an unparseable created_at must be dropped, not guessed")
+
+		require.Equal(t, "appkey-bad-ts", gotID, "the report must name the key")
+		require.Equal(t, "not-a-timestamp", gotRaw, "the report must carry the value that failed")
+		require.Error(t, gotErr, "the report must carry the parse error")
+	})
+
+	t.Run("a parseable value is still recorded", func(t *testing.T) {
+		var attrs datadogV2.PartialApplicationKeyAttributes
+		require.NoError(t, json.Unmarshal([]byte(`{"name":"k","created_at":"2026-08-22T04:01:01.5Z"}`), &attrs))
+
+		called := false
+		res, err := applicationKeyResource("appkey-good-ts", parent, &attrs,
+			func(string, string, error) { called = true })
+
+		require.NoError(t, err)
+		require.False(t, called, "a parseable created_at must not be reported as malformed")
+		require.NotNil(t, res.GetCreatedAt(), "a parseable created_at must be recorded")
+		require.Equal(t, 2026, res.GetCreatedAt().AsTime().Year())
+	})
+
+	t.Run("a nil callback is tolerated", func(t *testing.T) {
+		var attrs datadogV2.PartialApplicationKeyAttributes
+		require.NoError(t, json.Unmarshal([]byte(`{"name":"k","created_at":"nope"}`), &attrs))
+		res, err := applicationKeyResource("appkey-nil-cb", parent, &attrs, nil)
+		require.NoError(t, err)
+		require.Nil(t, res.GetCreatedAt())
+	})
+}
+
+// TestApplicationKeyListSurvivesMalformedCreatedAt: the whole walk must complete
+// when the provider returns an unparseable created_at, the affected key must
+// still be synced, and the warning must be sampled with total_occurrences rather
+// than emitted once per key (L7).
+func TestApplicationKeyListSurvivesMalformedCreatedAt(t *testing.T) {
+	const keys = 12
+	entries := make([]string, 0, keys)
+	for i := 0; i < keys; i++ {
+		entries = append(entries, fmt.Sprintf(
+			`{"id":"bad-ts-%02d","type":"application_keys","attributes":{"name":"k%02d","created_at":"not-a-timestamp"}}`, i, i))
+	}
+	usersPages := []string{`[{"id":"sa-1","type":"users","attributes":{"service_account":true}}]`}
+	appKeyPages := map[string][]string{"sa-1": {"[" + strings.Join(entries, ",") + "]"}}
+
+	server, _ := newAppKeyListServer(t, usersPages, appKeyPages, nil)
+	defer server.Close()
+
+	var logBuf bytes.Buffer
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.AddSync(&logBuf),
+		zapcore.DebugLevel,
+	)
+	ctx := ctxzap.ToContext(context.Background(), zap.New(core))
+
+	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	var synced []*v2.Resource
+	token := ""
+	for call := 0; call < 50; call++ {
+		got, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		require.NoError(t, err, "a malformed created_at must never fail the walk")
+		synced = append(synced, got...)
+		require.NotNil(t, results)
+		if results.NextPageToken == "" {
+			break
+		}
+		token = results.NextPageToken
+	}
+
+	require.Len(t, synced, keys, "every key must still be synced despite the bad timestamp")
+	for _, r := range synced {
+		require.Nil(t, r.GetCreatedAt(), "the unparseable timestamp must be dropped, not guessed")
+	}
+
+	warned := 0
+	for _, line := range strings.Split(strings.TrimSpace(logBuf.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		var rec struct {
+			Msg              string `json:"msg"`
+			TotalOccurrences *int64 `json:"total_occurrences"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(line), &rec))
+		if rec.Msg != "baton-datadog: application key created_at could not be parsed; syncing the key without it" {
+			continue
+		}
+		warned++
+		require.NotNil(t, rec.TotalOccurrences, "the warning must carry total_occurrences")
+	}
+	require.Equal(t, 2, warned, "12 malformed timestamps must log only the 1st and 10th, not one line each")
+}
+
+// TestApplicationKeySyncRequestsFullUsersPage: the users walk must ask for the
+// same page size the rest of the connector uses. Datadog's documented default is
+// 10, so omitting it costs ten times the round-trips for the same users.
+func TestApplicationKeySyncRequestsFullUsersPage(t *testing.T) {
+	usersPages := []string{`[{"id":"sa-1","type":"users","attributes":{"service_account":true}}]`}
+	appKeyPages := map[string][]string{"sa-1": {appKeyPageJSON("k", 1)}}
+	server, requests := newAppKeyListServer(t, usersPages, appKeyPages, nil)
+	defer server.Close()
+
+	drainAppKeyList(t, newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL)), requests)
+
+	sawUsersPage := false
+	for _, req := range snapshotRequests(requests) {
+		if req.path != "/api/v2/users" {
+			continue
+		}
+		sawUsersPage = true
+		require.Containsf(t, req.query, fmt.Sprintf("page%%5Bsize%%5D=%d", defaultV2PageSize),
+			"users walk must request the shared page size; query was %q", req.query)
+	}
+	require.True(t, sawUsersPage, "the walk must have listed users at least once")
+}
+
+// TestApiTokenListSurvivesMalformedTimestamps: the organization API-key sync
+// must not abort because a provider timestamp will not parse. This mirrors the
+// application-key behavior; deleting an org API key depends on the handle alone,
+// so a bad created_at or modified_at is not worth a whole-sync outage.
+func TestApiTokenListSurvivesMalformedTimestamps(t *testing.T) {
+	const keys = 12
+	entries := make([]string, 0, keys)
+	for i := 0; i < keys; i++ {
+		entries = append(entries, fmt.Sprintf(
+			`{"id":"key-%02d","type":"api_keys","attributes":{"name":"n%02d","created_at":"not-a-timestamp","modified_at":"also-bad"}}`, i, i))
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		page := 0
+		if raw := r.URL.Query().Get("page[number]"); raw != "" {
+			_, _ = fmt.Sscanf(raw, "%d", &page)
+		}
+		if r.URL.Path != "/api/v2/api_keys" {
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if page > 0 {
+			_, _ = w.Write([]byte(`{"data":[]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[` + strings.Join(entries, ",") + `]}`))
+	}))
+	defer server.Close()
+
+	var logBuf bytes.Buffer
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.AddSync(&logBuf),
+		zapcore.DebugLevel,
+	)
+	ctx := ctxzap.ToContext(context.Background(), zap.New(core))
+
+	builder := newApiTokenBuilder(newLifecycleTestWrapper(server.URL))
+	var synced []*v2.Resource
+	token := ""
+	for call := 0; call < 50; call++ {
+		got, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		require.NoError(t, err, "a malformed timestamp must never fail the org API-key walk")
+		synced = append(synced, got...)
+		require.NotNil(t, results)
+		if results.NextPageToken == "" {
+			break
+		}
+		token = results.NextPageToken
+	}
+
+	require.Len(t, synced, keys, "every org API key must still be synced despite bad timestamps")
+	for _, r := range synced {
+		require.Nil(t, r.GetCreatedAt(), "an unparseable created_at must be dropped, not guessed")
+	}
+
+	warned := 0
+	for _, line := range strings.Split(strings.TrimSpace(logBuf.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		var rec struct {
+			Msg              string `json:"msg"`
+			Field            string `json:"field"`
+			TotalOccurrences *int64 `json:"total_occurrences"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(line), &rec))
+		if rec.Msg != "baton-datadog: organization API key timestamp could not be parsed; syncing the key without it" {
+			continue
+		}
+		warned++
+		require.NotNil(t, rec.TotalOccurrences, "the warning must carry total_occurrences")
+		require.Contains(t, []string{"created_at", "modified_at"}, rec.Field, "the warning must name the field")
+	}
+	// 12 keys x 2 bad fields = 24 occurrences, so only the 1st and 10th log.
+	require.Equal(t, 2, warned, "24 malformed timestamps must log only the 1st and 10th, not one line each")
 }
