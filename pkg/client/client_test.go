@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -156,10 +157,27 @@ func TestServiceAccountApplicationKeyManagement(t *testing.T) {
 	})
 
 	t.Run("create sends requested scopes", func(t *testing.T) {
-		var body string
+		// body is written on the httptest server's goroutine and read by the test
+		// body. net/http promises no happens-before edge between the two, so the
+		// mutex is load-bearing rather than decorative -- the race detector does
+		// not report this shape, so it has to be reasoned about.
+		var (
+			bodyMu sync.Mutex
+			body   string
+		)
+		setBody := func(v string) {
+			bodyMu.Lock()
+			defer bodyMu.Unlock()
+			body = v
+		}
+		getBody := func() string {
+			bodyMu.Lock()
+			defer bodyMu.Unlock()
+			return body
+		}
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			buf, _ := io.ReadAll(r.Body)
-			body = string(buf)
+			setBody(string(buf))
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"data":{"id":"appkey-id","type":"application_keys","attributes":{"key":"plaintext-app-key","name":"c1-request"}}}`))
 		}))
@@ -167,8 +185,9 @@ func TestServiceAccountApplicationKeyManagement(t *testing.T) {
 
 		_, err := newOfficialTestClient(server.URL).CreateServiceAccountApplicationKey(context.Background(), serviceAccountID, "c1-request", []string{"dashboards_read", "metrics_read"})
 		assertNoError(t, err, "create service account application key should succeed")
-		assertContains(t, body, "dashboards_read", "request body should include the requested scopes")
-		assertContains(t, body, "metrics_read", "request body should include the requested scopes")
+		sent := getBody()
+		assertContains(t, sent, "dashboards_read", "request body should include the requested scopes")
+		assertContains(t, sent, "metrics_read", "request body should include the requested scopes")
 	})
 
 	t.Run("create rejects a response without plaintext material", func(t *testing.T) {

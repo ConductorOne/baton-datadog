@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
@@ -23,6 +24,11 @@ const defaultV2PageSize = 100
 type apiTokenBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
+
+	// malformedTimestamps counts organization API keys in the current walk whose
+	// created_at or modified_at could not be parsed. Sampled (L7): a provider
+	// emitting a bad timestamp format would emit it for every key.
+	malformedTimestamps atomic.Int64
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
@@ -78,11 +84,32 @@ func (o *apiTokenBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return o.resourceType
 }
 
+// warnMalformedTimestamp reports an unparseable provider timestamp, sampled so
+// a bad format affecting every key does not emit one line per resource.
+func (o *apiTokenBuilder) warnMalformedTimestamp(ctx context.Context, apiKeyID, field, raw string, err error) {
+	total := o.malformedTimestamps.Add(1)
+	if !shouldLogSampled(total) {
+		return
+	}
+	ctxzap.Extract(ctx).Warn(
+		"baton-datadog: organization API key timestamp could not be parsed; syncing the key without it",
+		zap.String("api_key_id", apiKeyID),
+		zap.String("field", field),
+		zap.String("value", raw),
+		zap.Int64("total_occurrences", total),
+		zap.Error(err),
+	)
+}
+
 func (o *apiTokenBuilder) List(
 	ctx context.Context,
 	resourceID *v2.ResourceId,
 	opts resource.SyncOpAttrs,
 ) ([]*v2.Resource, *resource.SyncOpResults, error) {
+	if opts.PageToken.Token == "" {
+		o.malformedTimestamps.Store(0)
+	}
+
 	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, nil, err
@@ -119,19 +146,27 @@ func (o *apiTokenBuilder) List(
 
 		var resourceOptions []resource.ResourceOption
 		timeFormat := time.RFC3339Nano
+		// A timestamp this connector cannot parse drops that field rather than
+		// failing the walk. Neither created_at nor modified_at is load-bearing
+		// here -- identifying and deleting an organization API key depends on
+		// the handle alone -- so aborting would trade every API key in the
+		// organization becoming invisible to C1 for one missing display value.
+		// Same reasoning as applicationKeyResource; see its comment.
 		if apiToken.Attributes != nil && apiToken.Attributes.CreatedAt != nil {
 			createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
 			if err != nil {
-				return nil, nil, err
+				o.warnMalformedTimestamp(ctx, *apiToken.Id, "created_at", *apiToken.Attributes.CreatedAt, err)
+			} else {
+				resourceOptions = append(resourceOptions, resource.WithResourceCreatedAt(createdAt))
 			}
-			resourceOptions = append(resourceOptions, resource.WithResourceCreatedAt(createdAt))
 		}
 		if apiToken.Attributes != nil && apiToken.Attributes.ModifiedAt != nil {
 			modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
 			if err != nil {
-				return nil, nil, err
+				o.warnMalformedTimestamp(ctx, *apiToken.Id, "modified_at", *apiToken.Attributes.ModifiedAt, err)
+			} else {
+				options = append(options, resource.WithSecretLastUsedAt(modifiedAt))
 			}
-			options = append(options, resource.WithSecretLastUsedAt(modifiedAt))
 		}
 		name := *apiToken.Id
 		if apiToken.Attributes != nil && apiToken.Attributes.Name != nil {

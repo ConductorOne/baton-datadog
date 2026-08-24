@@ -31,6 +31,12 @@ type applicationKeyBuilder struct {
 	// service account. It is reset at the start of each walk (see List) because
 	// this builder outlives any single sync.
 	skippedServiceAccounts atomic.Int64
+
+	// malformedCreatedAt counts application keys in the current walk whose
+	// created_at could not be parsed. Sampled for the same reason as the skip
+	// warning (L7): a provider emitting a bad timestamp format would emit it for
+	// every key, so an unsampled warning would be one line per resource.
+	malformedCreatedAt atomic.Int64
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &applicationKeyBuilder{}
@@ -150,6 +156,7 @@ func (o *applicationKeyBuilder) List(
 	// retried first page resets again, which is what a restarted walk wants.
 	if opts.PageToken.Token == "" {
 		o.skippedServiceAccounts.Store(0)
+		o.malformedCreatedAt.Store(0)
 	}
 
 	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
@@ -174,7 +181,13 @@ func (o *applicationKeyBuilder) listServiceAccountsPage(
 	bag *pagination.Bag,
 	page int64,
 ) ([]*v2.Resource, *resource.SyncOpResults, error) {
-	users, err := o.wrapper.ListUsers(ctx, datadogV2.NewListUsersOptionalParameters().WithPageNumber(page))
+	// Datadog's documented default page[size] is 10, so omitting it would run
+	// this walk at a tenth of the page size apiTokenBuilder.List uses -- ten
+	// times the round-trips for the same users, in a walk that already fans out
+	// one application-key request per service account found. Termination is
+	// unaffected: the users level ends on an empty page, not a short one.
+	users, err := o.wrapper.ListUsers(ctx,
+		datadogV2.NewListUsersOptionalParameters().WithPageNumber(page).WithPageSize(defaultV2PageSize))
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-datadog: list users while syncing service account application keys: %w", err)
 	}
@@ -263,7 +276,19 @@ func (o *applicationKeyBuilder) listApplicationKeyPage(
 		if key.Id == nil {
 			continue
 		}
-		rv, err := applicationKeyResource(*key.Id, serviceAccountResourceID, key.Attributes)
+		rv, err := applicationKeyResource(*key.Id, serviceAccountResourceID, key.Attributes,
+			func(appKeyID string, raw string, parseErr error) {
+				if total := o.malformedCreatedAt.Add(1); shouldLogSampled(total) {
+					ctxzap.Extract(ctx).Warn(
+						"baton-datadog: application key created_at could not be parsed; syncing the key without it",
+						zap.String("application_key_id", appKeyID),
+						zap.String("service_account_id", serviceAccountID),
+						zap.String("created_at", raw),
+						zap.Int64("total_occurrences", total),
+						zap.Error(parseErr),
+					)
+				}
+			})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -345,7 +370,16 @@ func applicationKeyProfileOptions(scopes *[]string) []resource.ResourceOption {
 // display-name text. WithParentResourceID records the owning service account
 // as the resource's parent; see Delete's doc comment for why that is the
 // field this connector's delete path relies on.
-func applicationKeyResource(appKeyID string, serviceAccountResourceID *v2.ResourceId, attrs *datadogV2.PartialApplicationKeyAttributes) (*v2.Resource, error) {
+// onMalformedCreatedAt is called when Datadog's created_at cannot be parsed. It
+// may be nil, in which case the field is dropped silently.
+type onMalformedCreatedAt func(appKeyID string, raw string, err error)
+
+func applicationKeyResource(
+	appKeyID string,
+	serviceAccountResourceID *v2.ResourceId,
+	attrs *datadogV2.PartialApplicationKeyAttributes,
+	reportMalformedCreatedAt onMalformedCreatedAt,
+) (*v2.Resource, error) {
 	name := appKeyID
 	var scopes *[]string
 	if attrs != nil {
@@ -371,12 +405,25 @@ func applicationKeyResource(appKeyID string, serviceAccountResourceID *v2.Resour
 	// syncSecretTraitToResource only copies a trait profile up when the
 	// resource has none -- so the profile set here is never clobbered.
 	resourceOptions = append(resourceOptions, applicationKeyProfileOptions(scopes)...)
+	// A created_at this connector cannot parse drops the field; it does not fail
+	// the resource, and it must not fail the walk. The timestamp is decorative
+	// here -- nothing about identifying, attributing or revoking the key depends
+	// on it, unlike the handle, the owning service account or the scopes -- so
+	// aborting would trade every application key in the organization becoming
+	// invisible to C1 for one missing display value on one key. For a security
+	// product, losing sight of live credentials is the worse failure. The
+	// provider is still misbehaving, so the caller is told and warns about it
+	// (sampled, since a bad format would affect every key).
 	if attrs != nil && attrs.CreatedAt != nil {
 		createdAt, err := time.Parse(time.RFC3339Nano, *attrs.CreatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("baton-datadog: parse application key created_at: %w", err)
+		switch {
+		case err != nil:
+			if reportMalformedCreatedAt != nil {
+				reportMalformedCreatedAt(appKeyID, *attrs.CreatedAt, err)
+			}
+		default:
+			resourceOptions = append(resourceOptions, resource.WithResourceCreatedAt(createdAt))
 		}
-		resourceOptions = append(resourceOptions, resource.WithResourceCreatedAt(createdAt))
 	}
 
 	return resource.NewSecretResource(
