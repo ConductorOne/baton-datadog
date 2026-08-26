@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
@@ -23,20 +22,6 @@ import (
 type applicationKeyBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
-
-	// skippedServiceAccounts counts how many service accounts the current walk
-	// has skipped because their application keys could not be read. The warning
-	// that reports a skip is sampled (L7): the case it exists for is a role
-	// missing service_account_write org-wide, which makes it fire for every
-	// service account. It is reset at the start of each walk (see List) because
-	// this builder outlives any single sync.
-	skippedServiceAccounts atomic.Int64
-
-	// malformedCreatedAt counts application keys in the current walk whose
-	// created_at could not be parsed. Sampled for the same reason as the skip
-	// warning (L7): a provider emitting a bad timestamp format would emit it for
-	// every key, so an unsampled warning would be one line per resource.
-	malformedCreatedAt atomic.Int64
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &applicationKeyBuilder{}
@@ -137,28 +122,6 @@ func (o *applicationKeyBuilder) List(
 	_ *v2.ResourceId,
 	opts resource.SyncOpAttrs,
 ) ([]*v2.Resource, *resource.SyncOpResults, error) {
-	// An empty page token is the first call of a walk, so the skip-warning
-	// sampling counter restarts here and each sync gets its own 1/10/100
-	// schedule. The builder is constructed once per connector process --
-	// Datadog.ResourceSyncers runs inside connectorbuilder.NewConnector, whose
-	// result is reused for every sync -- so without this reset the first sync
-	// consumes the early log slots and a later sync against the same org-wide
-	// missing permission would emit nothing until the running total reached
-	// 1000.
-	//
-	// An empty token is a safe first-walk signal for this builder: List only
-	// ever returns an empty NextPageToken from bag.Marshal() with an empty
-	// bag, and the bag can only be emptied by popping the users-level state,
-	// which happens solely on an empty users page -- the end of the walk. So
-	// no mid-walk call can carry one. (parsePageToken also accepts a "page:N"
-	// seed form, which nothing produces for this resource type; if one ever
-	// did, the counter would merely carry over rather than misbehave.) A
-	// retried first page resets again, which is what a restarted walk wants.
-	if opts.PageToken.Token == "" {
-		o.skippedServiceAccounts.Store(0)
-		o.malformedCreatedAt.Store(0)
-	}
-
 	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, nil, err
@@ -236,35 +199,21 @@ func (o *applicationKeyBuilder) listApplicationKeyPage(
 			maxApplicationKeyPages, serviceAccountID)
 	}
 
+	// Every error fails the sync, including PermissionDenied and NotFound.
+	// Skipping the service account instead would report a successful sync that
+	// omits its application keys, and C1 reads a resource missing from a
+	// completed sync as deleted -- so a role lacking service_account_write
+	// would silently retire live credentials from the inventory rather than
+	// saying it could not read them. Datadog also documents 403 and 404 on
+	// this endpoint without saying which failures produce which, so a 404 here
+	// cannot be assumed to mean the service account is genuinely gone.
 	resp, err := o.wrapper.ListServiceAccountApplicationKeys(ctx, serviceAccountID, page, defaultV2PageSize)
 	if err != nil {
-		// ListServiceAccountApplicationKeys requires Datadog's
-		// service_account_write permission, which this sync path is the
-		// first to need: an install that already had sync-secrets on for
-		// read-only key inventory may run a read-mostly custom role that
-		// lacks it. A service account can also be deleted mid-sync. Warn and
-		// skip that one service account rather than failing the whole sync
-		// (criteria R7); every other provider error still fails hard.
 		if code := status.Code(err); code == codes.PermissionDenied || code == codes.NotFound {
-			// Sampled, not per-service-account: an org-wide missing
-			// service_account_write would otherwise emit one line per service
-			// account on every sync. total_occurrences keeps the real count
-			// visible on the lines that do get through.
-			if total := o.skippedServiceAccounts.Add(1); shouldLogSampled(total) {
-				ctxzap.Extract(ctx).Warn(
-					"baton-datadog: skipping application keys for service account",
-					zap.String("service_account_id", serviceAccountID),
-					zap.String("code", code.String()),
-					zap.Int64("total_occurrences", total),
-					zap.Error(err),
-				)
-			}
-			bag.Pop()
-			nextPageToken, marshalErr := bag.Marshal()
-			if marshalErr != nil {
-				return nil, nil, fmt.Errorf("baton-datadog: marshal pagination bag: %w", marshalErr)
-			}
-			return nil, &resource.SyncOpResults{NextPageToken: nextPageToken}, nil
+			return nil, nil, fmt.Errorf(
+				"baton-datadog: list application keys for service account %q: %w "+
+					"(listing service-account application keys requires the Datadog service_account_write permission)",
+				serviceAccountID, err)
 		}
 		return nil, nil, fmt.Errorf("baton-datadog: list application keys for service account %q: %w", serviceAccountID, err)
 	}
@@ -278,16 +227,13 @@ func (o *applicationKeyBuilder) listApplicationKeyPage(
 		}
 		rv, err := applicationKeyResource(*key.Id, serviceAccountResourceID, key.Attributes,
 			func(appKeyID string, raw string, parseErr error) {
-				if total := o.malformedCreatedAt.Add(1); shouldLogSampled(total) {
-					ctxzap.Extract(ctx).Warn(
-						"baton-datadog: application key created_at could not be parsed; syncing the key without it",
-						zap.String("application_key_id", appKeyID),
-						zap.String("service_account_id", serviceAccountID),
-						zap.String("created_at", raw),
-						zap.Int64("total_occurrences", total),
-						zap.Error(parseErr),
-					)
-				}
+				ctxzap.Extract(ctx).Warn(
+					"baton-datadog: application key created_at could not be parsed; syncing the key without it",
+					zap.String("application_key_id", appKeyID),
+					zap.String("service_account_id", serviceAccountID),
+					zap.String("created_at", raw),
+					zap.Error(parseErr),
+				)
 			})
 		if err != nil {
 			return nil, nil, err
@@ -417,8 +363,7 @@ func applicationKeyResource(
 	// aborting would trade every application key in the organization becoming
 	// invisible to C1 for one missing display value on one key. For a security
 	// product, losing sight of live credentials is the worse failure. The
-	// provider is still misbehaving, so the caller is told and warns about it
-	// (sampled, since a bad format would affect every key).
+	// provider is still misbehaving, so the caller is told and warns about it.
 	if attrs != nil && attrs.CreatedAt != nil {
 		createdAt, err := time.Parse(time.RFC3339Nano, *attrs.CreatedAt)
 		switch {

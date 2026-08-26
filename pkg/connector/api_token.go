@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
@@ -24,11 +23,6 @@ const defaultV2PageSize = 100
 type apiTokenBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
-
-	// malformedTimestamps counts organization API keys in the current walk whose
-	// created_at or modified_at could not be parsed. Sampled (L7): a provider
-	// emitting a bad timestamp format would emit it for every key.
-	malformedTimestamps atomic.Int64
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
@@ -84,19 +78,14 @@ func (o *apiTokenBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return o.resourceType
 }
 
-// warnMalformedTimestamp reports an unparseable provider timestamp, sampled so
-// a bad format affecting every key does not emit one line per resource.
+// warnMalformedTimestamp reports an unparseable provider timestamp. The field
+// is dropped and the key still syncs.
 func (o *apiTokenBuilder) warnMalformedTimestamp(ctx context.Context, apiKeyID, field, raw string, err error) {
-	total := o.malformedTimestamps.Add(1)
-	if !shouldLogSampled(total) {
-		return
-	}
 	ctxzap.Extract(ctx).Warn(
 		"baton-datadog: organization API key timestamp could not be parsed; syncing the key without it",
 		zap.String("api_key_id", apiKeyID),
 		zap.String("field", field),
 		zap.String("value", raw),
-		zap.Int64("total_occurrences", total),
 		zap.Error(err),
 	)
 }
@@ -106,10 +95,6 @@ func (o *apiTokenBuilder) List(
 	resourceID *v2.ResourceId,
 	opts resource.SyncOpAttrs,
 ) ([]*v2.Resource, *resource.SyncOpResults, error) {
-	if opts.PageToken.Token == "" {
-		o.malformedTimestamps.Store(0)
-	}
-
 	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, nil, err
