@@ -644,11 +644,16 @@ func TestApplicationKeyBuilderListReturnsOnePagePerCall(t *testing.T) {
 	}
 }
 
-// TestApplicationKeyBuilderListSkipsForbiddenServiceAccount: a 403 from
-// ListServiceAccountApplicationKeys -- what an install whose Datadog role
-// lacks service_account_write gets -- must skip that one service account and
-// let the rest of the sync finish, not fail the whole sync (criteria R7).
-func TestApplicationKeyBuilderListSkipsForbiddenServiceAccount(t *testing.T) {
+// TestApplicationKeyBuilderListFailsHardOnForbiddenServiceAccount: a 403 from
+// ListServiceAccountApplicationKeys -- what an install whose Datadog role lacks
+// service_account_write gets -- must fail the sync. Skipping the service
+// account would report a successful sync missing its application keys, and C1
+// reads a resource absent from a completed sync as deleted, so the keys would
+// be retired from the inventory instead of the permission problem surfacing.
+// The error has to name the permission, because nothing else does: C1 does not
+// consume a connector's advertised CapabilityPermissions, so this message is
+// the only place an operator learns what to grant.
+func TestApplicationKeyBuilderListFailsHardOnForbiddenServiceAccount(t *testing.T) {
 	usersPages := []string{
 		`[{"id":"sa-forbidden","type":"users","attributes":{"service_account":true}},` +
 			`{"id":"sa-ok","type":"users","attributes":{"service_account":true}}]`,
@@ -657,18 +662,66 @@ func TestApplicationKeyBuilderListSkipsForbiddenServiceAccount(t *testing.T) {
 	server, requests := newAppKeyListServer(t, usersPages, appKeyPages, map[string]bool{"sa-forbidden": true})
 	defer server.Close()
 
-	got, _ := drainAppKeyList(t, newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL)), requests)
-
-	require.Len(t, got, 1, "the readable service account's keys must still sync")
-	require.Equal(t, "okkey-0", got[0].GetId().GetResource())
-
-	attempted := false
-	for _, req := range snapshotRequests(requests) {
-		if strings.Contains(req.path, "sa-forbidden") {
-			attempted = true
+	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	ctx := context.Background()
+	token := ""
+	for call := 0; call < 10; call++ {
+		_, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		if err != nil {
+			require.ErrorContains(t, err, "service_account_write",
+				"the error must name the permission the operator has to grant")
+			require.ErrorContains(t, err, "sa-forbidden",
+				"the error must name the service account that could not be read")
+			attempted := false
+			for _, req := range snapshotRequests(requests) {
+				if strings.Contains(req.path, "sa-forbidden") {
+					attempted = true
+				}
+			}
+			require.True(t, attempted, "the forbidden service account must actually have been attempted")
+			return
 		}
+		require.NotNil(t, results)
+		require.NotEmpty(t, results.NextPageToken, "sync ended without surfacing the 403")
+		token = results.NextPageToken
 	}
-	require.True(t, attempted, "the forbidden service account must actually have been attempted")
+	t.Fatal("List never surfaced the 403")
+}
+
+// TestApplicationKeyBuilderListFailsHardOnMissingServiceAccount: a 404 is
+// treated exactly like a 403. Datadog documents both on this endpoint without
+// saying which failures produce which, so a 404 cannot be assumed to mean the
+// service account is genuinely gone rather than invisible to this role --
+// and a role masked behind 404s would otherwise sync an empty credential
+// inventory while reporting success.
+func TestApplicationKeyBuilderListFailsHardOnMissingServiceAccount(t *testing.T) {
+	requests := &[]recordedRequest{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recordRequest(t, requests, r)
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/v2/users" {
+			_, _ = w.Write([]byte(`{"data":[{"id":"sa-gone","type":"users","attributes":{"service_account":true}}]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"errors":["Not Found"]}`))
+	}))
+	defer server.Close()
+
+	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	ctx := context.Background()
+	token := ""
+	for call := 0; call < 10; call++ {
+		_, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		if err != nil {
+			require.ErrorContains(t, err, "sa-gone")
+			return
+		}
+		require.NotNil(t, results)
+		require.NotEmpty(t, results.NextPageToken, "sync ended without surfacing the 404")
+		token = results.NextPageToken
+	}
+	t.Fatal("List never surfaced the 404")
 }
 
 // TestApplicationKeyBuilderListFailsHardOnUnexpectedError: only
@@ -701,156 +754,6 @@ func TestApplicationKeyBuilderListFailsHardOnUnexpectedError(t *testing.T) {
 		token = results.NextPageToken
 	}
 	t.Fatal("List never surfaced the provider 5xx")
-}
-
-// TestShouldLogSampled: the L7 schedule is the 1st, 10th and 100th occurrence,
-// then every 1000th, and nothing else.
-func TestShouldLogSampled(t *testing.T) {
-	logged := map[int64]bool{}
-	for n := int64(1); n <= 3000; n++ {
-		if shouldLogSampled(n) {
-			logged[n] = true
-		}
-	}
-	for _, want := range []int64{1, 10, 100, 1000, 2000, 3000} {
-		require.Truef(t, logged[want], "occurrence %d should be logged", want)
-	}
-	for _, notWant := range []int64{2, 9, 11, 99, 101, 999, 1001, 1999} {
-		require.Falsef(t, logged[notWant], "occurrence %d should not be logged", notWant)
-	}
-	require.Len(t, logged, 6, "exactly 1, 10, 100, 1000, 2000, 3000 in the first 3000")
-	require.False(t, shouldLogSampled(0), "a zero count is not an occurrence")
-	require.False(t, shouldLogSampled(-1), "a negative count is not an occurrence")
-}
-
-// skipWarning is one decoded skip-warning log record.
-type skipWarning struct {
-	serviceAccountID string
-	code             string
-	totalOccurrences int64
-}
-
-// drainForSkipWarnings runs one full List walk with its own log sink and returns
-// the skip warnings that walk emitted, decoded from the JSON log records rather
-// than substring-matched: total_occurrences is compared numerically, so `1`
-// cannot be satisfied by `10`, `100` or `1000`, and the assertions do not rot if
-// zap's encoding changes.
-//
-// Requires a builder whose walk visits at least one users page with data -- it
-// asserts the walk did not end on its first call.
-func drainForSkipWarnings(t *testing.T, builder *applicationKeyBuilder) []skipWarning {
-	t.Helper()
-	var logBuf bytes.Buffer
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-		zapcore.AddSync(&logBuf),
-		zapcore.DebugLevel,
-	)
-	logger := zap.New(core)
-	ctx := ctxzap.ToContext(context.Background(), logger)
-
-	calls := 0
-	token := ""
-	for {
-		require.Less(t, calls, 200, "List did not terminate")
-		_, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
-		require.NoError(t, err, "a 403 must never fail the sync")
-		require.NotNil(t, results)
-		if results.NextPageToken == "" {
-			// List treats an empty INCOMING token as "first call of this walk"
-			// and resets the sampling counter on it. That is only sound because
-			// a walk cannot both start and end on the same call -- otherwise an
-			// empty token would be ambiguous between the two. Assert it here,
-			// in the branch where it can actually fail; a walk that terminated
-			// on call zero never ran at all.
-			require.NotZero(t, calls, "walk ended on its first call, so an empty token is ambiguous between start and end")
-			break
-		}
-		token = results.NextPageToken
-		calls++
-	}
-	require.NoError(t, logger.Sync())
-
-	var skips []skipWarning
-	for _, line := range strings.Split(strings.TrimSpace(logBuf.String()), "\n") {
-		if line == "" {
-			continue
-		}
-		var rec struct {
-			Msg              string `json:"msg"`
-			ServiceAccountID string `json:"service_account_id"`
-			Code             string `json:"code"`
-			TotalOccurrences *int64 `json:"total_occurrences"`
-		}
-		require.NoErrorf(t, json.Unmarshal([]byte(line), &rec), "log line is not JSON: %s", line)
-		// Matched exactly, not by substring, so a reworded production message
-		// fails the sampling assertions loudly instead of quietly matching
-		// nothing. (Inline rather than a named constant: gosec G101 reads a
-		// const holding this sentence as a hardcoded credential.)
-		if rec.Msg != "baton-datadog: skipping application keys for service account" {
-			continue
-		}
-		require.NotNilf(t, rec.TotalOccurrences, "skip warning must carry total_occurrences: %s", line)
-		skips = append(skips, skipWarning{
-			serviceAccountID: rec.ServiceAccountID,
-			code:             rec.Code,
-			totalOccurrences: *rec.TotalOccurrences,
-		})
-	}
-	return skips
-}
-
-// TestApplicationKeyBuilderListSamplesSkipWarning: when the configured Datadog
-// role cannot read application keys org-wide, the skip warning must not fire
-// once per service account (criteria L7). With 12 forbidden service accounts
-// only the 1st and 10th are logged, each carrying total_occurrences.
-//
-// The counter also has to restart per walk. applicationKeyBuilder is built once
-// per connector process (Datadog.ResourceSyncers runs inside
-// connectorbuilder.NewConnector), so a counter that only ever climbed would let
-// the first sync consume the 1/10/100 slots and leave every later sync silent
-// until the running total reached 1000 -- which is worse than the noise the
-// sampling exists to prevent. Draining twice proves the second walk gets its
-// own schedule, and the occurrence numbers are compared exactly so a later
-// occurrence cannot pass as the first.
-func TestApplicationKeyBuilderListSamplesSkipWarning(t *testing.T) {
-	const serviceAccounts = 12
-	entries := make([]string, 0, serviceAccounts)
-	forbidden := map[string]bool{}
-	for i := 0; i < serviceAccounts; i++ {
-		id := fmt.Sprintf("sa-%02d", i)
-		entries = append(entries, fmt.Sprintf(`{"id":"%s","type":"users","attributes":{"service_account":true}}`, id))
-		forbidden[id] = true
-	}
-	usersPages := []string{"[" + strings.Join(entries, ",") + "]"}
-
-	server, requests := newAppKeyListServer(t, usersPages, nil, forbidden)
-	defer server.Close()
-
-	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
-
-	for walk := 1; walk <= 2; walk++ {
-		skips := drainForSkipWarnings(t, builder)
-		require.Lenf(t, skips, 2, "walk %d: 12 skips must log only the 1st and 10th, not one line each", walk)
-		require.Equalf(t, int64(1), skips[0].totalOccurrences, "walk %d: first logged line must be occurrence 1, not a later one", walk)
-		require.Equalf(t, int64(10), skips[1].totalOccurrences, "walk %d: second logged line must be occurrence 10", walk)
-		for i, skip := range skips {
-			require.Equalf(t, codes.PermissionDenied.String(), skip.code,
-				"walk %d line %d: a 403 must be reported as PermissionDenied", walk, i)
-			require.NotEmptyf(t, skip.serviceAccountID, "walk %d line %d: skip must name the service account", walk, i)
-		}
-	}
-
-	// Both walks attempted every service account. This is also what catches a
-	// walk that terminates early: a paging change that ended the walk before
-	// draining every service account would show up here as a short count.
-	attempted := 0
-	for _, req := range snapshotRequests(requests) {
-		if strings.Contains(req.path, "/application_keys") {
-			attempted++
-		}
-	}
-	require.Equal(t, serviceAccounts*2, attempted, "every service account must be attempted on every walk")
 }
 
 // --- application-key scopes on the resource profile -----------------------
@@ -1172,8 +1075,9 @@ func TestApplicationKeyResourceMalformedCreatedAt(t *testing.T) {
 
 // TestApplicationKeyListSurvivesMalformedCreatedAt: the whole walk must complete
 // when the provider returns an unparseable created_at, the affected key must
-// still be synced, and the warning must be sampled with total_occurrences rather
-// than emitted once per key (L7).
+// still be synced, and every affected key must be reported. The timestamp is
+// decorative -- nothing about identifying, attributing or revoking the key
+// depends on it -- so dropping the field beats losing sight of the credential.
 func TestApplicationKeyListSurvivesMalformedCreatedAt(t *testing.T) {
 	const keys = 12
 	entries := make([]string, 0, keys)
@@ -1220,17 +1124,15 @@ func TestApplicationKeyListSurvivesMalformedCreatedAt(t *testing.T) {
 			continue
 		}
 		var rec struct {
-			Msg              string `json:"msg"`
-			TotalOccurrences *int64 `json:"total_occurrences"`
+			Msg string `json:"msg"`
 		}
 		require.NoError(t, json.Unmarshal([]byte(line), &rec))
 		if rec.Msg != "baton-datadog: application key created_at could not be parsed; syncing the key without it" {
 			continue
 		}
 		warned++
-		require.NotNil(t, rec.TotalOccurrences, "the warning must carry total_occurrences")
 	}
-	require.Equal(t, 2, warned, "12 malformed timestamps must log only the 1st and 10th, not one line each")
+	require.Equal(t, keys, warned, "every key with an unparseable created_at must be reported")
 }
 
 // TestApplicationKeySyncRequestsFullUsersPage: the users walk must ask for the
@@ -1319,18 +1221,16 @@ func TestApiTokenListSurvivesMalformedTimestamps(t *testing.T) {
 			continue
 		}
 		var rec struct {
-			Msg              string `json:"msg"`
-			Field            string `json:"field"`
-			TotalOccurrences *int64 `json:"total_occurrences"`
+			Msg   string `json:"msg"`
+			Field string `json:"field"`
 		}
 		require.NoError(t, json.Unmarshal([]byte(line), &rec))
 		if rec.Msg != "baton-datadog: organization API key timestamp could not be parsed; syncing the key without it" {
 			continue
 		}
 		warned++
-		require.NotNil(t, rec.TotalOccurrences, "the warning must carry total_occurrences")
 		require.Contains(t, []string{"created_at", "modified_at"}, rec.Field, "the warning must name the field")
 	}
-	// 12 keys x 2 bad fields = 24 occurrences, so only the 1st and 10th log.
-	require.Equal(t, 2, warned, "24 malformed timestamps must log only the 1st and 10th, not one line each")
+	// Every key carries two unparseable fields, and each is reported.
+	require.Equal(t, keys*2, warned, "every unparseable timestamp must be reported")
 }
