@@ -724,9 +724,9 @@ func TestApplicationKeyBuilderListFailsHardOnMissingServiceAccount(t *testing.T)
 	t.Fatal("List never surfaced the 404")
 }
 
-// TestApplicationKeyBuilderListFailsHardOnUnexpectedError: only
-// PermissionDenied/NotFound are skipped; any other provider error must still
-// abort the sync rather than silently under-reporting keys.
+// TestApplicationKeyBuilderListFailsHardOnUnexpectedError: every provider
+// error aborts the sync; this covers the non-403/404 path, where the error
+// carries no permission or missing-service-account hint of its own.
 func TestApplicationKeyBuilderListFailsHardOnUnexpectedError(t *testing.T) {
 	requests := &[]recordedRequest{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
