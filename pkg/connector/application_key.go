@@ -209,10 +209,17 @@ func (o *applicationKeyBuilder) listApplicationKeyPage(
 	// cannot be assumed to mean the service account is genuinely gone.
 	resp, err := o.wrapper.ListServiceAccountApplicationKeys(ctx, serviceAccountID, page, defaultV2PageSize)
 	if err != nil {
-		if code := status.Code(err); code == codes.PermissionDenied || code == codes.NotFound {
+		code := status.Code(err)
+		if code == codes.PermissionDenied {
 			return nil, nil, fmt.Errorf(
 				"baton-datadog: list application keys for service account %q: %w "+
 					"(listing service-account application keys requires the Datadog service_account_write permission)",
+				serviceAccountID, err)
+		}
+		if code == codes.NotFound {
+			return nil, nil, fmt.Errorf(
+				"baton-datadog: list application keys for service account %q: %w "+
+					"(the service account was not found, and may have been deleted mid-sync)",
 				serviceAccountID, err)
 		}
 		return nil, nil, fmt.Errorf("baton-datadog: list application keys for service account %q: %w", serviceAccountID, err)
