@@ -79,6 +79,7 @@ Available Commands:
   help               Help about any command
 
 Flags:
+      --allow-org-api-key-deletion                       Allow this connector to delete Datadog organization API keys. Off by default: syncing secrets does not grant deletion. ($BATON_ALLOW_ORG_API_KEY_DELETION)
       --api-key string                                   required: API key used to authenticate to Datadog API. ($BATON_API_KEY)
       --app-key string                                   required: APP key used with API key to assign scopes for API access. ($BATON_APP_KEY)
       --client-id string                                 The client ID used to authenticate with ConductorOne ($BATON_CLIENT_ID)

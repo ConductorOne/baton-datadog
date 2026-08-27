@@ -18,10 +18,10 @@ sidebarTitle: "Datadog"
 | Roles | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | |
 | Teams | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | |
 | Schedules | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>* | | | |
-| Secrets - Organization API keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
+| Secrets - Organization API keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>‡ | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>‡ |
 | Secrets - Service account application keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>† |
 
-[This connector can sync secrets](/product/admin/inventory) and display them on the **Inventory** page. Organization API keys and service account application keys are synced and shown as distinct secret kinds; only application keys owned by a Datadog service account can be issued.
+[This connector can sync secrets](/product/admin/inventory) and display them on the **Inventory** page. Organization API keys and service account application keys are synced, issued, and shown as distinct secret kinds: they are two different kinds of API key, not two spellings of one, and a request names which kind it wants. Service account application keys are the default kind.
 
 An application key can be issued and revoked through C1 when **Sync secrets** is enabled, provided the selected Datadog user is a service account. Datadog does not support an expiration date when creating an application key.
 
@@ -30,6 +30,8 @@ Credential issuance targets a Datadog service account only. C1 re-checks at issu
 
 Revoking a service account application key requires the caller to supply that owning service account alongside the key itself. Until the requesting workflow threads it through, a revoke request that omits it fails rather than guessing which service account owns the key.
 </Warning>
+
+‡Organization API key issuance and revocation both require **Allow organization API key deletion**, which is off by default and is separate from **Sync secrets**. An organization API key belongs to the whole organization rather than to the person it was issued to, and it cannot be scoped, so C1 will not mint one it has no permission to revoke. With the setting off, organization API keys still sync; they simply cannot be issued or deleted.
 
 *Schedules and application-key issuance are not enabled by default. Enable **Sync schedules** or **Sync secrets**, respectively, when configuring the connector.
 
@@ -52,7 +54,7 @@ Configuring the connector requires you to pass in credentials generated in Datad
 <Warning>
 A user with the **Connector Administrator** or **Super Administrator** role in C1 and the **Datadog Admin** or **Datadog standard** role in Datadog must perform this task.
 
-If your user has a custom Datadog role, make sure it includes **User App Keys**, **User Access Invite**, and **User Access Manage** to create, update, enable, and disable users from C1. If you enable **Sync secrets**, also add **Service Account Write**, which governs syncing, issuing, and revoking service account application keys, plus **API Keys Read** and **API Keys Delete** to sync and revoke organization API keys. **Service Account Write** is required, not optional: with **Sync secrets** enabled, a role that lacks it fails the sync rather than syncing an application-key inventory that is silently missing keys.
+If your user has a custom Datadog role, make sure it includes **User App Keys**, **User Access Invite**, and **User Access Manage** to create, update, enable, and disable users from C1. If you enable **Sync secrets**, also add **Service Account Write**, which governs syncing, issuing, and revoking service account application keys, plus **API Keys Read** to sync organization API keys. Add **API Keys Write** and **API Keys Delete** only if you also enable **Allow organization API key deletion**; without that setting the connector never creates or deletes an organization API key, so those two permissions are not needed. **Service Account Write** is required, not optional: with **Sync secrets** enabled, a role that lacks it fails the sync rather than syncing an application-key inventory that is silently missing keys.
 </Warning>
 
 ### Locate your Datadog site
@@ -152,6 +154,9 @@ To complete this task, you'll need:
   **Optional.** Enable **Sync secrets** to display them on the [Inventory page](/product/admin/inventory).
   </Step>
   <Step>
+  **Optional.** Enable **Allow organization API key deletion** to let C1 issue and revoke Datadog organization API keys. Leave it off unless you want C1 to be able to delete organization-wide keys; enabling **Sync secrets** alone does not grant this.
+  </Step>
+  <Step>
   **Optional.** Enable **Sync schedules**.
   </Step>
   <Step>
@@ -241,6 +246,10 @@ stringData:
 
   # Optional: include if you want to sync secrets (API keys) from Datadog
   BATON_SYNC_SECRETS: true
+
+  # Optional: include ONLY if you want C1 to issue and delete organization-wide
+  # Datadog API keys. Syncing secrets does not grant this on its own.
+  BATON_ALLOW_ORG_API_KEY_DELETION: true
 ```
 
 See the connector's README or run `--help` to see all available configuration flags and environment variables.

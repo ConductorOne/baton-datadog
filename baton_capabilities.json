@@ -19,12 +19,15 @@
                 "permission": "api_keys_read"
               },
               {
+                "permission": "api_keys_write"
+              },
+              {
                 "permission": "api_keys_delete"
               }
             ]
           }
         ],
-        "description": "A Datadog organization API key. Owned by the org, not by any single Datadog identity; not used for credential issuance by this connector."
+        "description": "A Datadog organization API key. Owned by the org, not by any single Datadog identity."
       },
       "capabilities": [
         "CAPABILITY_SYNC",
@@ -34,6 +37,9 @@
         "permissions": [
           {
             "permission": "api_keys_read"
+          },
+          {
+            "permission": "api_keys_write"
           },
           {
             "permission": "api_keys_delete"
@@ -209,7 +215,13 @@
             "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
             "customScopesAllowed": true,
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
-            "secretResourceTypeId": "service-account-application-key"
+            "secretResourceTypeId": "service-account-application-key",
+            "preferred": true
+          },
+          {
+            "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
+            "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
+            "secretResourceTypeId": "api-key"
           }
         ],
         "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"
