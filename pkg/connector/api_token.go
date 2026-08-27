@@ -25,10 +25,24 @@ type apiTokenBuilder struct {
 	wrapper      *client.DatadogClient
 }
 
-var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
-var _ connectorbuilder.ResourceDeleterV2Limited = &apiTokenBuilder{}
+// deletableAPITokenBuilder is apiTokenBuilder plus the organization API key
+// delete path, registered only when the operator sets
+// allow-org-api-key-deletion.
+//
+// Delete lives on this type rather than on apiTokenBuilder because the SDK
+// derives CAPABILITY_RESOURCE_DELETE from a type assertion on the registered
+// syncer (connectorbuilder.builder.resourceDeleters). A Delete method on
+// apiTokenBuilder itself would advertise org-wide key deletion on every
+// sync-secrets install regardless of the grant, and a capability that is
+// advertised but refuses at call time is worse than one that is absent: C1
+// resolves what it may do from the advertisement, not from the error.
+type deletableAPITokenBuilder struct{ *apiTokenBuilder }
 
-func (o *apiTokenBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId, _ *v2.ResourceId) (annotations.Annotations, error) {
+var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
+var _ connectorbuilder.ResourceSyncerV2 = &deletableAPITokenBuilder{}
+var _ connectorbuilder.ResourceDeleterV2Limited = &deletableAPITokenBuilder{}
+
+func (o *deletableAPITokenBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId, _ *v2.ResourceId) (annotations.Annotations, error) {
 	if resourceID == nil {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: API key id is required")
 	}
@@ -159,7 +173,7 @@ func (o *apiTokenBuilder) List(
 		}
 		rv, err := resource.NewSecretResource(
 			name,
-			apiTokenResourceType,
+			o.resourceType,
 			*apiToken.Id,
 			options,
 			resourceOptions...,
@@ -186,4 +200,12 @@ func newApiTokenBuilder(wrapper *client.DatadogClient) *apiTokenBuilder {
 		resourceType: apiTokenResourceType,
 		wrapper:      wrapper,
 	}
+}
+
+func newDeletableAPITokenBuilder(wrapper *client.DatadogClient) *deletableAPITokenBuilder {
+	builder := newApiTokenBuilder(wrapper)
+	// Same resource type id, but the permission set that includes the delete
+	// and create rights this variant can actually reach.
+	builder.resourceType = deletableAPITokenResourceType
+	return &deletableAPITokenBuilder{apiTokenBuilder: builder}
 }

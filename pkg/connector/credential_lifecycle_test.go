@@ -134,7 +134,7 @@ func TestApiTokenBuilderDeleteUsesHandleNotSecret(t *testing.T) {
 	require.Equal(t, handle, issued.ID)
 	require.Equal(t, secret, issued.Secret)
 
-	deleter := newApiTokenBuilder(wrapper)
+	deleter := newDeletableAPITokenBuilder(wrapper)
 	resourceID := &v2.ResourceId{ResourceType: apiTokenResourceType.Id, Resource: issued.ID}
 	_, err = deleter.Delete(ctx, resourceID, nil)
 	require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestApiTokenBuilderDeleteRejectsMissingHandle(t *testing.T) {
 			defer server.Close()
 			wrapper := newLifecycleTestWrapper(server.URL)
 
-			deleter := newApiTokenBuilder(wrapper)
+			deleter := newDeletableAPITokenBuilder(wrapper)
 			_, err := deleter.Delete(context.Background(), tt.resourceID, nil)
 			require.Error(t, err)
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -239,11 +239,14 @@ func newServiceAccountAppKeyServer(t *testing.T, serviceAccountID, handle, secre
 
 func issueServiceAccountAppKey(t *testing.T, ctx context.Context, wrapper *client.DatadogClient, serviceAccountID, requestID string) *connectorbuilder.CredentialIssueOutput {
 	t.Helper()
-	issuer := newCredentialUserBuilder(wrapper)
+	issuer := newCredentialUserBuilder(wrapper, false)
 	out, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
-		IdentityID:        &v2.ResourceId{ResourceType: userResourceType.Id, Resource: serviceAccountID},
-		RequestID:         requestID,
-		CredentialOptions: v2.CredentialIssueOptions_builder{ApiKey: v2.CredentialIssueOptions_ApiKey_builder{}.Build()}.Build(),
+		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: serviceAccountID},
+		RequestID:  requestID,
+		CredentialOptions: v2.CredentialIssueOptions_builder{
+			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
+			ApiKey:               v2.CredentialIssueOptions_ApiKey_builder{}.Build(),
+		}.Build(),
 	})
 	require.NoError(t, err)
 	return out
@@ -288,11 +291,14 @@ func TestIssueRequiresServiceAccount(t *testing.T) {
 		defer server.Close()
 		wrapper := newLifecycleTestWrapper(server.URL)
 
-		issuer := newCredentialUserBuilder(wrapper)
+		issuer := newCredentialUserBuilder(wrapper, false)
 		out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
-			IdentityID:        &v2.ResourceId{ResourceType: userResourceType.Id, Resource: humanUserID},
-			RequestID:         "req-reject",
-			CredentialOptions: v2.CredentialIssueOptions_builder{ApiKey: v2.CredentialIssueOptions_ApiKey_builder{}.Build()}.Build(),
+			IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: humanUserID},
+			RequestID:  "req-reject",
+			CredentialOptions: v2.CredentialIssueOptions_builder{
+				SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
+				ApiKey:               v2.CredentialIssueOptions_ApiKey_builder{}.Build(),
+			}.Build(),
 		})
 		require.Nil(t, out)
 		require.Error(t, err)
@@ -330,11 +336,14 @@ func TestIssueRefusesDuplicateRequest(t *testing.T) {
 	defer server.Close()
 	wrapper := newLifecycleTestWrapper(server.URL)
 
-	issuer := newCredentialUserBuilder(wrapper)
+	issuer := newCredentialUserBuilder(wrapper, false)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
-		IdentityID:        &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
-		RequestID:         requestID,
-		CredentialOptions: v2.CredentialIssueOptions_builder{ApiKey: v2.CredentialIssueOptions_ApiKey_builder{}.Build()}.Build(),
+		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
+		RequestID:  requestID,
+		CredentialOptions: v2.CredentialIssueOptions_builder{
+			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
+			ApiKey:               v2.CredentialIssueOptions_ApiKey_builder{}.Build(),
+		}.Build(),
 	})
 	require.Nil(t, out)
 	require.Error(t, err)
@@ -976,12 +985,13 @@ func TestIssuePassesScopesToProviderAndProfile(t *testing.T) {
 	}))
 	defer server.Close()
 
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL))
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  "req-scoped",
 		CredentialOptions: v2.CredentialIssueOptions_builder{
-			ApiKey: v2.CredentialIssueOptions_ApiKey_builder{Scopes: requested}.Build(),
+			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
+			ApiKey:               v2.CredentialIssueOptions_ApiKey_builder{Scopes: requested}.Build(),
 		}.Build(),
 	})
 	require.NoError(t, err)

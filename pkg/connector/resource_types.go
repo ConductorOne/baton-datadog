@@ -68,36 +68,30 @@ var (
 	}
 	// apiTokenResourceType covers organization-scoped API keys (Datadog's
 	// "API keys", /api/v2/api_keys): org-wide credentials not owned by any
-	// single Datadog identity. This connector still syncs and can delete
-	// them, but Issue no longer targets this type -- an org-scoped key
-	// issued on behalf of a selected user is not an honest mapping of who
-	// holds it. See serviceAccountApplicationKeyResourceType for the type
-	// Issue does target.
+	// single Datadog identity. Issue targets this type only when the operator
+	// grants allow-org-api-key-deletion -- an org-scoped key has no honest
+	// owner, and the SDK will not advertise an issuance option whose secret
+	// resource type has no revoke path. See
+	// serviceAccountApplicationKeyResourceType for the type Issue prefers.
 	//
 	// The advertised permissions are the ones Datadog's own API spec marks
-	// required (the per-operation "x-permission" block) for the only two
-	// endpoints the advertised capabilities call: ListAPIKeys, backing
-	// CAPABILITY_SYNC, requires api_keys_read, and DeleteAPIKey
-	// (DELETE /api/v2/api_keys/{api_key_id}), backing
-	// CAPABILITY_RESOURCE_DELETE, requires api_keys_delete. api_keys_delete
-	// is a real Datadog permission ("API Keys Delete -- Delete API Keys for
-	// your organization", Datadog Admin Role) and is the one that governs
-	// delete; api_keys_write is scoped to CreateAPIKey/UpdateAPIKey ("Create
-	// and rename API Keys") and is deliberately NOT advertised here, because
-	// no advertised capability on this type creates or renames a key.
-	// Advertising it would make C1 demand org-wide key-creation rights the
-	// connector never exercises. CreateAPIKey/FindAPIKeyByName remain on
-	// DatadogClient for tests.
-	apiTokenResourceType = &v2.ResourceType{
-		Id:          "api-key",
-		DisplayName: "Organization API Key",
-		Description: "A Datadog organization API key. Owned by the org, not by any single Datadog identity; not used for credential issuance by this connector.",
-		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
-		Annotations: annotations.New(
-			&v2.SkipEntitlementsAndGrants{},
-			capabilityPermissions("api_keys_read", "api_keys_delete"),
-		),
-	}
+	// required (the per-operation "x-permission" block) for the endpoints the
+	// advertised capabilities call. api_keys_read backs CAPABILITY_SYNC
+	// (ListAPIKeys) and is always advertised. api_keys_write backs CreateAPIKey
+	// and so is advertised only by deletableAPITokenResourceType, which is also
+	// the only variant that can be an issuance target. api_keys_delete backs
+	// CAPABILITY_RESOURCE_DELETE (DeleteAPIKey) and is likewise only advertised
+	// on that variant: this base type carries no delete path, so demanding a
+	// Datadog Admin permission for it would send operators after rights no
+	// reachable code exercises.
+	apiTokenResourceType = newAPITokenResourceType("api_keys_read")
+	// deletableAPITokenResourceType is apiTokenResourceType as registered when
+	// allow-org-api-key-deletion is on: same id, plus the permissions the
+	// delete and issue paths that grant unlocks actually require.
+	// api_keys_delete is "API Keys Delete -- Delete API Keys for your
+	// organization" and api_keys_write is "Create and rename API Keys", both
+	// Datadog Admin Role permissions.
+	deletableAPITokenResourceType = newAPITokenResourceType("api_keys_read", "api_keys_write", "api_keys_delete")
 	// serviceAccountApplicationKeyResourceType covers application keys owned
 	// by a Datadog service-account user (/api/v2/service_accounts/{id}/application_keys).
 	// This is the resource type credential issuance targets: the key is
@@ -151,3 +145,19 @@ var (
 		),
 	}
 )
+
+// newAPITokenResourceType builds the organization API key resource type with a
+// given permission set. The id is shared across variants because only one of
+// them is ever registered: which one depends on allow-org-api-key-deletion.
+func newAPITokenResourceType(permissions ...string) *v2.ResourceType {
+	return &v2.ResourceType{
+		Id:          "api-key",
+		DisplayName: "Organization API Key",
+		Description: "A Datadog organization API key. Owned by the org, not by any single Datadog identity.",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
+		Annotations: annotations.New(
+			&v2.SkipEntitlementsAndGrants{},
+			capabilityPermissions(permissions...),
+		),
+	}
+}

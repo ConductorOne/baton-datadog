@@ -30,13 +30,19 @@ type Datadog struct {
 	baseURL       string
 	SyncSecrets   bool
 	SyncSchedules bool
+	// AllowOrgAPIKeyDeletion is the operator's explicit grant to destroy
+	// Datadog organization API keys. It is deliberately not implied by
+	// SyncSecrets: reading a credential inventory is not consent to delete
+	// from it, and an install already running with sync-secrets on must not
+	// acquire org-wide key deletion merely by upgrading the connector.
+	AllowOrgAPIKeyDeletion bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
 	userSyncer := connectorbuilder.ResourceSyncerV2(newUserBuilder(d.wrapper))
 	if d.SyncSecrets {
-		userSyncer = newCredentialUserBuilder(d.wrapper)
+		userSyncer = newCredentialUserBuilder(d.wrapper, d.AllowOrgAPIKeyDeletion)
 	}
 	resourceSyncers := []connectorbuilder.ResourceSyncerV2{
 		userSyncer,
@@ -45,7 +51,15 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 	}
 
 	if d.SyncSecrets {
-		resourceSyncers = append(resourceSyncers, newApiTokenBuilder(d.wrapper), newApplicationKeyBuilder(d.wrapper))
+		// The organization API key syncer is registered either way; only the
+		// variant carrying Delete is gated, so CAPABILITY_RESOURCE_DELETE is
+		// absent from the advertised capabilities without the grant rather
+		// than advertised and refused.
+		apiTokenSyncer := connectorbuilder.ResourceSyncerV2(newApiTokenBuilder(d.wrapper))
+		if d.AllowOrgAPIKeyDeletion {
+			apiTokenSyncer = newDeletableAPITokenBuilder(d.wrapper)
+		}
+		resourceSyncers = append(resourceSyncers, apiTokenSyncer, newApplicationKeyBuilder(d.wrapper))
 	}
 
 	if d.SyncSchedules {
@@ -137,6 +151,7 @@ func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connector
 	baseURL := ddc.BaseUrl
 	syncSecrets := ddc.SyncSecrets
 	syncSchedules := ddc.SyncSchedules
+	allowOrgAPIKeyDeletion := ddc.AllowOrgApiKeyDeletion
 
 	// Validate input parameters
 	if site == "" {
@@ -185,7 +200,8 @@ func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connector
 		baseURL:       baseURL,
 		client:        officialClient,
 		wrapper:       wrapper,
-		SyncSecrets:   syncSecrets,
-		SyncSchedules: syncSchedules,
+		SyncSecrets:            syncSecrets,
+		SyncSchedules:          syncSchedules,
+		AllowOrgAPIKeyDeletion: allowOrgAPIKeyDeletion,
 	}, nil, nil
 }
