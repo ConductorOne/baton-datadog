@@ -38,6 +38,16 @@ var (
 		field.WithDescription("Whether to sync secrets or not"),
 		field.WithDisplayName("Sync secrets"),
 	)
+	// AllowOrgAPIKeyDeletion is a destructive grant, deliberately separate from
+	// SyncSecrets. Reading organization API keys is not consent to destroy
+	// them, and an install that already syncs secrets must not gain org-wide
+	// key deletion by upgrading the connector.
+	AllowOrgAPIKeyDeletion = field.BoolField(
+		"allow-org-api-key-deletion",
+		field.WithDescription("Allow this connector to delete Datadog organization API keys. Off by default: syncing secrets does not grant deletion."),
+		field.WithDefaultValue(false),
+		field.WithDisplayName("Allow organization API key deletion"),
+	)
 	SyncSchedules = field.BoolField(
 		"sync-schedules",
 		field.WithDescription("Whether to sync on-call schedules or not"),
@@ -65,6 +75,7 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	ApiKey,
 	AppKey,
 	SyncSecrets,
+	AllowOrgAPIKeyDeletion,
 	SyncSchedules,
 	BaseURL,
 },
