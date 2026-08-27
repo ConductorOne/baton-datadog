@@ -23,36 +23,103 @@ type userBuilder struct {
 	wrapper      *client.DatadogClient
 }
 
-type credentialUserBuilder struct{ *userBuilder }
-
-func newCredentialUserBuilder(wrapper *client.DatadogClient) *credentialUserBuilder {
-	return &credentialUserBuilder{userBuilder: newUserBuilder(wrapper)}
+type credentialUserBuilder struct {
+	*userBuilder
+	// offerOrgAPIKey advertises organization API keys as a second issuance
+	// kind. It follows the allow-org-api-key-deletion grant because the SDK
+	// refuses to register an issuance descriptor whose secret resource type
+	// has no ResourceDeleterV2: without the grant this connector cannot revoke
+	// an org key, so it must not mint one either.
+	offerOrgAPIKey bool
 }
 
+func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey bool) *credentialUserBuilder {
+	return &credentialUserBuilder{userBuilder: newUserBuilder(wrapper), offerOrgAPIKey: offerOrgAPIKey}
+}
+
+// IssueCapabilityDetails advertises the credential kinds this connector mints.
+// Both are the API_KEY shape and they are distinguished only by
+// secret_resource_type_id, which is what that field is for: the closed Option
+// enum names the shape a caller asks for, the open resource type id names the
+// kind that comes back. Datadog's two kinds are genuinely different
+// credentials -- a service-account application key is scoped to and owned by
+// one identity, an organization API key is owned by the org and by nobody in
+// it -- so they must stay two descriptors. Collapsing them would leave a
+// caller unable to say which one it wants, and the SDK unable to check that
+// the resource Issue returns is the one that was requested.
+//
+// The service-account application key is marked preferred: it is the only
+// issuance mapping with an honest owner, so it is the default when a caller
+// asks for the API_KEY shape without choosing a kind.
 func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.CredentialDetailsCredentialIssue, annotations.Annotations, error) {
-	return v2.CredentialDetailsCredentialIssue_builder{
-		Options: []*v2.CredentialIssueOptionDescriptor{v2.CredentialIssueOptionDescriptor_builder{
+	options := []*v2.CredentialIssueOptionDescriptor{
+		v2.CredentialIssueOptionDescriptor_builder{
 			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
 			CustomScopesAllowed:  true,
-		}.Build()},
+			Preferred:            true,
+		}.Build(),
+	}
+	if u.offerOrgAPIKey {
+		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
+			Option:       v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+			ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+			// deletableAPITokenResourceType, not apiTokenResourceType: they
+			// share an id, and this is the variant registered whenever this
+			// descriptor is advertised.
+			SecretResourceTypeId: deletableAPITokenResourceType.Id,
+			// Datadog organization API keys carry no scopes. Advertising none
+			// and disallowing custom ones makes the SDK reject a scoped
+			// request for this kind before it reaches Issue.
+		}.Build())
+	}
+	return v2.CredentialDetailsCredentialIssue_builder{
+		Options:         options,
 		PreferredOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
 	}.Build(), nil, nil
 }
 
-// Issue mints a Datadog service-account application key scoped to and owned
-// by the target identity. Per SPEC-07 (the judged Datadog credential-issuance
-// design), this is the only honest issuance mapping this connector supports:
-// an organization API key or a current-user application key has no reliable
-// non-human owner, so Issue targets a service-account application key
-// instead, gated on a live re-check that the target is actually a Datadog
-// service account (its user record may have changed since it was last
-// synced).
+// Issue dispatches on the credential kind the caller selected. The oneof arm
+// of CredentialIssueOptions gives the shape (API_KEY) and
+// secret_resource_type_id gives the kind within it; the SDK has already
+// resolved that pair against IssueCapabilityDetails and rejected anything not
+// advertised, so this switch only has to route. It deliberately does not fall
+// back to a default arm: an unrecognised kind is a protocol mismatch, and
+// minting the wrong kind of Datadog credential is not a recoverable guess.
 func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	if input == nil || input.IdentityID == nil || input.IdentityID.GetResourceType() != userResourceType.Id {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: a Datadog user identity is required")
 	}
+	switch secretResourceTypeID := input.CredentialOptions.GetSecretResourceTypeId(); secretResourceTypeID {
+	case serviceAccountApplicationKeyResourceType.Id:
+		return u.issueServiceAccountApplicationKey(ctx, input)
+	case apiTokenResourceType.Id:
+		if !u.offerOrgAPIKey {
+			return nil, status.Error(codes.FailedPrecondition,
+				"baton-datadog: organization API key issuance requires allow-org-api-key-deletion, which also provides the revoke path")
+		}
+		return u.issueOrganizationAPIKey(ctx, input)
+	default:
+		return nil, status.Errorf(codes.InvalidArgument,
+			"baton-datadog: unsupported credential secret resource type %q", secretResourceTypeID)
+	}
+}
+
+// issuedCredentialName is the provider-side name this connector gives a
+// credential it mints. It is derived from the request id so a retried request
+// finds the key its predecessor created instead of minting a second one.
+func issuedCredentialName(requestID string) string {
+	return "c1-" + requestID
+}
+
+// issueServiceAccountApplicationKey mints a Datadog service-account
+// application key scoped to and owned by the target identity. Per SPEC-07 (the
+// judged Datadog credential-issuance design) this is the honest issuance
+// mapping: the key has a real non-human owner. It is gated on a live re-check
+// that the target is actually a Datadog service account, since its user record
+// may have changed since it was last synced.
+func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	serviceAccountID := input.IdentityID.GetResource()
 
 	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
@@ -66,7 +133,7 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account; credential issuance only targets service accounts", serviceAccountID)
 	}
 
-	name := "c1-" + input.RequestID
+	name := issuedCredentialName(input.RequestID)
 	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", input.RequestID, err)
@@ -109,6 +176,69 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 		Secret: secret,
 		PlaintextData: []*v2.PlaintextData{
 			v2.PlaintextData_builder{Name: "application_key", Bytes: []byte(key.Secret)}.Build(),
+		},
+		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+	}, nil
+}
+
+// issueOrganizationAPIKey mints a Datadog organization API key
+// (POST /api/v2/api_keys). This is the second, deliberately non-default
+// issuance kind: the key is org-wide and Datadog records its creator, not an
+// owner, so the identity on the returned SecretTrait is the identity the key
+// was vended TO rather than a provider-side owner Datadog would enforce. The
+// key is unscoped -- a Datadog organization API key carries no scopes at all,
+// which is exactly why it must stay a separate kind from a service-account
+// application key rather than a variation of one.
+func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
+	// The SDK rejects requested scopes for this descriptor before Issue runs
+	// (it advertises no scopes and disallows custom ones). Re-checking here
+	// keeps the arm correct for a caller that reaches Issue directly, and
+	// fails closed rather than silently minting an unscoped key for a request
+	// that asked for a scoped one.
+	if scopes := input.CredentialOptions.GetApiKey().GetScopes(); len(scopes) != 0 {
+		return nil, status.Error(codes.InvalidArgument,
+			"baton-datadog: Datadog organization API keys cannot be scoped; request a service account application key for a scoped credential")
+	}
+
+	name := issuedCredentialName(input.RequestID)
+	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: look up organization API key for request %q: %w", input.RequestID, err)
+	}
+	if existing != nil {
+		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: organization API key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
+	}
+
+	key, err := u.wrapper.CreateAPIKey(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
+	}
+
+	secretTraitOptions := []rs.SecretTraitOption{
+		rs.WithSecretCreatedByID(input.IdentityID),
+		rs.WithSecretIdentityID(input.IdentityID),
+		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
+		rs.WithSecretDetail("datadog.api_key"),
+	}
+	// No parent resource id: an organization API key hangs off the
+	// organization, not off the identity it was vended to, and the syncer
+	// (apiTokenBuilder.List) builds these keys without a parent too. Claiming
+	// the user as a parent here would make the issued resource disagree with
+	// the same key on its next sync.
+	secret, err := rs.NewSecretResource(name, deletableAPITokenResourceType, key.ID, secretTraitOptions)
+	if err != nil {
+		if deleteErr := u.wrapper.DeleteAPIKey(ctx, key.ID); deleteErr != nil {
+			ctxzap.Extract(ctx).Warn("failed to clean up Datadog organization API key after resource construction error",
+				zap.String("api_key_id", key.ID),
+				zap.Error(deleteErr),
+			)
+		}
+		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
+	}
+	return &connectorbuilder.CredentialIssueOutput{
+		Secret: secret,
+		PlaintextData: []*v2.PlaintextData{
+			v2.PlaintextData_builder{Name: "api_key", Bytes: []byte(key.Secret)}.Build(),
 		},
 		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil

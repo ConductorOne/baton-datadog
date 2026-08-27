@@ -51,7 +51,7 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	datadogConnector, ok := builder.(*Datadog)
 	require.True(t, ok)
 
-	issuer := newCredentialUserBuilder(datadogConnector.wrapper)
+	issuer := newCredentialUserBuilder(datadogConnector.wrapper, false)
 	requestID := "smoke-" + time.Now().UTC().Format("20060102T150405")
 	t.Logf("issuing Datadog service account application key with request id %q", requestID)
 	issued, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
@@ -59,8 +59,11 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 			ResourceType: userResourceType.Id,
 			Resource:     serviceAccountID,
 		},
-		RequestID:         requestID,
-		CredentialOptions: v2.CredentialIssueOptions_builder{ApiKey: v2.CredentialIssueOptions_ApiKey_builder{}.Build()}.Build(),
+		RequestID: requestID,
+		CredentialOptions: v2.CredentialIssueOptions_builder{
+			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
+			ApiKey:               v2.CredentialIssueOptions_ApiKey_builder{}.Build(),
+		}.Build(),
 	})
 	require.NoError(t, err)
 	revoked := false
