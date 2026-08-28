@@ -2,12 +2,12 @@ package connector
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/conductorone/baton-datadog/pkg/client"
 	cfg "github.com/conductorone/baton-datadog/pkg/config"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
@@ -140,27 +140,21 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 }
 
 // orgAPIKeyValidates asks Datadog whether one organization API key is live.
+// It goes through the connector's own client rather than a hand-rolled request:
 // GET /api/v1/validate authenticates on the API key alone, which is what makes
-// it the right probe here: an organization API key has no application key to
-// pair with, so the connector's ValidateCredentials path would not isolate the
-// credential under test.
+// it the right probe here. An organization API key has no application key to
+// pair with, so a probe that required one would not isolate the credential
+// under test. The empty application key is deliberate.
 func orgAPIKeyValidates(ctx context.Context, site, apiKey string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api."+site+"/api/v1/validate", nil)
+	cfg := datadog.NewConfiguration()
+	probe := client.NewDatadogClient(nil, datadog.NewAPIClient(cfg), site, apiKey, "")
+	resp, err := probe.ValidateCredentials(ctx)
 	if err != nil {
+		// Datadog refusing the credential is the answer, not a probe failure.
+		if isCredentialRejection(err) {
+			return false, nil
+		}
 		return false, err
 	}
-	req.Header.Set("DD-API-KEY", apiKey)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusForbidden, http.StatusUnauthorized:
-		return false, nil
-	default:
-		return false, fmt.Errorf("unexpected status %d from /api/v1/validate", resp.StatusCode)
-	}
+	return resp.GetValid(), nil
 }
