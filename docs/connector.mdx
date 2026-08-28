@@ -246,8 +246,14 @@ stringData:
   # Optional: include if you want to sync schedule data from Datadog
   BATON_SYNC_SCHEDULES: true
 
-  # Optional: include if you want to sync secrets (API keys) from Datadog
+  # Optional: include if you want to sync secrets (API keys) from Datadog.
+  # On its own this syncs organization API keys only.
   BATON_SYNC_SECRETS: true
+
+  # Optional: include alongside BATON_SYNC_SECRETS to sync, issue and revoke
+  # service account application keys. Needs the Datadog service_account_write
+  # and org_app_keys_read permissions; without them the sync fails.
+  BATON_SYNC_SERVICE_ACCOUNT_APPLICATION_KEYS: true
 
   # Optional: include ONLY if you want C1 to issue and delete organization-wide
   # Datadog API keys. Syncing secrets does not grant this on its own.
