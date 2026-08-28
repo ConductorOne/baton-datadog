@@ -195,33 +195,41 @@ func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedA
 	return &IssuedAPIKey{ID: *response.Data.Id, Secret: *response.Data.Attributes.Key}, nil
 }
 
+// nameSearchPageSize is the page both name lookups ask for. It is a ceiling on
+// how many keys a "c1-<request id>" filter may match, not a paging unit.
+const nameSearchPageSize = int64(100)
+
 // FindAPIKeyByName returns an exact name match, if one exists. Datadog's filter
-// is a string search, so compare the returned name exactly before treating it as
-// an existing issuance.
+// is a substring search, so compare the returned name exactly before treating
+// it as an existing issuance.
+//
+// One request, not a paged walk. The name searched for is always
+// "c1-<request id>", so only a key whose own name contains that whole string
+// can come back -- a page of 100 cannot fill with them. A full page therefore
+// means the filter did not narrow the way this depends on, which is refused:
+// reporting "no existing key" from a page that may not contain it would mint a
+// duplicate, and Datadog cannot re-issue plaintext for the one that already
+// exists.
 func (w *DatadogClient) FindAPIKeyByName(ctx context.Context, name string) (*datadogV2.PartialAPIKey, error) {
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewKeyManagementApi(w.officialClient)
-	const pageSize = int64(100)
-	const maxPages = int64(10000)
-	for page := int64(0); page < maxPages; page++ {
-		params := *datadogV2.NewListAPIKeysOptionalParameters().WithFilter(name).WithPageSize(pageSize).WithPageNumber(page)
-		response, httpRes, err := api.ListAPIKeys(ctx, params)
-		if httpRes != nil {
-			httpRes.Body.Close()
-		}
-		if err != nil {
-			return nil, wrapOfficialClientError("find API key by name", httpRes, err)
-		}
-		for _, key := range response.GetData() {
-			if key.Attributes != nil && key.Attributes.GetName() == name {
-				return &key, nil
-			}
-		}
-		if int64(len(response.GetData())) < pageSize {
-			return nil, nil
+	params := *datadogV2.NewListAPIKeysOptionalParameters().WithFilter(name).WithPageSize(nameSearchPageSize).WithPageNumber(0)
+	response, httpRes, err := api.ListAPIKeys(ctx, params)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, wrapOfficialClientError("find API key by name", httpRes, err)
+	}
+	for _, key := range response.GetData() {
+		if key.Attributes != nil && key.Attributes.GetName() == name {
+			return &key, nil
 		}
 	}
-	return nil, fmt.Errorf("find API key by name: exceeded %d pages", maxPages)
+	if int64(len(response.GetData())) >= nameSearchPageSize {
+		return nil, fmt.Errorf("find API key by name: filter %q returned a full page of %d keys with no exact match", name, nameSearchPageSize)
+	}
+	return nil, nil
 }
 
 func (w *DatadogClient) DeleteAPIKey(ctx context.Context, id string) error {
@@ -307,36 +315,28 @@ func (w *DatadogClient) CreateServiceAccountApplicationKey(ctx context.Context, 
 
 // FindServiceAccountApplicationKeyByName returns an exact name match among a
 // single service account's application keys, if one exists. Mirrors
-// FindAPIKeyByName's exact-match-after-filter, paginated pattern, scoped to
-// one service account instead of the whole org.
+// FindAPIKeyByName, including its single-request shape and its refusal of a
+// full page, scoped to one service account instead of the whole org.
 func (w *DatadogClient) FindServiceAccountApplicationKeyByName(ctx context.Context, serviceAccountID, name string) (*datadogV2.PartialApplicationKey, error) {
 	ctx = w.withAuthContext(ctx)
 	api := datadogV2.NewServiceAccountsApi(w.officialClient)
-	const pageSize = int64(100)
-	// maxPages bounds this loop so a provider that ignores page[number] and
-	// keeps returning full pages fails closed instead of spinning forever on
-	// the Issue hot path. 10_000 pages (1M keys) is far beyond any real
-	// service account's application-key count.
-	const maxPages = int64(10_000)
-	for page := int64(0); page < maxPages; page++ {
-		params := *datadogV2.NewListServiceAccountApplicationKeysOptionalParameters().WithFilter(name).WithPageSize(pageSize).WithPageNumber(page)
-		response, httpRes, err := api.ListServiceAccountApplicationKeys(ctx, serviceAccountID, params)
-		if httpRes != nil {
-			httpRes.Body.Close()
-		}
-		if err != nil {
-			return nil, wrapOfficialClientError("find service account application key by name", httpRes, err)
-		}
-		for _, key := range response.GetData() {
-			if key.Attributes != nil && key.Attributes.GetName() == name {
-				return &key, nil
-			}
-		}
-		if int64(len(response.GetData())) < pageSize {
-			return nil, nil
+	params := *datadogV2.NewListServiceAccountApplicationKeysOptionalParameters().WithFilter(name).WithPageSize(nameSearchPageSize).WithPageNumber(0)
+	response, httpRes, err := api.ListServiceAccountApplicationKeys(ctx, serviceAccountID, params)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return nil, wrapOfficialClientError("find service account application key by name", httpRes, err)
+	}
+	for _, key := range response.GetData() {
+		if key.Attributes != nil && key.Attributes.GetName() == name {
+			return &key, nil
 		}
 	}
-	return nil, fmt.Errorf("find service account application key by name: exceeded %d pages without a short page", maxPages)
+	if int64(len(response.GetData())) >= nameSearchPageSize {
+		return nil, fmt.Errorf("find service account application key by name: filter %q returned a full page of %d keys with no exact match", name, nameSearchPageSize)
+	}
+	return nil, nil
 }
 
 // ListServiceAccountApplicationKeys lists every application key owned by the

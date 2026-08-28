@@ -122,6 +122,9 @@
             "permissions": [
               {
                 "permission": "service_account_write"
+              },
+              {
+                "permission": "org_app_keys_read"
               }
             ]
           }
@@ -136,6 +139,9 @@
         "permissions": [
           {
             "permission": "service_account_write"
+          },
+          {
+            "permission": "org_app_keys_read"
           }
         ]
       }

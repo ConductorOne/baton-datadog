@@ -92,31 +92,33 @@ func TestAPIKeyManagement(t *testing.T) {
 		}
 	})
 
-	t.Run("find by name returns the exact match from a later page", func(t *testing.T) {
+	// A "c1-<request id>" filter cannot legitimately fill a page, so a full one
+	// means the filter did not narrow. Reporting "no existing key" from it
+	// would mint a duplicate of a key whose plaintext Datadog will not reissue,
+	// so it is an error rather than a not-found.
+	t.Run("find by name refuses a full page with no exact match", func(t *testing.T) {
+		requests := 0
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requests++
 			assertEqual(t, http.MethodGet, r.Method, "HTTP method should match")
-			q := r.URL.Query()
-			page := q.Get("page[number]")
 			w.Header().Set("Content-Type", "application/json")
-			if page == "" || page == "0" {
-				// Page 0: 100 filler keys, none matching.
-				entries := make([]string, 100)
-				for i := range entries {
-					entries[i] = fmt.Sprintf(`{"id":"key-%d","type":"api_keys","attributes":{"name":"c1-other-%d"}}`, i, i)
-				}
-				_, _ = fmt.Fprintf(w, `{"data":[%s],"meta":{"page":{"total_filtered_count":101}}}`, strings.Join(entries, ","))
-				return
+			entries := make([]string, 100)
+			for i := range entries {
+				entries[i] = fmt.Sprintf(`{"id":"key-%d","type":"api_keys","attributes":{"name":"c1-other-%d"}}`, i, i)
 			}
-			// Page 1: one exact match.
-			_, _ = w.Write([]byte(`{"data":[{"id":"key-match","type":"api_keys","attributes":{"name":"c1-request"}}],"meta":{"page":{"total_filtered_count":101}}}`))
+			_, _ = fmt.Fprintf(w, `{"data":[%s]}`, strings.Join(entries, ","))
 		}))
 		defer server.Close()
 
 		found, err := newOfficialTestClient(server.URL).FindAPIKeyByName(context.Background(), "c1-request")
-		assertNoError(t, err, "find API key by name should succeed")
-		assertNotNil(t, found, "expected an exact match across pages")
 		if found != nil {
-			assertEqual(t, "key-match", found.GetId(), "should find the key on page 1, not page 0")
+			t.Fatal("a full page with no exact match is not a match")
+		}
+		if err == nil {
+			t.Fatal("expected a full page with no exact match to be refused")
+		}
+		if requests != 1 {
+			t.Fatalf("the lookup should make exactly one request, made %d", requests)
 		}
 	})
 

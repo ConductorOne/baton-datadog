@@ -566,6 +566,41 @@ func TestApplicationKeyBuilderDeleteFailsWhenOwnerUnknown(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
+// TestApplicationKeyBuilderDeletePreservesOwnerLookupFailureCode: a transient
+// failure of the owner lookup must not surface as a terminal InvalidArgument.
+// wrapOfficialClientError classifies the provider response so a caller can
+// retry or diagnose -- 500 is retryable, 403 names a missing permission.
+// Collapsing either into InvalidArgument would strand the key being revoked.
+func TestApplicationKeyBuilderDeletePreservesOwnerLookupFailureCode(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		status int
+		want   codes.Code
+	}{
+		{name: "provider 500", status: http.StatusInternalServerError, want: codes.Unavailable},
+		{name: "provider 403", status: http.StatusForbidden, want: codes.PermissionDenied},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodDelete {
+					t.Errorf("provider should not be asked to delete when the owner lookup failed")
+				}
+				w.WriteHeader(tt.status)
+			}))
+			defer server.Close()
+
+			deleter := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+			_, err := deleter.Delete(
+				context.Background(),
+				&v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: "appkey-transient-1"},
+				nil,
+			)
+			require.Error(t, err)
+			require.Equal(t, tt.want, status.Code(err))
+		})
+	}
+}
+
 // --- applicationKeyBuilder.List paging ------------------------------------
 
 // newAppKeyListServer fakes the two endpoints applicationKeyBuilder.List

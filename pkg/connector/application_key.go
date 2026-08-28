@@ -87,11 +87,18 @@ func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.Resou
 	if serviceAccountID == "" {
 		owner, err := o.wrapper.FindApplicationKeyOwner(ctx, appKeyID)
 		if err != nil {
-			if status.Code(err) == codes.NotFound {
+			switch status.Code(err) {
+			case codes.NotFound:
 				return nil, nil
+			case codes.Unknown:
+				// The provider answered, and its answer names no owner. That
+				// is the only genuinely unresolvable case; every other code
+				// carries a retry or diagnosis signal worth preserving.
+				return nil, status.Errorf(codes.InvalidArgument,
+					"baton-datadog: the owning service account for application key %q could not be determined: %v", appKeyID, err)
+			default:
+				return nil, fmt.Errorf("baton-datadog: resolve owner for application key %q: %w", appKeyID, err)
 			}
-			return nil, status.Errorf(codes.InvalidArgument,
-				"baton-datadog: the owning service account for application key %q could not be determined: %v", appKeyID, err)
 		}
 		serviceAccountID = owner
 	}

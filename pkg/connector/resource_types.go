@@ -100,11 +100,17 @@ var (
 	// (organization API key) by resource type id, display name, and the
 	// underlying SecretTrait's credential_detail (see application_key.go).
 	//
-	// Every service-account application-key endpoint this connector calls
-	// requires exactly one Datadog RBAC permission, service_account_write:
+	// The service-account-scoped endpoints this connector calls require one
+	// Datadog RBAC permission, service_account_write:
 	// ListServiceAccountApplicationKeys (sync),
 	// CreateServiceAccountApplicationKey (issue) and
-	// DeleteServiceAccountApplicationKey (revoke). This is the "x-permission"
+	// DeleteServiceAccountApplicationKey (revoke). Revoke also reaches one
+	// org-scoped endpoint, GetApplicationKey, to recover the owning service
+	// account when the caller does not supply it; that one is governed by
+	// org_app_keys_read, so both are advertised. A role holding only
+	// service_account_write still syncs and issues -- it fails just the
+	// owner lookup, and reports PermissionDenied naming it. These are the
+	// "x-permission"
 	// block Datadog publishes for each operation in its own OpenAPI spec
 	// (docs.datadoghq.com/resources/json/full_spec_v2.json, the spec that
 	// renders the public API reference); Datadog's role-permission page
@@ -133,7 +139,7 @@ var (
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
 		Annotations: annotations.New(
 			&v2.SkipEntitlementsAndGrants{},
-			capabilityPermissions("service_account_write"),
+			capabilityPermissions("service_account_write", "org_app_keys_read"),
 		),
 	}
 	scheduleResourceType = &v2.ResourceType{
