@@ -172,6 +172,19 @@ func (o *applicationKeyBuilder) listServiceAccountsPage(
 		if serviceAccountID == "" {
 			continue
 		}
+		// Datadog answers 404, not an empty list, for a disabled service
+		// account's application keys, and listApplicationKeyPage fails closed
+		// on 404. Datadog never deletes users, only disables them, so visiting
+		// one would make every application key in the organization permanently
+		// unsyncable. A disabled account cannot authenticate, so skipping it
+		// drops no live credential.
+		if user.Attributes.GetDisabled() {
+			ctxzap.Extract(ctx).Debug(
+				"baton-datadog: skipping application keys for a disabled service account",
+				zap.String("service_account_id", serviceAccountID),
+			)
+			continue
+		}
 		bag.Push(pagination.PageState{
 			ResourceTypeID: userResourceType.Id,
 			ResourceID:     serviceAccountID,
@@ -217,9 +230,13 @@ func (o *applicationKeyBuilder) listApplicationKeyPage(
 				serviceAccountID, err)
 		}
 		if code == codes.NotFound {
+			// Disabled service accounts are filtered out before they reach here
+			// (see listServiceAccountsPage), so a 404 on one this walk chose to
+			// visit means it was enabled when the users page was read and is
+			// not readable now.
 			return nil, nil, fmt.Errorf(
 				"baton-datadog: list application keys for service account %q: %w "+
-					"(the service account was not found, and may have been deleted mid-sync)",
+					"(the service account was not found; it may have been deleted or disabled mid-sync)",
 				serviceAccountID, err)
 		}
 		return nil, nil, fmt.Errorf("baton-datadog: list application keys for service account %q: %w", serviceAccountID, err)
