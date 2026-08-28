@@ -57,7 +57,7 @@ var (
 	// a credential absent from a completed sync reads as deleted.
 	SyncServiceAccountApplicationKeys = field.BoolField(
 		"sync-service-account-application-keys",
-		field.WithDescription("Sync, issue and revoke Datadog service account application keys. Off by default: requires the Datadog service_account_write permission, and a role without it fails the whole sync."),
+		field.WithDescription("Sync, issue and revoke Datadog service account application keys. Off by default: needs the service_account_write permission, without which the sync fails."),
 		field.WithDefaultValue(false),
 		field.WithDisplayName("Sync service account application keys"),
 	)

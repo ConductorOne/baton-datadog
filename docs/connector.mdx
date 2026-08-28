@@ -19,7 +19,7 @@ sidebarTitle: "Datadog"
 | Teams | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | |
 | Schedules | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>* | | | |
 | Secrets - Organization API keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>‡ | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>‡ |
-| Secrets - Service account application keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>† |
+| Secrets - Service account application keys | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>* | | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>* | <Icon icon="square-check" iconType="solid"  color="#c937ae"/>*† |
 
 [This connector can sync secrets](/product/admin/inventory) and display them on the **Inventory** page. Organization API keys and service account application keys are synced, issued, and shown as distinct secret kinds: they are two different kinds of API key, not two spellings of one, and a request names which kind it wants. Service account application keys are the default kind.
 
@@ -33,7 +33,7 @@ Revoking a service account application key needs the owning service account as w
 
 ‡Organization API key issuance and revocation both require **Allow organization API key deletion**, which is off by default and is separate from **Sync secrets**. An organization API key belongs to the whole organization rather than to the person it was issued to, and it cannot be scoped, so C1 will not mint one it has no permission to revoke. With the setting off, organization API keys still sync; they simply cannot be issued or deleted.
 
-*Schedules and application keys are not enabled by default. Enable **Sync schedules** or **Sync secrets** plus **Sync service account application keys**, respectively, when configuring the connector.
+*Schedules and service account application keys are not enabled by default. Enable **Sync schedules** for schedules; enable **Sync secrets** *and* **Sync service account application keys** for application keys — **Sync secrets** alone syncs organization API keys only.
 
 †Revoking a service account application key needs the owning service account as well as the key, because Datadog has no delete-by-key-id-alone form for these keys. When the request omits it, the connector looks the owner up from the key and proceeds; a key whose owner cannot be identified is refused rather than guessed at — see the note above.
 
