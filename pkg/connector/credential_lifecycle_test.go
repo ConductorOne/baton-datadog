@@ -1244,3 +1244,79 @@ func TestApiTokenListSurvivesMalformedTimestamps(t *testing.T) {
 	// Every key carries two unparseable fields, and each is reported.
 	require.Equal(t, keys*2, warned, "every unparseable timestamp must be reported")
 }
+
+// TestApplicationKeyBuilderSkipsDisabledServiceAccounts is the regression for a
+// sync-wide outage: Datadog answers 404, not an empty list, for a disabled
+// service account's application keys, and listApplicationKeyPage fails closed on
+// 404. Because Datadog never deletes users -- only disables them -- one disabled
+// service account made every application key in the organization permanently
+// unsyncable. The walk must not visit them at all.
+func TestApplicationKeyBuilderSkipsDisabledServiceAccounts(t *testing.T) {
+	t.Parallel()
+
+	const enabledID = "sa-enabled"
+	const disabledID = "sa-disabled"
+	usersPage := `[` +
+		`{"id":"` + disabledID + `","attributes":{"service_account":true,"disabled":true,"status":"Disabled"}},` +
+		`{"id":"` + enabledID + `","attributes":{"service_account":true,"disabled":false,"status":"Active"}}` +
+		`]`
+
+	var mu sync.Mutex
+	visited := map[string]int{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		page := 0
+		if raw := r.URL.Query().Get("page[number]"); raw != "" {
+			_, _ = fmt.Sscanf(raw, "%d", &page)
+		}
+		if r.URL.Path == "/api/v2/users" {
+			if page == 0 {
+				_, _ = w.Write([]byte(`{"data":` + usersPage + `}`))
+			} else {
+				_, _ = w.Write([]byte(`{"data":[]}`))
+			}
+			return
+		}
+		const prefix = "/api/v2/service_accounts/"
+		const suffix = "/application_keys"
+		if strings.HasPrefix(r.URL.Path, prefix) && strings.HasSuffix(r.URL.Path, suffix) {
+			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, prefix), suffix)
+			mu.Lock()
+			visited[id]++
+			mu.Unlock()
+			if id == disabledID {
+				// What Datadog actually does for a disabled service account.
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"errors":["Not Found"]}`))
+				return
+			}
+			if page == 0 {
+				_, _ = w.Write([]byte(`{"data":` + appKeyPageJSON("live", 1) + `}`))
+			} else {
+				_, _ = w.Write([]byte(`{"data":[]}`))
+			}
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	builder := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	var synced []*v2.Resource
+	token := ""
+	for call := 0; call < 50; call++ {
+		got, results, err := builder.List(context.Background(), nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		require.NoError(t, err, "a disabled service account must not fail the walk")
+		synced = append(synced, got...)
+		if results == nil || results.NextPageToken == "" {
+			break
+		}
+		token = results.NextPageToken
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Zero(t, visited[disabledID], "the disabled service account must never be requested")
+	require.Positive(t, visited[enabledID], "the enabled service account must still be walked")
+	require.Len(t, synced, 1, "the enabled service account's application key must still sync")
+}
