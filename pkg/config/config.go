@@ -48,6 +48,19 @@ var (
 		field.WithDefaultValue(false),
 		field.WithDisplayName("Allow organization API key deletion"),
 	)
+	// SyncServiceAccountApplicationKeys carries the Datadog
+	// service_account_write permission, which api_keys_read does not imply.
+	// It is off by default because listing a service account's application
+	// keys fails the whole sync without that permission: an install already
+	// running with sync-secrets on would start failing every sync merely by
+	// upgrading the connector. Once granted, the fail-hard behaviour stands --
+	// a credential absent from a completed sync reads as deleted.
+	SyncServiceAccountApplicationKeys = field.BoolField(
+		"sync-service-account-application-keys",
+		field.WithDescription("Sync, issue and revoke Datadog service account application keys. Off by default: requires the Datadog service_account_write permission, and a role without it fails the whole sync."),
+		field.WithDefaultValue(false),
+		field.WithDisplayName("Sync service account application keys"),
+	)
 	SyncSchedules = field.BoolField(
 		"sync-schedules",
 		field.WithDescription("Whether to sync on-call schedules or not"),
@@ -76,6 +89,7 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	AppKey,
 	SyncSecrets,
 	AllowOrgAPIKeyDeletion,
+	SyncServiceAccountApplicationKeys,
 	SyncSchedules,
 	BaseURL,
 },

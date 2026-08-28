@@ -28,6 +28,8 @@ func main() {
 			SyncSecrets:            true,
 			SyncSchedules:          true,
 			AllowOrgAPIKeyDeletion: true,
+
+			SyncServiceAccountApplicationKeys: true,
 		}),
 	)
 }

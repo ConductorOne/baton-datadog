@@ -36,13 +36,26 @@ type Datadog struct {
 	// from it, and an install already running with sync-secrets on must not
 	// acquire org-wide key deletion merely by upgrading the connector.
 	AllowOrgAPIKeyDeletion bool
+	// SyncServiceAccountApplicationKeys is the operator's attestation that the
+	// connector's Datadog role holds service_account_write. Without it,
+	// listing a service account's application keys 403s and fails the whole
+	// sync, so registering that syncer unconditionally would break every
+	// existing sync-secrets install on upgrade. Off by default for that
+	// reason, not because the capability is optional in itself.
+	SyncServiceAccountApplicationKeys bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
+	offerServiceAccountKey := d.SyncSecrets && d.SyncServiceAccountApplicationKeys
+	offerOrgAPIKey := d.SyncSecrets && d.AllowOrgAPIKeyDeletion
+	// A credential issuer with no advertised kind is not an issuer. With
+	// secrets synced but neither kind granted, the plain user syncer is
+	// registered and CAPABILITY_CREDENTIAL_ISSUE is absent rather than
+	// advertised with an empty option list.
 	userSyncer := connectorbuilder.ResourceSyncerV2(newUserBuilder(d.wrapper))
-	if d.SyncSecrets {
-		userSyncer = newCredentialUserBuilder(d.wrapper, d.AllowOrgAPIKeyDeletion)
+	if offerServiceAccountKey || offerOrgAPIKey {
+		userSyncer = newCredentialUserBuilder(d.wrapper, offerOrgAPIKey, offerServiceAccountKey)
 	}
 	resourceSyncers := []connectorbuilder.ResourceSyncerV2{
 		userSyncer,
@@ -59,7 +72,10 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		if d.AllowOrgAPIKeyDeletion {
 			apiTokenSyncer = newDeletableAPITokenBuilder(d.wrapper)
 		}
-		resourceSyncers = append(resourceSyncers, apiTokenSyncer, newApplicationKeyBuilder(d.wrapper))
+		resourceSyncers = append(resourceSyncers, apiTokenSyncer)
+		if d.SyncServiceAccountApplicationKeys {
+			resourceSyncers = append(resourceSyncers, newApplicationKeyBuilder(d.wrapper))
+		}
 	}
 
 	if d.SyncSchedules {
@@ -152,6 +168,7 @@ func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connector
 	syncSecrets := ddc.SyncSecrets
 	syncSchedules := ddc.SyncSchedules
 	allowOrgAPIKeyDeletion := ddc.AllowOrgApiKeyDeletion
+	syncServiceAccountApplicationKeys := ddc.SyncServiceAccountApplicationKeys
 
 	// Validate input parameters
 	if site == "" {
@@ -194,14 +211,16 @@ func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connector
 	wrapper := client.NewDatadogClient(restClient, officialClient, site, apiKey, appKey)
 
 	return &Datadog{
-		site:          site,
-		apiKey:        apiKey,
-		appKey:        appKey,
-		baseURL:       baseURL,
-		client:        officialClient,
-		wrapper:       wrapper,
+		site:                   site,
+		apiKey:                 apiKey,
+		appKey:                 appKey,
+		baseURL:                baseURL,
+		client:                 officialClient,
+		wrapper:                wrapper,
 		SyncSecrets:            syncSecrets,
 		SyncSchedules:          syncSchedules,
 		AllowOrgAPIKeyDeletion: allowOrgAPIKeyDeletion,
+
+		SyncServiceAccountApplicationKeys: syncServiceAccountApplicationKeys,
 	}, nil, nil
 }

@@ -56,7 +56,7 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	require.True(t, ok)
 
 	// The grant is what puts the organization API key on the menu at all.
-	details, _, err := newCredentialUserBuilder(datadogConnector.wrapper, datadogConnector.AllowOrgAPIKeyDeletion).IssueCapabilityDetails(ctx)
+	details, _, err := newCredentialUserBuilder(datadogConnector.wrapper, datadogConnector.AllowOrgAPIKeyDeletion, true).IssueCapabilityDetails(ctx)
 	require.NoError(t, err)
 	var advertised bool
 	for _, descriptor := range details.GetOptions() {
@@ -66,7 +66,7 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	}
 	require.True(t, advertised, "organization API key issuance must be advertised when the grant is set")
 
-	issuer := newCredentialUserBuilder(datadogConnector.wrapper, true)
+	issuer := newCredentialUserBuilder(datadogConnector.wrapper, true, true)
 	requestID := "orgsmoke-" + time.Now().UTC().Format("20060102T150405")
 	t.Logf("issuing Datadog organization API key with request id %q", requestID)
 	issued, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{

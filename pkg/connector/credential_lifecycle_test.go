@@ -239,7 +239,7 @@ func newServiceAccountAppKeyServer(t *testing.T, serviceAccountID, handle, secre
 
 func issueServiceAccountAppKey(t *testing.T, ctx context.Context, wrapper *client.DatadogClient, serviceAccountID, requestID string) *connectorbuilder.CredentialIssueOutput {
 	t.Helper()
-	issuer := newCredentialUserBuilder(wrapper, false)
+	issuer := newCredentialUserBuilder(wrapper, false, true)
 	out, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: serviceAccountID},
 		RequestID:  requestID,
@@ -291,7 +291,7 @@ func TestIssueRequiresServiceAccount(t *testing.T) {
 		defer server.Close()
 		wrapper := newLifecycleTestWrapper(server.URL)
 
-		issuer := newCredentialUserBuilder(wrapper, false)
+		issuer := newCredentialUserBuilder(wrapper, false, true)
 		out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 			IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: humanUserID},
 			RequestID:  "req-reject",
@@ -336,7 +336,7 @@ func TestIssueRefusesDuplicateRequest(t *testing.T) {
 	defer server.Close()
 	wrapper := newLifecycleTestWrapper(server.URL)
 
-	issuer := newCredentialUserBuilder(wrapper, false)
+	issuer := newCredentialUserBuilder(wrapper, false, true)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  requestID,
@@ -1038,7 +1038,7 @@ func TestIssuePassesScopesToProviderAndProfile(t *testing.T) {
 	}))
 	defer server.Close()
 
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false)
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false, true)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  "req-scoped",

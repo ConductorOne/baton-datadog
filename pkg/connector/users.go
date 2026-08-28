@@ -31,10 +31,19 @@ type credentialUserBuilder struct {
 	// has no ResourceDeleterV2: without the grant this connector cannot revoke
 	// an org key, so it must not mint one either.
 	offerOrgAPIKey bool
+	// offerServiceAccountAppKey follows the
+	// sync-service-account-application-keys grant, for the same reason: that
+	// grant is what registers the application-key syncer, and the syncer is
+	// what carries the deleter the SDK requires behind this descriptor.
+	offerServiceAccountAppKey bool
 }
 
-func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey bool) *credentialUserBuilder {
-	return &credentialUserBuilder{userBuilder: newUserBuilder(wrapper), offerOrgAPIKey: offerOrgAPIKey}
+func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool) *credentialUserBuilder {
+	return &credentialUserBuilder{
+		userBuilder:               newUserBuilder(wrapper),
+		offerOrgAPIKey:            offerOrgAPIKey,
+		offerServiceAccountAppKey: offerServiceAccountAppKey,
+	}
 }
 
 // IssueCapabilityDetails advertises the credential kinds this connector mints.
@@ -52,14 +61,17 @@ func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey bool
 // issuance mapping with an honest owner, so it is the default when a caller
 // asks for the API_KEY shape without choosing a kind.
 func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.CredentialDetailsCredentialIssue, annotations.Annotations, error) {
-	options := []*v2.CredentialIssueOptionDescriptor{
-		v2.CredentialIssueOptionDescriptor_builder{
+	options := []*v2.CredentialIssueOptionDescriptor{}
+	if u.offerServiceAccountAppKey {
+		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
 			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
 			CustomScopesAllowed:  true,
-			Preferred:            true,
-		}.Build(),
+			// Preferred only where it can be: exactly one descriptor per shape
+			// may set it, and it must be set whenever several share a shape.
+			Preferred: u.offerOrgAPIKey,
+		}.Build())
 	}
 	if u.offerOrgAPIKey {
 		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
@@ -93,6 +105,10 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 	}
 	switch secretResourceTypeID := input.CredentialOptions.GetSecretResourceTypeId(); secretResourceTypeID {
 	case serviceAccountApplicationKeyResourceType.Id:
+		if !u.offerServiceAccountAppKey {
+			return nil, status.Error(codes.FailedPrecondition,
+				"baton-datadog: service account application key issuance requires sync-service-account-application-keys, which also provides the revoke path")
+		}
 		return u.issueServiceAccountApplicationKey(ctx, input)
 	case apiTokenResourceType.Id:
 		if !u.offerOrgAPIKey {

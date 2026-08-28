@@ -13,15 +13,41 @@ import (
 // fake provider, so a test can read the capabilities C1 would actually be
 // advertised for a given flag combination.
 func newGateTestConnector(serverURL string, syncSecrets, allowOrgAPIKeyDeletion bool) *Datadog {
+	// Application-key sync is on for the org-key tests so they read the same
+	// connector shape those tests were written against; the tests that gate it
+	// build the connector with newAppKeyGateTestConnector instead.
+	return newAppKeyGateTestConnector(serverURL, syncSecrets, allowOrgAPIKeyDeletion, true)
+}
+
+func newAppKeyGateTestConnector(serverURL string, syncSecrets, allowOrgAPIKeyDeletion, syncServiceAccountApplicationKeys bool) *Datadog {
 	// Only the wrapper and the flags matter here: these tests read advertised
 	// capabilities, which never touch the connector's own credentials. Leaving
 	// them unset keeps credential-shaped literals out of the package.
 	return &Datadog{
-		wrapper:                newLifecycleTestWrapper(serverURL),
-		site:                   "example.com",
-		SyncSecrets:            syncSecrets,
-		AllowOrgAPIKeyDeletion: allowOrgAPIKeyDeletion,
+		wrapper:                           newLifecycleTestWrapper(serverURL),
+		site:                              "example.com",
+		SyncSecrets:                       syncSecrets,
+		AllowOrgAPIKeyDeletion:            allowOrgAPIKeyDeletion,
+		SyncServiceAccountApplicationKeys: syncServiceAccountApplicationKeys,
 	}
+}
+
+// advertisedResourceTypeCapabilities is resourceTypeCapabilities without the
+// fatal: a gate whose point is that a resource type is absent needs to ask
+// whether it was advertised at all.
+func advertisedResourceTypeCapabilities(t *testing.T, d *Datadog, resourceTypeID string) ([]v2.Capability, bool) {
+	t.Helper()
+	ctx := context.Background()
+	server, err := connectorbuilder.NewConnector(ctx, d)
+	require.NoError(t, err)
+	md, err := server.GetMetadata(ctx, &v2.ConnectorServiceGetMetadataRequest{})
+	require.NoError(t, err)
+	for _, rtc := range md.GetMetadata().GetCapabilities().GetResourceTypeCapabilities() {
+		if rtc.GetResourceType().GetId() == resourceTypeID {
+			return rtc.GetCapabilities(), true
+		}
+	}
+	return nil, false
 }
 
 // resourceTypeCapabilities returns the capabilities the SDK advertises for one
@@ -93,6 +119,60 @@ func TestOrgAPIKeyDeletePermissionFollowsTheGrant(t *testing.T) {
 			require.ElementsMatch(t, tt.want, got)
 			for _, absent := range tt.absent {
 				require.NotContains(t, got, absent)
+			}
+		})
+	}
+}
+
+// TestApplicationKeySyncRequiresItsOwnGrant is the upgrade regression: listing
+// a service account's application keys needs Datadog's service_account_write,
+// which api_keys_read does not imply, and a 403 there fails the whole sync.
+// An install already running with sync-secrets on must keep syncing after an
+// upgrade rather than start failing on a permission it was never asked for.
+func TestApplicationKeySyncRequiresItsOwnGrant(t *testing.T) {
+	d := newAppKeyGateTestConnector("http://127.0.0.1:1", true, false, false)
+
+	_, advertised := advertisedResourceTypeCapabilities(t, d, serviceAccountApplicationKeyResourceType.Id)
+	require.False(t, advertised,
+		"sync-secrets alone must not advertise service account application keys")
+
+	orgKeyCaps, advertised := advertisedResourceTypeCapabilities(t, d, apiTokenResourceType.Id)
+	require.True(t, advertised, "organization API keys must still sync")
+	require.Contains(t, orgKeyCaps, v2.Capability_CAPABILITY_SYNC)
+}
+
+func TestApplicationKeySyncAdvertisedWithGrant(t *testing.T) {
+	d := newAppKeyGateTestConnector("http://127.0.0.1:1", true, false, true)
+	caps, advertised := advertisedResourceTypeCapabilities(t, d, serviceAccountApplicationKeyResourceType.Id)
+	require.True(t, advertised)
+	require.Contains(t, caps, v2.Capability_CAPABILITY_SYNC)
+	require.Contains(t, caps, v2.Capability_CAPABILITY_RESOURCE_DELETE)
+}
+
+// TestCredentialIssueFollowsTheKindGrants: with secrets synced but neither
+// kind granted there is nothing to issue, so the capability must be absent
+// rather than advertised with an empty option list. Either grant brings it
+// back.
+func TestCredentialIssueFollowsTheKindGrants(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		orgKey    bool
+		appKey    bool
+		wantIssue bool
+	}{
+		{name: "neither kind granted", wantIssue: false},
+		{name: "application keys only", appKey: true, wantIssue: true},
+		{name: "organization keys only", orgKey: true, wantIssue: true},
+		{name: "both kinds", orgKey: true, appKey: true, wantIssue: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d := newAppKeyGateTestConnector("http://127.0.0.1:1", true, tt.orgKey, tt.appKey)
+			caps, advertised := advertisedResourceTypeCapabilities(t, d, userResourceType.Id)
+			require.True(t, advertised, "users must sync regardless")
+			if tt.wantIssue {
+				require.Contains(t, caps, v2.Capability_CAPABILITY_CREDENTIAL_ISSUE)
+			} else {
+				require.NotContains(t, caps, v2.Capability_CAPABILITY_CREDENTIAL_ISSUE)
 			}
 		})
 	}

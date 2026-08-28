@@ -148,6 +148,12 @@
       "boolField": {}
     },
     {
+      "name": "sync-service-account-application-keys",
+      "displayName": "Sync service account application keys",
+      "description": "Sync, issue and revoke Datadog service account application keys. Off by default: requires the Datadog service_account_write permission, and a role without it fails the whole sync.",
+      "boolField": {}
+    },
+    {
       "name": "sync-schedules",
       "displayName": "Sync schedules",
       "description": "Whether to sync on-call schedules or not",

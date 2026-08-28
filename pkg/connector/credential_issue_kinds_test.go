@@ -20,7 +20,7 @@ import (
 // secret_resource_type_id.
 func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 	ctx := context.Background()
-	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true).IssueCapabilityDetails(ctx)
+	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true).IssueCapabilityDetails(ctx)
 	require.NoError(t, err)
 	require.Len(t, details.GetOptions(), 2)
 
@@ -45,12 +45,12 @@ func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 // would fail connector startup, so the descriptor has to be absent too.
 func TestIssuanceOmitsOrgAPIKeyWithoutGrant(t *testing.T) {
 	ctx := context.Background()
-	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), false).IssueCapabilityDetails(ctx)
+	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), false, true).IssueCapabilityDetails(ctx)
 	require.NoError(t, err)
 	require.Len(t, details.GetOptions(), 1)
 	require.Equal(t, serviceAccountApplicationKeyResourceType.Id, details.GetOptions()[0].GetSecretResourceTypeId())
 
-	out, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), false).Issue(ctx, &connectorbuilder.CredentialIssueInput{
+	out, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), false, true).Issue(ctx, &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  "req-org-denied",
 		CredentialOptions: v2.CredentialIssueOptions_builder{
@@ -89,7 +89,7 @@ func TestIssueDispatchesOnRequestedCredentialKind(t *testing.T) {
 	}))
 	defer server.Close()
 
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true)
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, true)
 	out, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  "req-org",
@@ -121,7 +121,7 @@ func TestIssueDispatchesOnRequestedCredentialKind(t *testing.T) {
 // TestIssueRejectsScopesOnOrgAPIKey: the shape allows scopes, this kind does
 // not, so the arm has to fail closed rather than mint an unscoped key.
 func TestIssueRejectsScopesOnOrgAPIKey(t *testing.T) {
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true)
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  "req-org-scoped",
@@ -137,7 +137,7 @@ func TestIssueRejectsScopesOnOrgAPIKey(t *testing.T) {
 // TestIssueRejectsUnknownCredentialKind: an unadvertised secret resource type
 // is a protocol mismatch, not a cue to fall back to the preferred arm.
 func TestIssueRejectsUnknownCredentialKind(t *testing.T) {
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true)
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true)
 	for _, secretType := range []string{"", "not-a-datadog-credential"} {
 		out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 			IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
