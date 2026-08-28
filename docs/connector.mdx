@@ -28,14 +28,14 @@ An application key can be issued and revoked through C1 when **Sync secrets** is
 <Warning>
 Credential issuance targets a Datadog service account only. C1 re-checks at issuance time that the selected user is still a service account, and refuses to issue against a human user. The issued application key is owned by, and scoped to, that service account.
 
-Revoking a service account application key requires the caller to supply that owning service account alongside the key itself. Until the requesting workflow threads it through, a revoke request that omits it fails rather than guessing which service account owns the key.
+Revoking a service account application key needs the owning service account as well as the key. C1 does not supply it today, so the connector reads it from the key's own owner record instead. A revoke is refused only when that lookup cannot name an owner either.
 </Warning>
 
 ‡Organization API key issuance and revocation both require **Allow organization API key deletion**, which is off by default and is separate from **Sync secrets**. An organization API key belongs to the whole organization rather than to the person it was issued to, and it cannot be scoped, so C1 will not mint one it has no permission to revoke. With the setting off, organization API keys still sync; they simply cannot be issued or deleted.
 
 *Schedules and application-key issuance are not enabled by default. Enable **Sync schedules** or **Sync secrets**, respectively, when configuring the connector.
 
-†Revoking a service account application key requires the request to name the owning service account as well as the key, because Datadog has no delete-by-key-id-alone form for these keys. A revoke request that omits it is refused rather than guessing. Until the requesting workflow supplies it, revocation is implemented and advertised but will not complete — see the note above.
+†Revoking a service account application key needs the owning service account as well as the key, because Datadog has no delete-by-key-id-alone form for these keys. When the request omits it, the connector looks the owner up from the key and proceeds; a key whose owner cannot be identified is refused rather than guessed at — see the note above.
 
 ### Connector actions
 
