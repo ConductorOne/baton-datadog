@@ -68,10 +68,10 @@ func (o *applicationKeyBuilder) Grants(_ context.Context, _ *v2.Resource, _ reso
 // ResourceDeleterV2Limited.Delete signature itself is unchanged by this
 // choice -- it already took two *v2.ResourceId parameters; apiTokenBuilder
 // (organization API keys, which need only one id) simply discards the
-// second one. Whatever C1-side caller eventually populates parentResourceID
-// for a real delete is a platform-level change this file does not make and
-// does not depend on to be correct: until that caller exists, Delete fails
-// closed with InvalidArgument rather than guessing.
+// second one. No C1 caller populates parentResourceID today, so Delete falls
+// back to the key's owned_by relationship and only fails closed when that
+// lookup cannot name an owner either -- a delete capability that is advertised
+// but refuses every call would leave issued keys live at the provider.
 func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId, parentResourceID *v2.ResourceId) (annotations.Annotations, error) {
 	if resourceID == nil {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: service account application key id is required")
@@ -80,10 +80,21 @@ func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.Resou
 	if isMalformedAPIKeyHandle(appKeyID) {
 		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: service account application key id %q is malformed", appKeyID)
 	}
-	if parentResourceID == nil || parentResourceID.GetResourceType() != userResourceType.Id {
-		return nil, status.Error(codes.InvalidArgument, "baton-datadog: the owning service account id is required to delete a service account application key")
+	serviceAccountID := ""
+	if parentResourceID != nil && parentResourceID.GetResourceType() == userResourceType.Id {
+		serviceAccountID = parentResourceID.GetResource()
 	}
-	serviceAccountID := parentResourceID.GetResource()
+	if serviceAccountID == "" {
+		owner, err := o.wrapper.FindApplicationKeyOwner(ctx, appKeyID)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				return nil, nil
+			}
+			return nil, status.Errorf(codes.InvalidArgument,
+				"baton-datadog: the owning service account for application key %q could not be determined: %v", appKeyID, err)
+		}
+		serviceAccountID = owner
+	}
 	if isMalformedAPIKeyHandle(serviceAccountID) {
 		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: owning service account id %q is malformed", serviceAccountID)
 	}
@@ -101,6 +112,11 @@ func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.Resou
 // fails closed instead of paging forever. 10_000 pages (1M keys) is far
 // beyond any real service account's application-key count.
 const maxApplicationKeyPages = int64(10_000)
+
+// maxUserPages bounds the users level of the same walk. It terminates on an
+// empty page rather than a short one, so a provider that ignores page[number]
+// and keeps returning full pages would re-push child states forever.
+const maxUserPages = int64(10_000)
 
 // List returns at most one provider page per call. The sync walks two levels:
 // the users pages, to discover which users are service accounts, and then each
@@ -144,6 +160,11 @@ func (o *applicationKeyBuilder) listServiceAccountsPage(
 	bag *pagination.Bag,
 	page int64,
 ) ([]*v2.Resource, *resource.SyncOpResults, error) {
+	if page >= maxUserPages {
+		return nil, nil, fmt.Errorf(
+			"baton-datadog: exceeded %d users pages while syncing service account application keys",
+			maxUserPages)
+	}
 	// Datadog's documented default page[size] is 10, so omitting it would run
 	// this walk at a tenth of the page size apiTokenBuilder.List uses -- ten
 	// times the round-trips for the same users, in a walk that already fans out

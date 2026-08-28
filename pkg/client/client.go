@@ -372,6 +372,30 @@ func (w *DatadogClient) DeleteServiceAccountApplicationKey(ctx context.Context, 
 	return nil
 }
 
+// FindApplicationKeyOwner returns the id of the service account that owns an
+// application key. Datadog carries it as the key's owned_by relationship, so a
+// caller holding only the key id can still reach the service-account-scoped
+// endpoints, which take both ids.
+func (w *DatadogClient) FindApplicationKeyOwner(ctx context.Context, appKeyID string) (string, error) {
+	ctx = w.withAuthContext(ctx)
+	api := datadogV2.NewKeyManagementApi(w.officialClient)
+	response, httpRes, err := api.GetApplicationKey(ctx, appKeyID)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return "", wrapOfficialClientError("get application key", httpRes, err)
+	}
+	if response.Data == nil || response.Data.Relationships == nil || response.Data.Relationships.OwnedBy == nil {
+		return "", fmt.Errorf("get application key %s: response omitted the owned_by relationship", appKeyID)
+	}
+	ownerID := response.Data.Relationships.OwnedBy.Data.Id
+	if ownerID == "" {
+		return "", fmt.Errorf("get application key %s: owned_by names no user", appKeyID)
+	}
+	return ownerID, nil
+}
+
 // Wrapper methods that handle HTTP response body closing automatically
 
 // ListRoleUsers lists users for a specific role and automatically handles HTTP response body closing.

@@ -447,12 +447,10 @@ func TestApplicationKeyBuilderDeleteUsesServiceAccountAPI(t *testing.T) {
 }
 
 // TestApplicationKeyBuilderDeleteRejectsMalformedHandle: nil ResourceId, an
-// empty or control-character handle, a missing/wrong-type/malformed
-// parentResourceID (the owning service account) must all fail closed before
-// any provider request. Datadog's DeleteServiceAccountApplicationKey needs
-// both ids; parentResourceID carries the service account id (see
-// application_key.go's Delete doc comment for why that parameter, not a
-// packed handle string).
+// empty or control-character handle, and a control-character service account
+// id must all fail closed before any provider request. An absent parent is a
+// separate case -- it is resolvable from the key itself, so it is covered by
+// TestApplicationKeyBuilderDeleteResolvesOwnerFromTheKey rather than here.
 func TestApplicationKeyBuilderDeleteRejectsMalformedHandle(t *testing.T) {
 	validParent := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID}
 	tests := []struct {
@@ -476,21 +474,6 @@ func TestApplicationKeyBuilderDeleteRejectsMalformedHandle(t *testing.T) {
 			parentResourceID: validParent,
 		},
 		{
-			name:             "nil parentResourceID (owning service account missing)",
-			resourceID:       &v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: "appkey-1"},
-			parentResourceID: nil,
-		},
-		{
-			name:             "wrong-type parentResourceID",
-			resourceID:       &v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: "appkey-1"},
-			parentResourceID: &v2.ResourceId{ResourceType: apiTokenResourceType.Id, Resource: testServiceAccountID},
-		},
-		{
-			name:             "empty parentResourceID.Resource",
-			resourceID:       &v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: "appkey-1"},
-			parentResourceID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: ""},
-		},
-		{
 			name:             "parentResourceID with control character",
 			resourceID:       &v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: "appkey-1"},
 			parentResourceID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: "sa-\n1"},
@@ -511,6 +494,76 @@ func TestApplicationKeyBuilderDeleteRejectsMalformedHandle(t *testing.T) {
 			require.Equal(t, codes.InvalidArgument, status.Code(err))
 		})
 	}
+}
+
+// TestApplicationKeyBuilderDeleteResolvesOwnerFromTheKey: no C1 caller
+// populates parentResourceID today, so an absent one must not strand an issued
+// key at the provider. Datadog carries the owner on the key's owned_by
+// relationship; Delete reads it and then issues the same service-account-scoped
+// DELETE it would have made had the parent been supplied.
+func TestApplicationKeyBuilderDeleteResolvesOwnerFromTheKey(t *testing.T) {
+	const handle = "appkey-orphaned-1"
+	tests := []struct {
+		name             string
+		parentResourceID *v2.ResourceId
+	}{
+		{name: "nil parentResourceID", parentResourceID: nil},
+		{name: "wrong-type parentResourceID", parentResourceID: &v2.ResourceId{ResourceType: apiTokenResourceType.Id, Resource: testServiceAccountID}},
+		{name: "empty parentResourceID.Resource", parentResourceID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: ""}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var deletePath string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v2/application_keys/"+handle:
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte(`{"data":{"id":"` + handle + `","type":"application_keys",` +
+						`"relationships":{"owned_by":{"data":{"id":"` + testServiceAccountID + `","type":"users"}}}}}`))
+				case r.Method == http.MethodDelete:
+					deletePath = r.URL.Path
+					w.WriteHeader(http.StatusNoContent)
+				default:
+					t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+			}))
+			defer server.Close()
+
+			deleter := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+			_, err := deleter.Delete(
+				context.Background(),
+				&v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: handle},
+				tt.parentResourceID,
+			)
+			require.NoError(t, err)
+			require.Equal(t, "/api/v2/service_accounts/"+testServiceAccountID+"/application_keys/"+handle, deletePath)
+		})
+	}
+}
+
+// TestApplicationKeyBuilderDeleteFailsWhenOwnerUnknown: the fallback only
+// widens what Delete can revoke, it does not make it guess. A key whose
+// owned_by names nobody still fails closed, and still without a DELETE.
+func TestApplicationKeyBuilderDeleteFailsWhenOwnerUnknown(t *testing.T) {
+	const handle = "appkey-ownerless-1"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			t.Errorf("provider should not be asked to delete a key with no resolvable owner")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"` + handle + `","type":"application_keys"}}`))
+	}))
+	defer server.Close()
+
+	deleter := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	_, err := deleter.Delete(
+		context.Background(),
+		&v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: handle},
+		nil,
+	)
+	require.Error(t, err)
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
 // --- applicationKeyBuilder.List paging ------------------------------------
