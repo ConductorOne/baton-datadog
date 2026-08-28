@@ -13,11 +13,12 @@ import (
 // fake provider, so a test can read the capabilities C1 would actually be
 // advertised for a given flag combination.
 func newGateTestConnector(serverURL string, syncSecrets, allowOrgAPIKeyDeletion bool) *Datadog {
+	// Only the wrapper and the flags matter here: these tests read advertised
+	// capabilities, which never touch the connector's own credentials. Leaving
+	// them unset keeps credential-shaped literals out of the package.
 	return &Datadog{
 		wrapper:                newLifecycleTestWrapper(serverURL),
 		site:                   "example.com",
-		apiKey:                 "connector-api-key",
-		appKey:                 "connector-app-key",
 		SyncSecrets:            syncSecrets,
 		AllowOrgAPIKeyDeletion: allowOrgAPIKeyDeletion,
 	}
