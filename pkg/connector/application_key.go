@@ -81,8 +81,10 @@ func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.Resou
 		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: service account application key id %q is malformed", appKeyID)
 	}
 	serviceAccountID := ""
+	ownerFromParent := false
 	if parentResourceID != nil && parentResourceID.GetResourceType() == userResourceType.Id {
 		serviceAccountID = parentResourceID.GetResource()
+		ownerFromParent = serviceAccountID != ""
 	}
 	if serviceAccountID == "" {
 		owner, err := o.wrapper.FindApplicationKeyOwner(ctx, appKeyID)
@@ -107,6 +109,27 @@ func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.Resou
 	}
 	if err := o.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, appKeyID); err != nil {
 		if status.Code(err) == codes.NotFound {
+			if !ownerFromParent {
+				return nil, nil
+			}
+			owner, ownerErr := o.wrapper.FindApplicationKeyOwner(ctx, appKeyID)
+			if ownerErr != nil {
+				switch status.Code(ownerErr) {
+				case codes.NotFound:
+					return nil, nil
+				case codes.Unknown:
+					return nil, status.Errorf(codes.InvalidArgument,
+						"baton-datadog: the owning service account for application key %q could not be determined: %v", appKeyID, ownerErr)
+				default:
+					return nil, fmt.Errorf("baton-datadog: resolve owner for application key %q: %w", appKeyID, ownerErr)
+				}
+			}
+			if isMalformedAPIKeyHandle(owner) {
+				return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: owning service account id %q is malformed", owner)
+			}
+			if retryErr := o.wrapper.DeleteServiceAccountApplicationKey(ctx, owner, appKeyID); retryErr != nil && status.Code(retryErr) != codes.NotFound {
+				return nil, fmt.Errorf("baton-datadog: delete service account application key: %w", retryErr)
+			}
 			return nil, nil
 		}
 		return nil, fmt.Errorf("baton-datadog: delete service account application key: %w", err)

@@ -542,6 +542,49 @@ func TestApplicationKeyBuilderDeleteResolvesOwnerFromTheKey(t *testing.T) {
 	}
 }
 
+func TestApplicationKeyBuilderDeleteResolvesWrongParentFromTheKey(t *testing.T) {
+	const (
+		handle      = "appkey-wrong-parent-1"
+		wrongOwner  = "service-account-wrong"
+		actualOwner = testServiceAccountID
+	)
+	var deletePaths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodDelete:
+			deletePaths = append(deletePaths, r.URL.Path)
+			if strings.Contains(r.URL.Path, wrongOwner) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			if got, want := r.URL.Path, "/api/v2/service_accounts/"+actualOwner+"/application_keys/"+handle; got != want {
+				t.Errorf("unexpected delete path: got %q, want %q", got, want)
+			}
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/application_keys/"+handle:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"` + handle + `","type":"application_keys",` +
+				`"relationships":{"owned_by":{"data":{"id":"` + actualOwner + `","type":"users"}}}}}`))
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	deleter := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	_, err := deleter.Delete(
+		context.Background(),
+		&v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: handle},
+		&v2.ResourceId{ResourceType: userResourceType.Id, Resource: wrongOwner},
+	)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"/api/v2/service_accounts/" + wrongOwner + "/application_keys/" + handle,
+		"/api/v2/service_accounts/" + actualOwner + "/application_keys/" + handle,
+	}, deletePaths)
+}
+
 // TestApplicationKeyBuilderDeleteFailsWhenOwnerUnknown: the fallback only
 // widens what Delete can revoke, it does not make it guess. A key whose
 // owned_by names nobody still fails closed, and still without a DELETE.
