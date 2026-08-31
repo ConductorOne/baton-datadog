@@ -251,8 +251,8 @@ stringData:
   BATON_SYNC_SECRETS: true
 
   # Optional: include alongside BATON_SYNC_SECRETS to sync, issue and revoke
-  # service account application keys. Needs the Datadog service_account_write
-  # and org_app_keys_read permissions; without them the sync fails.
+  # service account application keys. Needs service_account_write, without
+  # which sync fails, plus org_app_keys_read for revoke owner lookup.
   BATON_SYNC_SERVICE_ACCOUNT_APPLICATION_KEYS: true
 
   # Optional: include ONLY if you want C1 to issue and delete organization-wide

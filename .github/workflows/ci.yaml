@@ -31,3 +31,7 @@ jobs:
           baton-entitlement: 'role:32af72b4-6c01-11f1-94df-da7ad0900005:member'
           baton-principal: '41da61ff-ac62-48a3-832d-540bb01079d3'
           baton-principal-type: 'user'
+          # The auth-error check intentionally invalidates BATON_* secrets.
+          # Keep this feature flag parseable so it reaches authentication.
+          bad-credentials: |
+            BATON_SYNC_SECRETS=true
