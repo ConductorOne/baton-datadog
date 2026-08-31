@@ -1451,3 +1451,45 @@ func TestApplicationKeyBuilderSkipsDisabledServiceAccounts(t *testing.T) {
 	require.Positive(t, visited[enabledID], "the enabled service account must still be walked")
 	require.Len(t, synced, 1, "the enabled service account's application key must still sync")
 }
+
+// TestApiTokenListBoundsPagination: the organization API-key walk terminates on
+// "the page was not empty" whenever the response omits
+// meta.page.total_filtered_count (hasMoreAPIKeyPages), so a provider that
+// ignores page[number] and keeps answering with full pages would page forever.
+// The walk must fail closed at maxOrgAPIKeyPages instead, and must not issue
+// the request for the page past the bound.
+func TestApiTokenListBoundsPagination(t *testing.T) {
+	var requests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		// No meta.page.total_filtered_count, and never a short page: exactly the
+		// shape hasMoreAPIKeyPages cannot terminate on.
+		entries := make([]string, 0, defaultV2PageSize)
+		for i := int64(0); i < defaultV2PageSize; i++ {
+			entries = append(entries, fmt.Sprintf(`{"id":"key-%d","type":"api_keys"}`, i))
+		}
+		_, _ = w.Write([]byte(`{"data":[` + strings.Join(entries, ",") + `]}`))
+	}))
+	defer server.Close()
+
+	builder := newApiTokenBuilder(newLifecycleTestWrapper(server.URL))
+	ctx := context.Background()
+
+	// The page below the bound is still served, and still asks for another.
+	got, results, err := builder.List(ctx, nil, rs.SyncOpAttrs{
+		PageToken: pagination.Token{Token: fmt.Sprintf("page:%d", maxOrgAPIKeyPages-1)},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, defaultV2PageSize)
+	require.NotNil(t, results)
+	require.NotEmpty(t, results.NextPageToken, "an unbounded provider never stops offering pages")
+	require.Equal(t, 1, requests)
+
+	// The page at the bound fails closed, before the request goes out.
+	_, _, err = builder.List(ctx, nil, rs.SyncOpAttrs{PageToken: pagination.Token{Token: results.NextPageToken}})
+	require.Error(t, err, "the walk must fail closed rather than page forever")
+	require.Contains(t, err.Error(), "exceeded")
+	require.Contains(t, err.Error(), apiTokenResourceType.Id, "the error must name the resource type")
+	require.Equal(t, 1, requests, "no request may be issued for the page past the bound")
+}

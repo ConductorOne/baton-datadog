@@ -20,6 +20,15 @@ import (
 
 const defaultV2PageSize = 100
 
+// maxOrgAPIKeyPages bounds the organization API-key walk so a provider that
+// ignores page[number] and keeps returning full pages fails closed instead of
+// paging forever. Nothing else in this walk terminates it in that case:
+// hasMoreAPIKeyPages only compares against meta.page.total_filtered_count when
+// the response carries one, and falls back to "the page was not empty"
+// otherwise. Mirrors maxApplicationKeyPages and maxUserPages; 10_000 pages
+// (1M keys) is far beyond any real organization's API-key count.
+const maxOrgAPIKeyPages = int64(10_000)
+
 type apiTokenBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
@@ -112,6 +121,12 @@ func (o *apiTokenBuilder) List(
 	bag, page, err := parsePageToken(opts.PageToken.Token, &v2.ResourceId{ResourceType: o.resourceType.Id})
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if page >= maxOrgAPIKeyPages {
+		return nil, nil, fmt.Errorf(
+			"baton-datadog: exceeded %d organization API-key pages while syncing %s resources",
+			maxOrgAPIKeyPages, o.resourceType.Id)
 	}
 
 	res, err := o.wrapper.ListAPIKeys(ctx, datadogV2.NewListAPIKeysOptionalParameters().WithPageNumber(page).WithPageSize(defaultV2PageSize))
