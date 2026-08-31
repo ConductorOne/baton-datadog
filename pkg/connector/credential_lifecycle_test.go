@@ -660,7 +660,15 @@ func TestApplicationKeyBuilderDeleteKeepsUnmappedTransportFailureRetryable(t *te
 // not be joined onto ErrApplicationKeyOwnerUnknown: doing so routes Delete
 // through its InvalidArgument arm and turns a retryable failure into a
 // permanent refusal, leaving a live application key un-revokable.
+//
+// The sentinel is asserted at the producer, not on Delete's return. Delete's
+// sentinel arm formats the cause with %v rather than chaining it, so the
+// sentinel is unreachable through errors.Is from Delete -- asserting it there
+// would pass even with the client bug present. What Delete's error can still
+// carry is the code, so the InvalidArgument assertion is the one that must
+// hold there.
 func TestApplicationKeyBuilderDeleteKeepsDatalessSuccessBodyRetryable(t *testing.T) {
+	const handle = "appkey-dataless-1"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			t.Errorf("provider should not be asked to delete when the owner lookup failed")
@@ -677,14 +685,20 @@ func TestApplicationKeyBuilderDeleteKeepsDatalessSuccessBodyRetryable(t *testing
 	deleter := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
 	_, err := deleter.Delete(
 		context.Background(),
-		&v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: "appkey-dataless-1"},
+		&v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: handle},
 		nil,
 	)
 	require.Error(t, err)
-	require.NotErrorIs(t, err, client.ErrApplicationKeyOwnerUnknown,
-		"a dataless 2xx is not the provider naming no owner")
 	require.NotEqual(t, codes.InvalidArgument, status.Code(err),
 		"a transport failure must not be converted into a permanent refusal")
+
+	// Delete's refusal must be driven by the sentinel, not by a gRPC code the
+	// transport also produces. status.Errorf formats the cause with %v rather
+	// than chaining it, so the sentinel is asserted where it is produced.
+	_, ownerErr := newLifecycleTestWrapper(server.URL).FindApplicationKeyOwner(context.Background(), handle)
+	require.Error(t, ownerErr)
+	require.NotErrorIs(t, ownerErr, client.ErrApplicationKeyOwnerUnknown,
+		"a dataless 2xx is not the provider naming no owner")
 }
 
 // TestApplicationKeyBuilderDeletePreservesOwnerLookupFailureCode: a transient
