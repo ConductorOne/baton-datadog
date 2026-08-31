@@ -649,6 +649,44 @@ func TestApplicationKeyBuilderDeleteKeepsUnmappedTransportFailureRetryable(t *te
 	require.Equal(t, codes.Unknown, status.Code(err), "the lookup's own code must survive")
 }
 
+// TestApplicationKeyBuilderDeleteKeepsDatalessSuccessBodyRetryable is the
+// sibling of the test above, for the transport anomaly that one cannot reach:
+// it serves a body the generated client *can* decode, so Unmarshal returns a
+// nil error and the guard in FindApplicationKeyOwner sees the response at all.
+// A 200 carrying {} -- or a proxy's error envelope -- leaves
+// ApplicationKeyResponse.Data nil, because the generated UnmarshalJSON only
+// assigns Data from the payload's data key and does not treat its absence as a
+// failure. That is not the provider answering and naming no owner, so it must
+// not be joined onto ErrApplicationKeyOwnerUnknown: doing so routes Delete
+// through its InvalidArgument arm and turns a retryable failure into a
+// permanent refusal, leaving a live application key un-revokable.
+func TestApplicationKeyBuilderDeleteKeepsDatalessSuccessBodyRetryable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			t.Errorf("provider should not be asked to delete when the owner lookup failed")
+		}
+		// 200 with a syntactically valid body that carries no data: the
+		// generated client decodes it without error and nils Data, which is
+		// exactly the shape the shared guard used to misread as ownerless.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	deleter := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	_, err := deleter.Delete(
+		context.Background(),
+		&v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: "appkey-dataless-1"},
+		nil,
+	)
+	require.Error(t, err)
+	require.NotErrorIs(t, err, client.ErrApplicationKeyOwnerUnknown,
+		"a dataless 2xx is not the provider naming no owner")
+	require.NotEqual(t, codes.InvalidArgument, status.Code(err),
+		"a transport failure must not be converted into a permanent refusal")
+}
+
 // TestApplicationKeyBuilderDeletePreservesOwnerLookupFailureCode: a transient
 // failure of the owner lookup must not surface as a terminal InvalidArgument.
 // wrapOfficialClientError classifies the provider response so a caller can
