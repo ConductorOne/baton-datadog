@@ -11,6 +11,20 @@ import (
 // without depending on the SDK error message format.
 var ErrNotFound = errors.New("baton-datadog: not found")
 
+// ErrApplicationKeyOwnerUnknown is joined onto the errors
+// FindApplicationKeyOwner returns when the provider answered successfully and
+// its answer names no owner for the key. That is the one owner-lookup failure
+// a retry cannot fix, so callers branch on it -- with errors.Is, not with a
+// gRPC code -- to refuse permanently.
+//
+// A gRPC code cannot carry this. These errors reach a caller as codes.Unknown,
+// but so does anything wrapOfficialClientError classifies through
+// uhttp.GrpcCodeFromHTTPStatus's default arm, which is every status outside
+// 4xx/5xx -- including a 2xx or 3xx whose body the generated Datadog client
+// could not unmarshal. Treating that code as "no owner exists" would turn a
+// retryable transport failure into a permanent refusal.
+var ErrApplicationKeyOwnerUnknown = errors.New("baton-datadog: application key owner unknown")
+
 // IsNotFound reports whether err was returned for a 404 response.
 func IsNotFound(err error) bool {
 	return errors.Is(err, ErrNotFound)

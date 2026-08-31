@@ -3,23 +3,89 @@ package connector
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+const defaultV2PageSize = 100
+
+// maxOrgAPIKeyPages bounds the organization API-key walk so a provider that
+// ignores page[number] and keeps returning full pages fails closed instead of
+// paging forever. Nothing else in this walk terminates it in that case:
+// hasMoreAPIKeyPages only compares against meta.page.total_filtered_count when
+// the response carries one, and falls back to "the page was not empty"
+// otherwise. Mirrors maxApplicationKeyPages and maxUserPages; 10_000 pages
+// (1M keys) is far beyond any real organization's API-key count.
+const maxOrgAPIKeyPages = int64(10_000)
 
 type apiTokenBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
 }
 
+// deletableAPITokenBuilder is apiTokenBuilder plus the organization API key
+// delete path, registered only when the operator sets
+// allow-org-api-key-deletion.
+//
+// Delete lives on this type rather than on apiTokenBuilder because the SDK
+// derives CAPABILITY_RESOURCE_DELETE from a type assertion on the registered
+// syncer (connectorbuilder.builder.resourceDeleters). A Delete method on
+// apiTokenBuilder itself would advertise org-wide key deletion on every
+// sync-secrets install regardless of the grant, and a capability that is
+// advertised but refuses at call time is worse than one that is absent: C1
+// resolves what it may do from the advertisement, not from the error.
+type deletableAPITokenBuilder struct{ *apiTokenBuilder }
+
 var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
+var _ connectorbuilder.ResourceSyncerV2 = &deletableAPITokenBuilder{}
+var _ connectorbuilder.ResourceDeleterV2Limited = &deletableAPITokenBuilder{}
+
+func (o *deletableAPITokenBuilder) Delete(ctx context.Context, resourceID *v2.ResourceId, _ *v2.ResourceId) (annotations.Annotations, error) {
+	if resourceID == nil {
+		return nil, status.Error(codes.InvalidArgument, "baton-datadog: API key id is required")
+	}
+	handle := resourceID.GetResource()
+	if isMalformedAPIKeyHandle(handle) {
+		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: API key id %q is malformed", handle)
+	}
+	if err := o.wrapper.DeleteAPIKey(ctx, handle); err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("baton-datadog: delete API key: %w", err)
+	}
+	return nil, nil
+}
+
+// isMalformedAPIKeyHandle reports whether handle cannot be a valid Datadog API
+// key id: empty (including whitespace-only), or containing a control
+// character that has no place in an id and is unsafe to embed in a request
+// path or log line. The vendored v2 client passes this id through as an
+// opaque string with no documented length or charset constraint, so this
+// deliberately stays conservative instead of enforcing e.g. UUID shape --
+// rejecting a handle Datadog considers valid would break real deletes.
+func isMalformedAPIKeyHandle(handle string) bool {
+	if strings.TrimSpace(handle) == "" {
+		return true
+	}
+	for _, r := range handle {
+		if r < 0x20 || r == 0x7f {
+			return true
+		}
+	}
+	return false
+}
 
 func (o *apiTokenBuilder) Entitlements(_ context.Context, _ *v2.Resource, _ resource.SyncOpAttrs) ([]*v2.Entitlement, *resource.SyncOpResults, error) {
 	// API Token secrets do not have entitlements
@@ -35,6 +101,18 @@ func (o *apiTokenBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return o.resourceType
 }
 
+// warnMalformedTimestamp reports an unparseable provider timestamp. The field
+// is dropped and the key still syncs.
+func (o *apiTokenBuilder) warnMalformedTimestamp(ctx context.Context, apiKeyID, field, raw string, err error) {
+	ctxzap.Extract(ctx).Warn(
+		"baton-datadog: organization API key timestamp could not be parsed; syncing the key without it",
+		zap.String("api_key_id", apiKeyID),
+		zap.String("field", field),
+		zap.String("value", raw),
+		zap.Error(err),
+	)
+}
+
 func (o *apiTokenBuilder) List(
 	ctx context.Context,
 	resourceID *v2.ResourceId,
@@ -45,7 +123,13 @@ func (o *apiTokenBuilder) List(
 		return nil, nil, err
 	}
 
-	res, err := o.wrapper.ListAPIKeys(ctx, datadogV2.NewListAPIKeysOptionalParameters().WithPageNumber(page))
+	if page >= maxOrgAPIKeyPages {
+		return nil, nil, fmt.Errorf(
+			"baton-datadog: exceeded %d organization API-key pages while syncing %s resources",
+			maxOrgAPIKeyPages, o.resourceType.Id)
+	}
+
+	res, err := o.wrapper.ListAPIKeys(ctx, datadogV2.NewListAPIKeysOptionalParameters().WithPageNumber(page).WithPageSize(defaultV2PageSize))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing api tokens: %w", err)
 	}
@@ -76,19 +160,27 @@ func (o *apiTokenBuilder) List(
 
 		var resourceOptions []resource.ResourceOption
 		timeFormat := time.RFC3339Nano
+		// A timestamp this connector cannot parse drops that field rather than
+		// failing the walk. Neither created_at nor modified_at is load-bearing
+		// here -- identifying and deleting an organization API key depends on
+		// the handle alone -- so aborting would trade every API key in the
+		// organization becoming invisible to C1 for one missing display value.
+		// Same reasoning as applicationKeyResource; see its comment.
 		if apiToken.Attributes != nil && apiToken.Attributes.CreatedAt != nil {
 			createdAt, err := time.Parse(timeFormat, *apiToken.Attributes.CreatedAt)
 			if err != nil {
-				return nil, nil, err
+				o.warnMalformedTimestamp(ctx, *apiToken.Id, "created_at", *apiToken.Attributes.CreatedAt, err)
+			} else {
+				resourceOptions = append(resourceOptions, resource.WithResourceCreatedAt(createdAt))
 			}
-			resourceOptions = append(resourceOptions, resource.WithResourceCreatedAt(createdAt))
 		}
 		if apiToken.Attributes != nil && apiToken.Attributes.ModifiedAt != nil {
 			modifiedAt, err := time.Parse(timeFormat, *apiToken.Attributes.ModifiedAt)
 			if err != nil {
-				return nil, nil, err
+				o.warnMalformedTimestamp(ctx, *apiToken.Id, "modified_at", *apiToken.Attributes.ModifiedAt, err)
+			} else {
+				options = append(options, resource.WithSecretLastUsedAt(modifiedAt))
 			}
-			options = append(options, resource.WithSecretLastUsedAt(modifiedAt))
 		}
 		name := *apiToken.Id
 		if apiToken.Attributes != nil && apiToken.Attributes.Name != nil {
@@ -96,7 +188,7 @@ func (o *apiTokenBuilder) List(
 		}
 		rv, err := resource.NewSecretResource(
 			name,
-			apiTokenResourceType,
+			o.resourceType,
 			*apiToken.Id,
 			options,
 			resourceOptions...,
@@ -108,7 +200,7 @@ func (o *apiTokenBuilder) List(
 	}
 
 	nextPageToken := ""
-	if len(apiTokens) != 0 {
+	if hasMoreAPIKeyPages(res, page, int64(len(apiTokens)), defaultV2PageSize) {
 		nextPageToken, err = getPageTokenFromPage(bag, page+1)
 		if err != nil {
 			return nil, nil, fmt.Errorf("baton-datadog: failed to get token from page: %w", err)
@@ -123,4 +215,12 @@ func newApiTokenBuilder(wrapper *client.DatadogClient) *apiTokenBuilder {
 		resourceType: apiTokenResourceType,
 		wrapper:      wrapper,
 	}
+}
+
+func newDeletableAPITokenBuilder(wrapper *client.DatadogClient) *deletableAPITokenBuilder {
+	builder := newApiTokenBuilder(wrapper)
+	// Same resource type id, but the permission set that includes the delete
+	// and create rights this variant can actually reach.
+	builder.resourceType = deletableAPITokenResourceType
+	return &deletableAPITokenBuilder{apiTokenBuilder: builder}
 }

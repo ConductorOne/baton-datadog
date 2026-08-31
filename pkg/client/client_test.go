@@ -4,11 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Helper function to check if two strings are equal.
@@ -17,6 +23,247 @@ func assertEqual(t *testing.T, expected, actual string, message string) {
 	if expected != actual {
 		t.Errorf("%s: expected %q, got %q", message, expected, actual)
 	}
+}
+
+func newOfficialTestClient(serverURL string) *DatadogClient {
+	cfg := datadog.NewConfiguration()
+	cfg.Servers = datadog.ServerConfigurations{{URL: serverURL}}
+	return NewDatadogClient(nil, datadog.NewAPIClient(cfg), "example.com", testAPIKey, testAppKey)
+}
+
+func TestAPIKeyManagement(t *testing.T) {
+	t.Run("create returns issued material", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodPost, r.Method, "HTTP method should match")
+			assertEqual(t, "/api/v2/api_keys", r.URL.Path, "request path should match")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"key-id","type":"api_keys","attributes":{"key":"plaintext-key","name":"c1-request"}}}`))
+		}))
+		defer server.Close()
+
+		issued, err := newOfficialTestClient(server.URL).CreateAPIKey(context.Background(), "c1-request")
+		assertNoError(t, err, "create API key should succeed")
+		assertEqual(t, "key-id", issued.ID, "issued key ID should match")
+		assertEqual(t, "plaintext-key", issued.Secret, "issued key material should match")
+	})
+
+	t.Run("create rejects a response without plaintext material", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"key-id","type":"api_keys","attributes":{}}}`))
+		}))
+		defer server.Close()
+
+		_, err := newOfficialTestClient(server.URL).CreateAPIKey(context.Background(), "c1-request")
+		assertError(t, err, "create API key should reject missing plaintext material")
+	})
+
+	t.Run("find by name returns the exact match", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodGet, r.Method, "HTTP method should match")
+			assertEqual(t, "/api/v2/api_keys", r.URL.Path, "request path should match")
+			w.Header().Set("Content-Type", "application/json")
+			// Datadog's filter is a substring search, so the response can contain a
+			// partial match alongside the exact one; only the exact name should win.
+			_, _ = w.Write([]byte(`{"data":[
+				{"id":"key-partial","type":"api_keys","attributes":{"name":"c1-request-old"}},
+				{"id":"key-exact","type":"api_keys","attributes":{"name":"c1-request"}}
+			]}`))
+		}))
+		defer server.Close()
+
+		found, err := newOfficialTestClient(server.URL).FindAPIKeyByName(context.Background(), "c1-request")
+		assertNoError(t, err, "find API key by name should succeed")
+		assertNotNil(t, found, "expected an exact match")
+		assertEqual(t, "key-exact", found.GetId(), "exact match should be the id whose name matches exactly")
+	})
+
+	t.Run("find by name ignores a non-exact partial match", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"id":"key-partial","type":"api_keys","attributes":{"name":"c1-request-old"}}]}`))
+		}))
+		defer server.Close()
+
+		found, err := newOfficialTestClient(server.URL).FindAPIKeyByName(context.Background(), "c1-request")
+		assertNoError(t, err, "find API key by name should succeed even with no exact match")
+		if found != nil {
+			t.Fatalf("expected no exact match, got %+v", found)
+		}
+	})
+
+	// A "c1-<request id>" filter cannot legitimately fill a page, so a full one
+	// means the filter did not narrow. Reporting "no existing key" from it
+	// would mint a duplicate of a key whose plaintext Datadog will not reissue,
+	// so it is an error rather than a not-found.
+	t.Run("find by name refuses a full page with no exact match", func(t *testing.T) {
+		requests := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requests++
+			assertEqual(t, http.MethodGet, r.Method, "HTTP method should match")
+			w.Header().Set("Content-Type", "application/json")
+			entries := make([]string, 100)
+			for i := range entries {
+				entries[i] = fmt.Sprintf(`{"id":"key-%d","type":"api_keys","attributes":{"name":"c1-other-%d"}}`, i, i)
+			}
+			_, _ = fmt.Fprintf(w, `{"data":[%s]}`, strings.Join(entries, ","))
+		}))
+		defer server.Close()
+
+		found, err := newOfficialTestClient(server.URL).FindAPIKeyByName(context.Background(), "c1-request")
+		if found != nil {
+			t.Fatal("a full page with no exact match is not a match")
+		}
+		if err == nil {
+			t.Fatal("expected a full page with no exact match to be refused")
+		}
+		if requests != 1 {
+			t.Fatalf("the lookup should make exactly one request, made %d", requests)
+		}
+	})
+
+	t.Run("delete maps a provider 404 to not found", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodDelete, r.Method, "HTTP method should match")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"errors":["Not found"]}`))
+		}))
+		defer server.Close()
+
+		err := newOfficialTestClient(server.URL).DeleteAPIKey(context.Background(), "missing-key")
+		if status.Code(err) != codes.NotFound {
+			t.Fatalf("DeleteAPIKey() error code = %s, want %s; error = %v", status.Code(err), codes.NotFound, err)
+		}
+	})
+}
+
+func TestServiceAccountApplicationKeyManagement(t *testing.T) {
+	const serviceAccountID = "sa-1"
+	appKeysPath := "/api/v2/service_accounts/" + serviceAccountID + "/application_keys"
+
+	t.Run("create returns issued material and the owning service account id", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodPost, r.Method, "HTTP method should match")
+			assertEqual(t, appKeysPath, r.URL.Path, "request path should match")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"appkey-id","type":"application_keys","attributes":{"key":"plaintext-app-key","name":"c1-request"}}}`))
+		}))
+		defer server.Close()
+
+		issued, err := newOfficialTestClient(server.URL).CreateServiceAccountApplicationKey(context.Background(), serviceAccountID, "c1-request", nil)
+		assertNoError(t, err, "create service account application key should succeed")
+		assertEqual(t, "appkey-id", issued.ID, "issued application key ID should match")
+		assertEqual(t, "plaintext-app-key", issued.Secret, "issued application key material should match")
+		assertEqual(t, serviceAccountID, issued.ServiceAccountID, "issued application key should record its owning service account")
+	})
+
+	t.Run("create sends requested scopes", func(t *testing.T) {
+		// body is written on the httptest server's goroutine and read by the test
+		// body. net/http promises no happens-before edge between the two, so the
+		// mutex is load-bearing rather than decorative -- the race detector does
+		// not report this shape, so it has to be reasoned about.
+		var (
+			bodyMu sync.Mutex
+			body   string
+		)
+		setBody := func(v string) {
+			bodyMu.Lock()
+			defer bodyMu.Unlock()
+			body = v
+		}
+		getBody := func() string {
+			bodyMu.Lock()
+			defer bodyMu.Unlock()
+			return body
+		}
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			buf, _ := io.ReadAll(r.Body)
+			setBody(string(buf))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"appkey-id","type":"application_keys","attributes":{"key":"plaintext-app-key","name":"c1-request"}}}`))
+		}))
+		defer server.Close()
+
+		_, err := newOfficialTestClient(server.URL).CreateServiceAccountApplicationKey(context.Background(), serviceAccountID, "c1-request", []string{"dashboards_read", "metrics_read"})
+		assertNoError(t, err, "create service account application key should succeed")
+		sent := getBody()
+		assertContains(t, sent, "dashboards_read", "request body should include the requested scopes")
+		assertContains(t, sent, "metrics_read", "request body should include the requested scopes")
+	})
+
+	t.Run("create rejects a response without plaintext material", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"appkey-id","type":"application_keys","attributes":{}}}`))
+		}))
+		defer server.Close()
+
+		_, err := newOfficialTestClient(server.URL).CreateServiceAccountApplicationKey(context.Background(), serviceAccountID, "c1-request", nil)
+		assertError(t, err, "create service account application key should reject missing plaintext material")
+	})
+
+	t.Run("find by name returns the exact match, scoped to the service account", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodGet, r.Method, "HTTP method should match")
+			assertEqual(t, appKeysPath, r.URL.Path, "request path should match")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[
+				{"id":"appkey-partial","type":"application_keys","attributes":{"name":"c1-request-old"}},
+				{"id":"appkey-exact","type":"application_keys","attributes":{"name":"c1-request"}}
+			]}`))
+		}))
+		defer server.Close()
+
+		found, err := newOfficialTestClient(server.URL).FindServiceAccountApplicationKeyByName(context.Background(), serviceAccountID, "c1-request")
+		assertNoError(t, err, "find application key by name should succeed")
+		assertNotNil(t, found, "expected an exact match")
+		assertEqual(t, "appkey-exact", found.GetId(), "exact match should be the id whose name matches exactly")
+	})
+
+	t.Run("find by name ignores a non-exact partial match", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"id":"appkey-partial","type":"application_keys","attributes":{"name":"c1-request-old"}}]}`))
+		}))
+		defer server.Close()
+
+		found, err := newOfficialTestClient(server.URL).FindServiceAccountApplicationKeyByName(context.Background(), serviceAccountID, "c1-request")
+		assertNoError(t, err, "find application key by name should succeed even with no exact match")
+		if found != nil {
+			t.Fatalf("expected no exact match, got %+v", found)
+		}
+	})
+
+	t.Run("list pages through all application keys for the service account", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodGet, r.Method, "HTTP method should match")
+			assertEqual(t, appKeysPath, r.URL.Path, "request path should match")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"id":"appkey-1","type":"application_keys","attributes":{"name":"c1-req-1"}}]}`))
+		}))
+		defer server.Close()
+
+		resp, err := newOfficialTestClient(server.URL).ListServiceAccountApplicationKeys(context.Background(), serviceAccountID, 0, 100)
+		assertNoError(t, err, "list service account application keys should succeed")
+		assertEqualInt(t, 1, len(resp.GetData()), "expected one application key")
+	})
+
+	t.Run("delete maps a provider 404 to not found", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assertEqual(t, http.MethodDelete, r.Method, "HTTP method should match")
+			assertEqual(t, appKeysPath+"/appkey-id", r.URL.Path, "request path should include both the service account and application key ids")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"errors":["Not found"]}`))
+		}))
+		defer server.Close()
+
+		err := newOfficialTestClient(server.URL).DeleteServiceAccountApplicationKey(context.Background(), serviceAccountID, "appkey-id")
+		if status.Code(err) != codes.NotFound {
+			t.Fatalf("DeleteServiceAccountApplicationKey() error code = %s, want %s; error = %v", status.Code(err), codes.NotFound, err)
+		}
+	})
 }
 
 // Helper function to check if a value is not nil.

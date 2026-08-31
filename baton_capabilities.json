@@ -4,7 +4,7 @@
     {
       "resourceType": {
         "id": "api-key",
-        "displayName": "API Key",
+        "displayName": "Organization API Key",
         "traits": [
           "TRAIT_SECRET"
         ],
@@ -17,18 +17,32 @@
             "permissions": [
               {
                 "permission": "api_keys_read"
+              },
+              {
+                "permission": "api_keys_write"
+              },
+              {
+                "permission": "api_keys_delete"
               }
             ]
           }
-        ]
+        ],
+        "description": "A Datadog organization API key. Owned by the org, not by any single Datadog identity."
       },
       "capabilities": [
-        "CAPABILITY_SYNC"
+        "CAPABILITY_SYNC",
+        "CAPABILITY_RESOURCE_DELETE"
       ],
       "permissions": {
         "permissions": [
           {
             "permission": "api_keys_read"
+          },
+          {
+            "permission": "api_keys_write"
+          },
+          {
+            "permission": "api_keys_delete"
           }
         ]
       }
@@ -94,6 +108,46 @@
     },
     {
       "resourceType": {
+        "id": "service-account-application-key",
+        "displayName": "Service Account Application Key",
+        "traits": [
+          "TRAIT_SECRET"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+          },
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
+            "permissions": [
+              {
+                "permission": "service_account_write"
+              },
+              {
+                "permission": "org_app_keys_read"
+              }
+            ]
+          }
+        ],
+        "description": "A Datadog application key owned by one service-account identity. Distinct from an org API key (\"api-key\"): scoped to, and deleted through, its owning service account."
+      },
+      "capabilities": [
+        "CAPABILITY_SYNC",
+        "CAPABILITY_RESOURCE_DELETE"
+      ],
+      "permissions": {
+        "permissions": [
+          {
+            "permission": "service_account_write"
+          },
+          {
+            "permission": "org_app_keys_read"
+          }
+        ]
+      }
+    },
+    {
+      "resourceType": {
         "id": "team",
         "displayName": "Team",
         "traits": [
@@ -148,7 +202,8 @@
       },
       "capabilities": [
         "CAPABILITY_SYNC",
-        "CAPABILITY_ACCOUNT_PROVISIONING"
+        "CAPABILITY_ACCOUNT_PROVISIONING",
+        "CAPABILITY_CREDENTIAL_ISSUE"
       ],
       "permissions": {
         "permissions": [
@@ -159,6 +214,23 @@
             "permission": "user_access_manage"
           }
         ]
+      },
+      "credentialIssue": {
+        "options": [
+          {
+            "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
+            "customScopesAllowed": true,
+            "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
+            "secretResourceTypeId": "service-account-application-key",
+            "preferred": true
+          },
+          {
+            "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
+            "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
+            "secretResourceTypeId": "api-key"
+          }
+        ],
+        "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"
       }
     }
   ],
@@ -166,7 +238,9 @@
     "CAPABILITY_PROVISION",
     "CAPABILITY_SYNC",
     "CAPABILITY_ACCOUNT_PROVISIONING",
-    "CAPABILITY_ACTIONS"
+    "CAPABILITY_RESOURCE_DELETE",
+    "CAPABILITY_ACTIONS",
+    "CAPABILITY_CREDENTIAL_ISSUE"
   ],
   "credentialDetails": {
     "capabilityAccountProvisioning": {

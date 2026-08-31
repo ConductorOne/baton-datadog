@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 )
@@ -108,4 +109,24 @@ func getPageTokenFromPage(bag *pagination.Bag, page int64) (string, error) {
 	}
 
 	return pageToken, nil
+}
+
+// hasMoreAPIKeyPages reports whether a ListAPIKeys response has additional pages.
+func hasMoreAPIKeyPages(res *datadogV2.APIKeysResponse, page int64, count int64, pageSize int64) bool {
+	if res == nil {
+		return count != 0
+	}
+	meta, ok := res.GetMetaOk()
+	if !ok || meta == nil {
+		return count != 0
+	}
+	m := meta.GetPage()
+	if m.HasTotalFilteredCount() {
+		total := m.GetTotalFilteredCount()
+		if total == 0 {
+			return count != 0
+		}
+		return page*pageSize+count < total
+	}
+	return count != 0
 }
