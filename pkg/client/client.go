@@ -386,10 +386,19 @@ func (w *DatadogClient) FindApplicationKeyOwner(ctx context.Context, appKeyID st
 	if err != nil {
 		return "", wrapOfficialClientError("get application key", httpRes, err)
 	}
+	// A 2xx body the generated client can decode but that carries no data --
+	// an empty object, or a proxy's error envelope -- leaves Data nil with a
+	// nil error, because ApplicationKeyResponse.UnmarshalJSON only assigns
+	// o.Data from the payload's data key and does not treat its absence as a
+	// failure. That is a transport anomaly, not the provider naming no owner,
+	// so it stays out of the sentinel below and keeps Delete's default arm.
+	if response.Data == nil {
+		return "", fmt.Errorf("get application key %s: response carried no data", appKeyID)
+	}
 	// Both of these are the provider answering and naming no owner, which no
 	// retry changes; ErrApplicationKeyOwnerUnknown is how a caller tells them
 	// apart from a transport failure that merely mapped to the same gRPC code.
-	if response.Data == nil || response.Data.Relationships == nil || response.Data.Relationships.OwnedBy == nil {
+	if response.Data.Relationships == nil || response.Data.Relationships.OwnedBy == nil {
 		return "", errors.Join(ErrApplicationKeyOwnerUnknown,
 			fmt.Errorf("get application key %s: response omitted the owned_by relationship", appKeyID))
 	}
