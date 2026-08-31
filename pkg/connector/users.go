@@ -99,6 +99,13 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 // advertised, so this switch only has to route. It deliberately does not fall
 // back to a default arm: an unrecognised kind is a protocol mismatch, and
 // minting the wrong kind of Datadog credential is not a recoverable guess.
+//
+// Issue is not retried automatically. A failure anywhere in it -- the
+// duplicate-issuance lookup, the mint itself, or the trait construction after
+// it -- fails the issuance outright and a human has to re-drive the request.
+// That is why the lookups it depends on are single-request rather than paged
+// walks, and why a mint whose result cannot be returned is cleaned up on the
+// spot: there is no later attempt to recover from either.
 func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	if input == nil || input.IdentityID == nil || input.IdentityID.GetResourceType() != userResourceType.Id {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: a Datadog user identity is required")
