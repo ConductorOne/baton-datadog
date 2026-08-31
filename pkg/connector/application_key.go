@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -89,15 +90,23 @@ func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.Resou
 	if serviceAccountID == "" {
 		owner, err := o.wrapper.FindApplicationKeyOwner(ctx, appKeyID)
 		if err != nil {
-			switch status.Code(err) {
-			case codes.NotFound:
-				return nil, nil
-			case codes.Unknown:
+			switch {
+			case errors.Is(err, client.ErrApplicationKeyOwnerUnknown):
 				// The provider answered, and its answer names no owner. That
-				// is the only genuinely unresolvable case; every other code
-				// carries a retry or diagnosis signal worth preserving.
+				// is the only genuinely unresolvable case; every other failure
+				// carries a retry or diagnosis signal worth preserving, so it
+				// falls through to the wrapped-error default below with its
+				// code intact. This is matched on the sentinel rather than on
+				// status.Code(err) == codes.Unknown because Unknown is also
+				// what uhttp.GrpcCodeFromHTTPStatus's default arm returns for
+				// any status outside 4xx/5xx -- a 2xx or 3xx whose body the
+				// generated Datadog client cannot unmarshal included -- and
+				// converting that to InvalidArgument would make a retryable
+				// transport failure permanent.
 				return nil, status.Errorf(codes.InvalidArgument,
 					"baton-datadog: the owning service account for application key %q could not be determined: %v", appKeyID, err)
+			case status.Code(err) == codes.NotFound:
+				return nil, nil
 			default:
 				return nil, fmt.Errorf("baton-datadog: resolve owner for application key %q: %w", appKeyID, err)
 			}
@@ -114,12 +123,13 @@ func (o *applicationKeyBuilder) Delete(ctx context.Context, resourceID *v2.Resou
 			}
 			owner, ownerErr := o.wrapper.FindApplicationKeyOwner(ctx, appKeyID)
 			if ownerErr != nil {
-				switch status.Code(ownerErr) {
-				case codes.NotFound:
-					return nil, nil
-				case codes.Unknown:
+				// Same branching as the first lookup above; see its comment.
+				switch {
+				case errors.Is(ownerErr, client.ErrApplicationKeyOwnerUnknown):
 					return nil, status.Errorf(codes.InvalidArgument,
 						"baton-datadog: the owning service account for application key %q could not be determined: %v", appKeyID, ownerErr)
+				case status.Code(ownerErr) == codes.NotFound:
+					return nil, nil
 				default:
 					return nil, fmt.Errorf("baton-datadog: resolve owner for application key %q: %w", appKeyID, ownerErr)
 				}

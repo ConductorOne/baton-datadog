@@ -386,12 +386,17 @@ func (w *DatadogClient) FindApplicationKeyOwner(ctx context.Context, appKeyID st
 	if err != nil {
 		return "", wrapOfficialClientError("get application key", httpRes, err)
 	}
+	// Both of these are the provider answering and naming no owner, which no
+	// retry changes; ErrApplicationKeyOwnerUnknown is how a caller tells them
+	// apart from a transport failure that merely mapped to the same gRPC code.
 	if response.Data == nil || response.Data.Relationships == nil || response.Data.Relationships.OwnedBy == nil {
-		return "", fmt.Errorf("get application key %s: response omitted the owned_by relationship", appKeyID)
+		return "", errors.Join(ErrApplicationKeyOwnerUnknown,
+			fmt.Errorf("get application key %s: response omitted the owned_by relationship", appKeyID))
 	}
 	ownerID := response.Data.Relationships.OwnedBy.Data.Id
 	if ownerID == "" {
-		return "", fmt.Errorf("get application key %s: owned_by names no user", appKeyID)
+		return "", errors.Join(ErrApplicationKeyOwnerUnknown,
+			fmt.Errorf("get application key %s: owned_by names no user", appKeyID))
 	}
 	return ownerID, nil
 }

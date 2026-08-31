@@ -607,6 +607,46 @@ func TestApplicationKeyBuilderDeleteFailsWhenOwnerUnknown(t *testing.T) {
 	)
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
+
+	// Delete's refusal must be driven by the sentinel, not by a gRPC code the
+	// transport also produces. status.Errorf formats the cause with %v rather
+	// than chaining it, so the sentinel is asserted where it is produced.
+	_, ownerErr := newLifecycleTestWrapper(server.URL).FindApplicationKeyOwner(context.Background(), handle)
+	require.ErrorIs(t, ownerErr, client.ErrApplicationKeyOwnerUnknown)
+}
+
+// TestApplicationKeyBuilderDeleteKeepsUnmappedTransportFailureRetryable is the
+// regression for branching the refusal on codes.Unknown. wrapOfficialClientError
+// classifies through uhttp.GrpcCodeFromHTTPStatus, whose default arm returns
+// Unknown for any status outside 4xx/5xx -- including a 2xx whose body the
+// generated Datadog client cannot unmarshal. That is a transport failure, not
+// the provider naming no owner, so it must keep its code and stay retryable
+// instead of collapsing into a permanent InvalidArgument refusal.
+func TestApplicationKeyBuilderDeleteKeepsUnmappedTransportFailureRetryable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			t.Errorf("provider should not be asked to delete when the owner lookup failed")
+		}
+		// 200 with a body the generated client cannot decode: the official
+		// client errors, and 200 is outside every arm of GrpcCodeFromHTTPStatus.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data": not-json`))
+	}))
+	defer server.Close()
+
+	deleter := newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL))
+	_, err := deleter.Delete(
+		context.Background(),
+		&v2.ResourceId{ResourceType: serviceAccountApplicationKeyResourceType.Id, Resource: "appkey-undecodable-1"},
+		nil,
+	)
+	require.Error(t, err)
+	require.NotErrorIs(t, err, client.ErrApplicationKeyOwnerUnknown,
+		"an undecodable response is not the provider naming no owner")
+	require.NotEqual(t, codes.InvalidArgument, status.Code(err),
+		"a transport failure must not be converted into a permanent refusal")
+	require.Equal(t, codes.Unknown, status.Code(err), "the lookup's own code must survive")
 }
 
 // TestApplicationKeyBuilderDeletePreservesOwnerLookupFailureCode: a transient
