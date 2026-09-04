@@ -26,7 +26,7 @@ baton resources
 ## docker
 
 ```
-docker run --rm -v $(pwd):/out -e BATON_API_KEY=datadogApiKey BATON_APP_KEY=datadogAppKey BATON_SITE=datadogSite ghcr.io/conductorone/baton-datadog:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_API_KEY=datadogApiKey BATON_APP_KEY=datadogAppKey BATON_SITE=datadogSite public.ecr.aws/conductorone/baton-datadog:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
