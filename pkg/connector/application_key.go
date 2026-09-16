@@ -408,6 +408,16 @@ type onMalformedCreatedAt func(appKeyID string, raw string, err error)
 // as the resource's parent; see Delete's doc comment for why that is the
 // field this connector's delete path relies on.
 //
+// CreatedById is deliberately left unset. Datadog's application-key
+// relationships expose only owned_by (see
+// datadogV2.ApplicationKeyRelationships), never a creator -- the provider
+// gives this connector no authoritative answer to "who created this key",
+// only "whose permissions does it carry". WithSecretIdentityID below already
+// carries that ownership fact; stamping the same service-account id onto
+// CreatedById as well would assert a fact about causation (a non-interactive
+// service account cannot itself perform a create action) that the provider
+// never reported and that is not true. See CXP-1101 / IGA-4361.
+//
 // reportMalformedCreatedAt may be nil, in which case an unparseable created_at
 // is dropped silently.
 func applicationKeyResource(
@@ -428,7 +438,6 @@ func applicationKeyResource(
 	options := []resource.SecretTraitOption{
 		resource.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
 		resource.WithSecretDetail("datadog.service_account_application_key"),
-		resource.WithSecretCreatedByID(serviceAccountResourceID),
 		resource.WithSecretIdentityID(serviceAccountResourceID),
 	}
 

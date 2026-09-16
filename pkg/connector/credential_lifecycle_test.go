@@ -1533,3 +1533,168 @@ func TestApiTokenListBoundsPagination(t *testing.T) {
 	require.Contains(t, err.Error(), apiTokenResourceType.Id, "the error must name the resource type")
 	require.Equal(t, 1, requests, "no request may be issued for the page past the bound")
 }
+
+// --- creator attribution (CXP-1101 / IGA-4361) ------------------------------
+//
+// Datadog's application-key relationships expose owned_by only -- never a
+// creator (datadogV2.ApplicationKeyRelationships has no created_by field at
+// all). Organization API keys are the opposite: Datadog reports created_by
+// (and modified_by), not ownership. The connector must not blur these two
+// relationships together by substituting one identity for a fact the
+// provider never actually reported.
+
+// secretTraitOf extracts the SecretTrait annotation from a synced or issued
+// resource, the way a consumer (or these tests) would read CreatedById /
+// IdentityId off it.
+func secretTraitOf(t *testing.T, r *v2.Resource) *v2.SecretTrait {
+	t.Helper()
+	trait := &v2.SecretTrait{}
+	annos := annotations.Annotations(r.GetAnnotations())
+	found, err := annos.Pick(trait)
+	require.NoError(t, err)
+	require.True(t, found, "resource must carry a secret trait")
+	return trait
+}
+
+// TestApplicationKeyResourceOmitsCreator: applicationKeyResource must not
+// claim the owning service account is the key's creator. Datadog's
+// application-key API never reports a creator, only an owner, and a
+// non-interactive service account cannot itself perform a create action.
+func TestApplicationKeyResourceOmitsCreator(t *testing.T) {
+	parent := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID}
+	var attrs datadogV2.PartialApplicationKeyAttributes
+	require.NoError(t, json.Unmarshal([]byte(`{"name":"k"}`), &attrs))
+
+	res, err := applicationKeyResource("appkey-1", parent, &attrs, nil)
+	require.NoError(t, err)
+
+	trait := secretTraitOf(t, res)
+	require.Nil(t, trait.GetCreatedById(), "application-key sync must not fabricate a creator")
+	require.Equal(t, parent.GetResource(), trait.GetIdentityId().GetResource(),
+		"the owning service account must still be recorded as the identity")
+}
+
+// TestIssueServiceAccountApplicationKeyOmitsCreator: issuing a new
+// service-account application key must not repeat the sync-path bug on the
+// write path -- the freshly minted key must not claim the service account
+// created it either.
+func TestIssueServiceAccountApplicationKeyOmitsCreator(t *testing.T) {
+	const (
+		handle = "handle-creator-appkey-1"
+		secret = "plaintext-creator-appkey"
+		name   = "c1-req-creator-appkey"
+	)
+	server, _ := newServiceAccountAppKeyServer(t, testServiceAccountID, handle, secret, name)
+	defer server.Close()
+	wrapper := newLifecycleTestWrapper(server.URL)
+
+	out := issueServiceAccountAppKey(t, context.Background(), wrapper, testServiceAccountID, "req-creator-appkey")
+
+	trait := secretTraitOf(t, out.Secret)
+	require.Nil(t, trait.GetCreatedById(), "issuing an application key must not fabricate a creator")
+	require.Equal(t, testServiceAccountID, trait.GetIdentityId().GetResource())
+}
+
+// TestIssueOrganizationAPIKeyUsesProviderCreatedBy: organization API-key
+// issuance authenticates as the connector's own configured principal, not as
+// the identity the key is vended to, so Datadog's created_by relationship on
+// the create response -- not the recipient -- must become CreatedById.
+func TestIssueOrganizationAPIKeyUsesProviderCreatedBy(t *testing.T) {
+	const (
+		handle    = "handle-org-creator-1"
+		secret    = "plaintext-org-creator" //nolint:gosec // synthetic test fixture, not a real credential
+		recipient = "user-recipient-1"
+		provider  = "user-connector-principal-1"
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/api_keys":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/api_keys":
+			_, _ = w.Write([]byte(`{"data":{"id":"` + handle + `","type":"api_keys","attributes":{"key":"` + secret + `","name":"c1-req-org-creator"},` +
+				`"relationships":{"created_by":{"data":{"id":"` + provider + `","type":"users"}}}}}`))
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, false)
+	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
+		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: recipient},
+		RequestID:  "req-org-creator",
+		CredentialOptions: v2.CredentialIssueOptions_builder{
+			SecretResourceTypeId: apiTokenResourceType.Id,
+			ApiKey:               v2.CredentialIssueOptions_ApiKey_builder{}.Build(),
+		}.Build(),
+	})
+	require.NoError(t, err)
+
+	trait := secretTraitOf(t, out.Secret)
+	require.Equal(t, provider, trait.GetCreatedById().GetResource(), "creator must come from the provider's created_by relationship")
+	require.Equal(t, recipient, trait.GetIdentityId().GetResource(), "the recipient must still be recorded as the identity the key was vended to")
+	require.NotEqual(t, trait.GetCreatedById().GetResource(), trait.GetIdentityId().GetResource(),
+		"creator and recipient are different actors here on purpose")
+}
+
+// TestIssueOrganizationAPIKeyOmitsCreatorWhenProviderSilent: when Datadog's
+// create response reports no created_by relationship, CreatedById must be
+// left unset -- never defaulted to the recipient identity.
+func TestIssueOrganizationAPIKeyOmitsCreatorWhenProviderSilent(t *testing.T) {
+	const (
+		handle    = "handle-org-silent-1"
+		secret    = "plaintext-org-silent" //nolint:gosec // synthetic test fixture, not a real credential
+		recipient = "user-recipient-2"
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/api_keys":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/api_keys":
+			_, _ = w.Write([]byte(`{"data":{"id":"` + handle + `","type":"api_keys","attributes":{"key":"` + secret + `","name":"c1-req-org-silent"}}}`))
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, false)
+	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
+		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: recipient},
+		RequestID:  "req-org-silent",
+		CredentialOptions: v2.CredentialIssueOptions_builder{
+			SecretResourceTypeId: apiTokenResourceType.Id,
+			ApiKey:               v2.CredentialIssueOptions_ApiKey_builder{}.Build(),
+		}.Build(),
+	})
+	require.NoError(t, err)
+
+	trait := secretTraitOf(t, out.Secret)
+	require.Nil(t, trait.GetCreatedById(), "a silent provider response must not fabricate a creator from the recipient")
+	require.Equal(t, recipient, trait.GetIdentityId().GetResource())
+}
+
+// TestApiTokenListUsesProviderCreatedBy: the sync path (already correct
+// before this fix) must keep reading Datadog's created_by relationship
+// rather than regress toward either issuance path's identity.
+func TestApiTokenListUsesProviderCreatedBy(t *testing.T) {
+	const creator = "user-sync-creator-1"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"key-1","type":"api_keys","attributes":{"name":"k"},` +
+			`"relationships":{"created_by":{"data":{"id":"` + creator + `","type":"users"}}}}]}`))
+	}))
+	defer server.Close()
+
+	builder := newApiTokenBuilder(newLifecycleTestWrapper(server.URL))
+	got, _, err := builder.List(context.Background(), nil, rs.SyncOpAttrs{})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+
+	trait := secretTraitOf(t, got[0])
+	require.Equal(t, creator, trait.GetCreatedById().GetResource())
+}
