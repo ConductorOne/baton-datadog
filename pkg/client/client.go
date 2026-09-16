@@ -425,6 +425,9 @@ func (w *DatadogClient) AddUserToRole(ctx context.Context, roleId string, body d
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusConflict {
+		return &resp, errors.Join(ErrAlreadyExists, err)
+	}
 	if err != nil {
 		return &resp, wrapOfficialClientError("add user to role", httpRes, err)
 	}
@@ -486,6 +489,9 @@ func (w *DatadogClient) CreateTeamMembership(ctx context.Context, teamId string,
 	resp, httpRes, err := teamsApi.CreateTeamMembership(ctx, teamId, body)
 	if httpRes != nil {
 		defer httpRes.Body.Close()
+	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusConflict {
+		return &resp, errors.Join(ErrAlreadyExists, err)
 	}
 	if err != nil {
 		return &resp, wrapOfficialClientError("create team membership", httpRes, err)

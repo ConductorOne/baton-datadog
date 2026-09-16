@@ -25,9 +25,19 @@ var ErrNotFound = errors.New("baton-datadog: not found")
 // retryable transport failure into a permanent refusal.
 var ErrApplicationKeyOwnerUnknown = errors.New("baton-datadog: application key owner unknown")
 
+// ErrAlreadyExists is joined onto errors returned from wrapper methods when the
+// Datadog API responds with HTTP 409. Grant callers use IsAlreadyExists to treat
+// a duplicate membership as success without depending on the SDK error message.
+var ErrAlreadyExists = errors.New("baton-datadog: already exists")
+
 // IsNotFound reports whether err was returned for a 404 response.
 func IsNotFound(err error) bool {
 	return errors.Is(err, ErrNotFound)
+}
+
+// IsAlreadyExists reports whether err was returned for a 409 response.
+func IsAlreadyExists(err error) bool {
+	return errors.Is(err, ErrAlreadyExists)
 }
 
 // ReqOpt represents a request option that can be applied to an HTTP request.

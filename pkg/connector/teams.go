@@ -177,6 +177,9 @@ func (t *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	_, err := t.wrapper.CreateTeamMembership(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
+		if client.IsAlreadyExists(err) {
+			return annotations.New(&v2.GrantAlreadyExists{}), nil
+		}
 		return nil, fmt.Errorf("error adding user to team: %w", err)
 	}
 
