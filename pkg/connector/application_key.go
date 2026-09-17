@@ -416,7 +416,7 @@ type onMalformedCreatedAt func(appKeyID string, raw string, err error)
 // carries that ownership fact; stamping the same service-account id onto
 // CreatedById as well would assert a fact about causation (a non-interactive
 // service account cannot itself perform a create action) that the provider
-// never reported and that is not true. See CXP-1101 / IGA-4361.
+// never reported and that is not true.
 //
 // reportMalformedCreatedAt may be nil, in which case an unparseable created_at
 // is dropped silently.

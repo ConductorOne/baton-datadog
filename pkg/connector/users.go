@@ -150,8 +150,7 @@ func issuedCredentialName(requestID string) string {
 // connector's own credential-issuance call is not evidence to the contrary --
 // it authenticates as the connector's configured Datadog principal, not as
 // the service account -- so recording the service account as creator here
-// would repeat the same unsupported claim the sync path used to make. See
-// CXP-1101 / IGA-4361.
+// would repeat the same unsupported claim the sync path used to make.
 func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	serviceAccountID := input.IdentityID.GetResource()
 
@@ -230,7 +229,7 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 // key to that principal rather than to whoever it was vended to; recipient
 // and creator are frequently different actors here, not just in an edge
 // case. When the response reports no creator, CreatedById is left unset
-// rather than defaulting to the recipient. See CXP-1101.
+// rather than defaulting to the recipient.
 func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	// The SDK rejects requested scopes for this descriptor before Issue runs
 	// (it advertises no scopes and disallows custom ones). Re-checking here

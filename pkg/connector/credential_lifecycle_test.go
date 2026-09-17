@@ -1534,7 +1534,7 @@ func TestApiTokenListBoundsPagination(t *testing.T) {
 	require.Equal(t, 1, requests, "no request may be issued for the page past the bound")
 }
 
-// --- creator attribution (CXP-1101 / IGA-4361) ------------------------------
+// --- creator attribution ----------------------------------------------------
 //
 // Datadog's application-key relationships expose owned_by only -- never a
 // creator (datadogV2.ApplicationKeyRelationships has no created_by field at
