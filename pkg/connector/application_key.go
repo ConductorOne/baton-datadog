@@ -414,9 +414,8 @@ type onMalformedCreatedAt func(appKeyID string, raw string, err error)
 // gives this connector no authoritative answer to "who created this key",
 // only "whose permissions does it carry". WithSecretIdentityID below already
 // carries that ownership fact; stamping the same service-account id onto
-// CreatedById as well would assert a fact about causation (a non-interactive
-// service account cannot itself perform a create action) that the provider
-// never reported and that is not true.
+// CreatedById as well would assert a fact about causation that the provider
+// never reported and that this connector cannot support.
 //
 // reportMalformedCreatedAt may be nil, in which case an unparseable created_at
 // is dropped silently.

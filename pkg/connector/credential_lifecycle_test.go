@@ -1558,8 +1558,8 @@ func secretTraitOf(t *testing.T, r *v2.Resource) *v2.SecretTrait {
 
 // TestApplicationKeyResourceOmitsCreator: applicationKeyResource must not
 // claim the owning service account is the key's creator. Datadog's
-// application-key API never reports a creator, only an owner, and a
-// non-interactive service account cannot itself perform a create action.
+// application-key API never reports a creator, only an owner, so the
+// connector has nothing to support such a claim with.
 func TestApplicationKeyResourceOmitsCreator(t *testing.T) {
 	parent := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID}
 	var attrs datadogV2.PartialApplicationKeyAttributes
