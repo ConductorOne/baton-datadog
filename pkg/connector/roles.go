@@ -155,6 +155,9 @@ func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	_, err := r.wrapper.AddUserToRole(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
+		if client.IsAlreadyExists(err) {
+			return annotations.New(&v2.GrantAlreadyExists{}), nil
+		}
 		return nil, fmt.Errorf("baton-datadog: failed to add user to role: %w", err)
 	}
 
