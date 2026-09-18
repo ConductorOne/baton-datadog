@@ -175,6 +175,14 @@ func (w *DatadogClient) ListAPIKeys(ctx context.Context, params *datadogV2.ListA
 type IssuedAPIKey struct {
 	ID     string
 	Secret string
+	// CreatedByUserID is the Datadog user id from the create response's
+	// relationships.created_by, when the provider reported one. Empty means
+	// Datadog did not report a creator for this creation call -- the create
+	// call authenticates as this connector's configured principal, not as
+	// whichever identity the key is being vended to, so callers must not
+	// substitute the recipient identity when this is empty. Mirrors how
+	// apiTokenBuilder.List reads the same relationship on sync.
+	CreatedByUserID string
 }
 
 func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedAPIKey, error) {
@@ -192,7 +200,11 @@ func (w *DatadogClient) CreateAPIKey(ctx context.Context, name string) (*IssuedA
 	if response.Data == nil || response.Data.Id == nil || response.Data.Attributes == nil || response.Data.Attributes.Key == nil || *response.Data.Attributes.Key == "" {
 		return nil, fmt.Errorf("create API key response omitted id or key")
 	}
-	return &IssuedAPIKey{ID: *response.Data.Id, Secret: *response.Data.Attributes.Key}, nil
+	issued := &IssuedAPIKey{ID: *response.Data.Id, Secret: *response.Data.Attributes.Key}
+	if response.Data.Relationships != nil && response.Data.Relationships.CreatedBy != nil {
+		issued.CreatedByUserID = response.Data.Relationships.CreatedBy.Data.Id
+	}
+	return issued, nil
 }
 
 // nameSearchPageSize is the page both name lookups ask for. It is a ceiling on

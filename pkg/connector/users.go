@@ -142,6 +142,15 @@ func issuedCredentialName(requestID string) string {
 // mapping: the key has a real non-human owner. It is gated on a live re-check
 // that the target is actually a Datadog service account, since its user record
 // may have changed since it was last synced.
+//
+// The returned secret's CreatedById is deliberately left unset, for the same
+// reason applicationKeyResource leaves it unset on sync: Datadog's
+// application-key API never reports who created a key, only who owns it
+// (see application_key.go's applicationKeyResource doc comment). This
+// connector's own credential-issuance call is not evidence to the contrary --
+// it authenticates as the connector's configured Datadog principal, not as
+// the service account -- so recording the service account as creator here
+// would repeat the same unsupported claim the sync path used to make.
 func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	serviceAccountID := input.IdentityID.GetResource()
 
@@ -172,7 +181,6 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	}
 
 	secretTraitOptions := []rs.SecretTraitOption{
-		rs.WithSecretCreatedByID(input.IdentityID),
 		rs.WithSecretIdentityID(input.IdentityID),
 		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
 		rs.WithSecretDetail("datadog.service_account_application_key"),
@@ -212,6 +220,16 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 // key is unscoped -- a Datadog organization API key carries no scopes at all,
 // which is exactly why it must stay a separate kind from a service-account
 // application key rather than a variation of one.
+//
+// CreatedById comes from Datadog's own relationships.created_by on the create
+// response (see IssuedAPIKey.CreatedByUserID), the same field
+// apiTokenBuilder.List reads on sync -- never from input.IdentityID. This
+// call authenticates as the connector's configured Datadog principal, not as
+// the requesting/receiving identity, so Datadog will typically attribute the
+// key to that principal rather than to whoever it was vended to; recipient
+// and creator are frequently different actors here, not just in an edge
+// case. When the response reports no creator, CreatedById is left unset
+// rather than defaulting to the recipient.
 func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	// The SDK rejects requested scopes for this descriptor before Issue runs
 	// (it advertises no scopes and disallows custom ones). Re-checking here
@@ -238,10 +256,15 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	}
 
 	secretTraitOptions := []rs.SecretTraitOption{
-		rs.WithSecretCreatedByID(input.IdentityID),
 		rs.WithSecretIdentityID(input.IdentityID),
 		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
 		rs.WithSecretDetail("datadog.api_key"),
+	}
+	if key.CreatedByUserID != "" {
+		secretTraitOptions = append(secretTraitOptions, rs.WithSecretCreatedByID(&v2.ResourceId{
+			ResourceType: userResourceType.Id,
+			Resource:     key.CreatedByUserID,
+		}))
 	}
 	// No parent resource id: an organization API key hangs off the
 	// organization, not off the identity it was vended to, and the syncer

@@ -47,6 +47,31 @@ func TestAPIKeyManagement(t *testing.T) {
 		assertEqual(t, "plaintext-key", issued.Secret, "issued key material should match")
 	})
 
+	t.Run("create carries the provider-reported creator", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"key-id","type":"api_keys","attributes":{"key":"plaintext-key","name":"c1-request"},` +
+				`"relationships":{"created_by":{"data":{"id":"user-creator-1","type":"users"}}}}}`))
+		}))
+		defer server.Close()
+
+		issued, err := newOfficialTestClient(server.URL).CreateAPIKey(context.Background(), "c1-request")
+		assertNoError(t, err, "create API key should succeed")
+		assertEqual(t, "user-creator-1", issued.CreatedByUserID, "issued key should carry the provider's created_by relationship")
+	})
+
+	t.Run("create leaves creator empty when the provider reports none", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"key-id","type":"api_keys","attributes":{"key":"plaintext-key","name":"c1-request"}}}`))
+		}))
+		defer server.Close()
+
+		issued, err := newOfficialTestClient(server.URL).CreateAPIKey(context.Background(), "c1-request")
+		assertNoError(t, err, "create API key should succeed")
+		assertEqual(t, "", issued.CreatedByUserID, "issued key must not fabricate a creator the provider did not report")
+	})
+
 	t.Run("create rejects a response without plaintext material", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
