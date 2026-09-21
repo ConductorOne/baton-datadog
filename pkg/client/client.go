@@ -426,7 +426,7 @@ func (w *DatadogClient) AddUserToRole(ctx context.Context, roleId string, body d
 		defer httpRes.Body.Close()
 	}
 	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusConflict {
-		return &resp, errors.Join(ErrAlreadyExists, err)
+		return &resp, errors.Join(ErrAlreadyExists, wrapOfficialClientError("add user to role", httpRes, err))
 	}
 	if err != nil {
 		return &resp, wrapOfficialClientError("add user to role", httpRes, err)
@@ -491,10 +491,32 @@ func (w *DatadogClient) CreateTeamMembership(ctx context.Context, teamId string,
 		defer httpRes.Body.Close()
 	}
 	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusConflict {
-		return &resp, errors.Join(ErrAlreadyExists, err)
+		return &resp, errors.Join(ErrAlreadyExists, wrapOfficialClientError("create team membership", httpRes, err))
 	}
 	if err != nil {
 		return &resp, wrapOfficialClientError("create team membership", httpRes, err)
+	}
+	return &resp, nil
+}
+
+// UpdateTeamMembership updates a user's role on a team and automatically handles HTTP response body closing.
+func (w *DatadogClient) UpdateTeamMembership(ctx context.Context, teamId string, userId string, role datadogV2.UserTeamRole) (*datadogV2.UserTeamResponse, error) {
+	ctx = w.withAuthContext(ctx)
+	teamsApi := datadogV2.NewTeamsApi(w.officialClient)
+	body := datadogV2.UserTeamUpdateRequest{
+		Data: datadogV2.UserTeamUpdate{
+			Attributes: &datadogV2.UserTeamAttributes{
+				Role: *datadogV2.NewNullableUserTeamRole(&role),
+			},
+			Type: datadogV2.USERTEAMTYPE_TEAM_MEMBERSHIPS,
+		},
+	}
+	resp, httpRes, err := teamsApi.UpdateTeamMembership(ctx, teamId, userId, body)
+	if httpRes != nil {
+		defer httpRes.Body.Close()
+	}
+	if err != nil {
+		return &resp, wrapOfficialClientError("update team membership", httpRes, err)
 	}
 	return &resp, nil
 }
