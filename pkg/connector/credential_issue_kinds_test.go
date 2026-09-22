@@ -26,6 +26,7 @@ func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 
 	byType := map[string]*v2.CredentialIssueOptionDescriptor{}
 	for _, o := range details.GetOptions() {
+		require.Equal(t, []v2.FullKnowledgeVaultConfig_ProtocolVersion{v2.FullKnowledgeVaultConfig_PROTOCOL_VERSION_V1}, o.GetFullKnowledgeVaultProfiles())
 		require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY, o.GetOption(),
 			"both kinds are the same shape; only the secret resource type separates them")
 		byType[o.GetSecretResourceTypeId()] = o

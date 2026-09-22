@@ -64,10 +64,11 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 	options := []*v2.CredentialIssueOptionDescriptor{}
 	if u.offerServiceAccountAppKey {
 		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
-			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
-			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
-			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
-			CustomScopesAllowed:  true,
+			Option:                     v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+			ResourceMode:               v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+			SecretResourceTypeId:       serviceAccountApplicationKeyResourceType.Id,
+			CustomScopesAllowed:        true,
+			FullKnowledgeVaultProfiles: []v2.FullKnowledgeVaultConfig_ProtocolVersion{v2.FullKnowledgeVaultConfig_PROTOCOL_VERSION_V1},
 			// Preferred only where it can be: exactly one descriptor per shape
 			// may set it, and it must be set whenever several share a shape.
 			Preferred: u.offerOrgAPIKey,
@@ -80,7 +81,8 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// deletableAPITokenResourceType, not apiTokenResourceType: they
 			// share an id, and this is the variant registered whenever this
 			// descriptor is advertised.
-			SecretResourceTypeId: deletableAPITokenResourceType.Id,
+			SecretResourceTypeId:       deletableAPITokenResourceType.Id,
+			FullKnowledgeVaultProfiles: []v2.FullKnowledgeVaultConfig_ProtocolVersion{v2.FullKnowledgeVaultConfig_PROTOCOL_VERSION_V1},
 			// Datadog organization API keys carry no scopes. Advertising none
 			// and disallowing custom ones makes the SDK reject a scoped
 			// request for this kind before it reaches Issue.
