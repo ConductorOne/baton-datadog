@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -778,4 +779,43 @@ func TestDatadogRestClient_OnCallMethods(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error due to connection issues in test environment")
 	}
+}
+
+// A 409 from the membership/role add endpoints must carry BOTH the ErrAlreadyExists
+// sentinel (for errors.Is) AND codes.AlreadyExists (so an uncaught error doesn't
+// reach the SDK as codes.Unknown).
+func TestConflictCarriesAlreadyExistsCode(t *testing.T) {
+	conflict := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"errors":["already exists"]}`))
+	}
+
+	t.Run("CreateTeamMembership", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(conflict))
+		defer server.Close()
+		c := newOfficialTestClient(server.URL)
+		_, err := c.CreateTeamMembership(context.Background(), "team-1",
+			datadogV2.UserTeamRequest{Data: datadogV2.UserTeamCreate{Type: datadogV2.USERTEAMTYPE_TEAM_MEMBERSHIPS}})
+		if !IsAlreadyExists(err) {
+			t.Errorf("want IsAlreadyExists, got %v", err)
+		}
+		if status.Code(err) != codes.AlreadyExists {
+			t.Errorf("want codes.AlreadyExists, got %v", status.Code(err))
+		}
+	})
+
+	t.Run("AddUserToRole", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(conflict))
+		defer server.Close()
+		c := newOfficialTestClient(server.URL)
+		_, err := c.AddUserToRole(context.Background(), "role-1",
+			datadogV2.RelationshipToUser{Data: *datadogV2.NewRelationshipToUserData("user-1", datadogV2.USERSTYPE_USERS)})
+		if !IsAlreadyExists(err) {
+			t.Errorf("want IsAlreadyExists, got %v", err)
+		}
+		if status.Code(err) != codes.AlreadyExists {
+			t.Errorf("want codes.AlreadyExists, got %v", status.Code(err))
+		}
+	})
 }

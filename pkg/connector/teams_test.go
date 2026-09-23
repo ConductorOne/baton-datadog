@@ -100,3 +100,98 @@ func TestTeamGrantsBuildFromMembershipUserID(t *testing.T) {
 		t.Fatalf("got %d grants, want 4 (3 member + 1 admin)", len(grants))
 	}
 }
+
+func testTeamWrapper(baseURL string) *client.DatadogClient {
+	cfg := datadog.NewConfiguration()
+	cfg.Servers = datadog.ServerConfigurations{{URL: baseURL}}
+	return client.NewDatadogClient(nil, datadog.NewAPIClient(cfg), "example.com", "api-key", "app-key")
+}
+
+func teamEntitlement(teamID, slug string) *v2.Entitlement {
+	return &v2.Entitlement{
+		Slug:     slug,
+		Resource: &v2.Resource{Id: &v2.ResourceId{ResourceType: teamResourceType.Id, Resource: teamID}},
+	}
+}
+
+// A 409 from CreateTeamMembership on the admin entitlement means the user is
+// already on the team as a member; the connector must PATCH the role rather than
+// report GrantAlreadyExists (which would drop the promotion silently).
+func TestTeamGrantAdminOn409PromotesViaPatch(t *testing.T) {
+	const (
+		teamID = "team-1"
+		userID = "user-1"
+	)
+
+	var postCalls, patchCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/team/"+teamID+"/memberships":
+			postCalls++
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"errors":["already a member"]}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/api/v2/team/"+teamID+"/memberships/"+userID:
+			patchCalls++
+			_, _ = w.Write([]byte(`{"data":{"type":"team_memberships","id":"m-1"}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	builder := newTeamBuilder(testTeamWrapper(server.URL))
+	principal := &v2.Resource{Id: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: userID}}
+
+	annos, err := builder.Grant(context.Background(), principal, teamEntitlement(teamID, adminRole))
+	if err != nil {
+		t.Fatalf("Grant returned error, want nil: %v", err)
+	}
+	if postCalls != 1 || patchCalls != 1 {
+		t.Fatalf("want 1 POST + 1 PATCH, got %d POST + %d PATCH", postCalls, patchCalls)
+	}
+	if annos.Contains(&v2.GrantAlreadyExists{}) {
+		t.Errorf("admin promotion applied a change, should not report GrantAlreadyExists")
+	}
+}
+
+// A 409 on the member entitlement means the user is already a member: report
+// GrantAlreadyExists and never PATCH.
+func TestTeamGrantMemberOn409IsAlreadyExists(t *testing.T) {
+	const (
+		teamID = "team-1"
+		userID = "user-1"
+	)
+
+	var patchCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/team/"+teamID+"/memberships":
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"errors":["already a member"]}`))
+		case r.Method == http.MethodPatch:
+			patchCalls++
+			t.Errorf("member grant must not PATCH")
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	builder := newTeamBuilder(testTeamWrapper(server.URL))
+	principal := &v2.Resource{Id: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: userID}}
+
+	annos, err := builder.Grant(context.Background(), principal, teamEntitlement(teamID, memberRole))
+	if err != nil {
+		t.Fatalf("Grant returned error, want nil: %v", err)
+	}
+	if patchCalls != 0 {
+		t.Fatalf("member 409 must not PATCH, got %d PATCH calls", patchCalls)
+	}
+	if !annos.Contains(&v2.GrantAlreadyExists{}) {
+		t.Errorf("member 409 should report GrantAlreadyExists")
+	}
+}

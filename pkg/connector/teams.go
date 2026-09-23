@@ -177,7 +177,20 @@ func (t *teamBuilder) Grant(ctx context.Context, principal *v2.Resource, entitle
 
 	_, err := t.wrapper.CreateTeamMembership(ctx, entitlement.Resource.Id.Resource, body)
 	if err != nil {
-		return nil, fmt.Errorf("error adding user to team: %w", err)
+		if !client.IsAlreadyExists(err) {
+			return nil, fmt.Errorf("error adding user to team: %w", err)
+		}
+		// CreateTeamMembership can't change an existing member's role: a 409 on
+		// the admin entitlement means the user is already on the team as a member,
+		// so PATCH the role instead. For member, already being on the team is the
+		// desired state.
+		if entitlement.Slug != adminRole {
+			return annotations.New(&v2.GrantAlreadyExists{}), nil
+		}
+		if _, err := t.wrapper.UpdateTeamMembership(ctx, entitlement.Resource.Id.Resource, principal.Id.Resource, datadogV2.USERTEAMROLE_ADMIN); err != nil {
+			return nil, fmt.Errorf("error promoting team member to admin: %w", err)
+		}
+		return nil, nil
 	}
 
 	return nil, nil
