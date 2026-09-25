@@ -25,6 +25,8 @@ sidebarTitle: "Datadog"
 
 An application key can be issued and revoked through C1 when **Sync secrets** and **Sync service account application keys** are both enabled, provided the selected Datadog user is a service account. Datadog does not support an expiration date when creating an application key.
 
+Issued keys can be returned encrypted to a recipient key that C1 supplies, so the plaintext key never leaves the connector unencrypted.
+
 <Warning>
 Credential issuance targets a Datadog service account only. C1 re-checks at issuance time that the selected user is still a service account, and refuses to issue against a human user. The issued application key is owned by, and scoped to, that service account.
 
