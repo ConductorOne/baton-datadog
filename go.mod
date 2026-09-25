@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/DataDog/datadog-api-client-go/v2 v2.43.0
-	github.com/conductorone/baton-sdk v0.32.2
+	github.com/conductorone/baton-sdk v0.32.3-0.20260925004646-a0e2dec1816c
 	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/quasilyte/go-ruleguard/dsl v0.3.23
