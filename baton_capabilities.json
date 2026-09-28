@@ -203,7 +203,8 @@
       "capabilities": [
         "CAPABILITY_SYNC",
         "CAPABILITY_ACCOUNT_PROVISIONING",
-        "CAPABILITY_CREDENTIAL_ISSUE"
+        "CAPABILITY_CREDENTIAL_ISSUE",
+        "CAPABILITY_CREDENTIAL_ENCRYPTION_JWE_XWING_V1"
       ],
       "permissions": {
         "permissions": [
@@ -240,7 +241,8 @@
     "CAPABILITY_ACCOUNT_PROVISIONING",
     "CAPABILITY_RESOURCE_DELETE",
     "CAPABILITY_ACTIONS",
-    "CAPABILITY_CREDENTIAL_ISSUE"
+    "CAPABILITY_CREDENTIAL_ISSUE",
+    "CAPABILITY_CREDENTIAL_ENCRYPTION_JWE_XWING_V1"
   ],
   "credentialDetails": {
     "capabilityAccountProvisioning": {
