@@ -26,9 +26,12 @@ The schema and strict decoder are in Multipass
 and [`codec.rs`](https://github.com/ductone/multipass/blob/f873f21b2353a72f28bd2bfd7b9b8c00ad07a317/crates/latchkey-client-sdk/src/secret_types/codec.rs).
 The encoder test checks the exact declared field set and traverses a fake
 Datadog create response through the official client. The SAT path has its own
-fake-provider and Baton SDK encrypted-issuance fixtures. A Rust execution of
-the decoder is still needed before rollout; this environment does not have
-`cargo`.
+fake-provider and Baton SDK encrypted-issuance fixtures. A temporary harness
+at the pinned Multipass commit decoded the exact SAT plaintext obtained after
+SDK encryption and decryption, then re-encoded it byte for byte. It also
+rejected raw, missing-key, nested-value, and unknown-field controls. The run
+used Nix Rust/Cargo 1.98.1 with the repository's locked dependencies; the
+repository pins Rust 1.93.0 for its normal build.
 
 ## Why issuance remains raw
 

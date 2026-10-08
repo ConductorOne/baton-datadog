@@ -11,6 +11,8 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
+const serviceAccessTokenType = "service_access_tokens"
+
 // The pinned Datadog Go client does not generate the newer service access
 // token endpoints. These types cover only the documented request and response
 // fields that this connector uses; transport, auth and server selection use
@@ -56,7 +58,7 @@ func (v serviceAccessTokenJSON) validateOwner(serviceAccountID string) error {
 		return nil // The scoped endpoint is authoritative when relationship is absent.
 	}
 	if owner.Data.ID != serviceAccountID || owner.Data.Type != "service_account" {
-		return fmt.Errorf("Datadog service access token owner did not match requested service account")
+		return fmt.Errorf("datadog service access token owner did not match requested service account")
 	}
 	return nil
 }
@@ -105,7 +107,7 @@ func (w *DatadogClient) serviceAccessTokenRequest(ctx context.Context, method, p
 		return nil, wrapOfficialClientError("read service access token response", resp, err)
 	}
 	if resp.StatusCode >= 300 {
-		return nil, wrapOfficialClientError("service access token request", resp, fmt.Errorf("Datadog returned HTTP %d", resp.StatusCode))
+		return nil, wrapOfficialClientError("service access token request", resp, fmt.Errorf("datadog returned HTTP %d", resp.StatusCode))
 	}
 	return bytes, nil
 }
@@ -120,7 +122,7 @@ func (w *DatadogClient) CreateServiceAccountAccessToken(ctx context.Context, ser
 		Scopes    []string   `json:"scopes"`
 		ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	}{Name: name, Scopes: scopes, ExpiresAt: expiresAt}
-	body := map[string]any{"data": map[string]any{"type": "service_access_tokens", "attributes": attrs}}
+	body := map[string]any{"data": map[string]any{"type": serviceAccessTokenType, "attributes": attrs}}
 	bytes, err := w.serviceAccessTokenRequest(ctx, http.MethodPost, serviceAccessTokenPath(serviceAccountID), body, nil)
 	if err != nil {
 		return nil, err
@@ -133,13 +135,13 @@ func (w *DatadogClient) CreateServiceAccountAccessToken(ctx context.Context, ser
 	}
 	data := response.Data
 	ownerErr := data.validateOwner(serviceAccountID)
-	if data.Type != "service_access_tokens" || data.ID == "" || data.Attributes.Key == "" || ownerErr != nil {
+	if data.Type != serviceAccessTokenType || data.ID == "" || data.Attributes.Key == "" || ownerErr != nil {
 		if data.ID != "" {
 			if revokeErr := w.RevokeServiceAccountAccessToken(ctx, serviceAccountID, data.ID); revokeErr != nil {
-				return nil, fmt.Errorf("Datadog service access token create response was invalid; revoke of undeliverable token %q failed: %w", data.ID, revokeErr)
+				return nil, fmt.Errorf("datadog service access token create response was invalid; revoke of undeliverable token %q failed: %w", data.ID, revokeErr)
 			}
 		}
-		return nil, fmt.Errorf("Datadog service access token create response was invalid")
+		return nil, fmt.Errorf("datadog service access token create response was invalid")
 	}
 	return &IssuedServiceAccessToken{ServiceAccessToken: data.token(), Key: data.Attributes.Key}, nil
 }
@@ -155,8 +157,8 @@ func (w *DatadogClient) GetServiceAccountAccessToken(ctx context.Context, servic
 	if err := json.Unmarshal(bytes, &response); err != nil {
 		return nil, fmt.Errorf("decode Datadog service access token get response: %w", err)
 	}
-	if response.Data.Type != "service_access_tokens" || response.Data.ID != tokenID || response.Data.validateOwner(serviceAccountID) != nil {
-		return nil, fmt.Errorf("Datadog service access token get response did not match requested token")
+	if response.Data.Type != serviceAccessTokenType || response.Data.ID != tokenID || response.Data.validateOwner(serviceAccountID) != nil {
+		return nil, fmt.Errorf("datadog service access token get response did not match requested token")
 	}
 	token := response.Data.token()
 	return &token, nil
@@ -176,8 +178,8 @@ func (w *DatadogClient) ListServiceAccountAccessTokens(ctx context.Context, serv
 	}
 	out := make([]ServiceAccessToken, 0, len(response.Data))
 	for _, data := range response.Data {
-		if data.Type != "service_access_tokens" || data.ID == "" || data.validateOwner(serviceAccountID) != nil {
-			return nil, fmt.Errorf("Datadog service access token list response omitted type or id")
+		if data.Type != serviceAccessTokenType || data.ID == "" || data.validateOwner(serviceAccountID) != nil {
+			return nil, fmt.Errorf("datadog service access token list response omitted type or id")
 		}
 		out = append(out, data.token())
 	}
@@ -199,8 +201,8 @@ func (w *DatadogClient) FindServiceAccountAccessTokenByName(ctx context.Context,
 		return nil, fmt.Errorf("decode Datadog service access token search response: %w", err)
 	}
 	for _, data := range response.Data {
-		if data.Type != "service_access_tokens" || data.ID == "" || data.validateOwner(serviceAccountID) != nil {
-			return nil, fmt.Errorf("Datadog service access token search response omitted type or id")
+		if data.Type != serviceAccessTokenType || data.ID == "" || data.validateOwner(serviceAccountID) != nil {
+			return nil, fmt.Errorf("datadog service access token search response omitted type or id")
 		}
 		if data.Attributes.Name == name {
 			token := data.token()
@@ -208,7 +210,7 @@ func (w *DatadogClient) FindServiceAccountAccessTokenByName(ctx context.Context,
 		}
 	}
 	if len(response.Data) >= int(nameSearchPageSize) {
-		return nil, fmt.Errorf("Datadog service access token search returned a full page without exact match")
+		return nil, fmt.Errorf("datadog service access token search returned a full page without exact match")
 	}
 	return nil, nil
 }

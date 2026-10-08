@@ -23,11 +23,11 @@ func TestDatadogAPIKeyV2Payload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			const secret = "secret-🔑-\"-\n"
+			const fixtureValue = "fixture-🔑-\"-\n"
 			const id = "provider-handle"
-			encoded, err := encodeDatadogAPIKeyV2(tt.kind, secret, id, tt.scopes)
+			encoded, err := encodeDatadogAPIKeyV2(tt.kind, fixtureValue, id, tt.scopes)
 			require.NoError(t, err)
-			require.NotEqual(t, []byte(secret), encoded, "native plaintext is JSON, not the legacy raw key")
+			require.NotEqual(t, []byte(fixtureValue), encoded, "native plaintext is JSON, not the legacy raw key")
 
 			// Check the exact Multipass api_key_v2 field set. JsonV1 rejects
 			// unknown keys, so an extra connector field would break decoding.
@@ -40,7 +40,7 @@ func TestDatadogAPIKeyV2Payload(t *testing.T) {
 			require.ElementsMatch(t, wantKeys, mapKeys(fields))
 			var gotSecret string
 			require.NoError(t, json.Unmarshal(fields["key_value"], &gotSecret))
-			require.Equal(t, secret, gotSecret)
+			require.Equal(t, fixtureValue, gotSecret)
 			require.Equal(t, `"provider-handle"`, string(fields["key_id"]))
 			require.Equal(t, `"datadog"`, string(fields["provider"]))
 			require.Equal(t, `"`+tt.wantHeader+`"`, string(fields["header_name"]))

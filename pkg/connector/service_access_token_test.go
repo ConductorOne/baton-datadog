@@ -49,7 +49,7 @@ func TestServiceAccessTokenOptInRefusesBeforeMint(t *testing.T) {
 
 func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 	const tokenID = "sat-provider-id"
-	const tokenValue = "ddsat_test-secret-value"
+	const fixtureValue = "ddsat_fixture-value"
 	const expiresAt = "2027-07-11T13:17:19Z"
 	var mu sync.Mutex
 	created := false
@@ -84,9 +84,13 @@ func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 			if r.URL.Query().Has("filter") {
 				name = "c1-req-sat"
 			}
-			_, _ = w.Write([]byte(`{"data":[{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"name":"` + name + `","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}]}`))
+			_, _ = w.Write([]byte(`{"data":[{"id":"` + tokenID + `","type":"service_access_tokens",` +
+				`"attributes":{"name":"` + name + `","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},` +
+				`"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}]}`))
 		case r.Method == http.MethodGet && r.URL.Path == path+"/"+tokenID:
-			_, _ = w.Write([]byte(`{"data":{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"name":"renamed-after-issue","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}}`))
+			_, _ = w.Write([]byte(`{"data":{"id":"` + tokenID + `","type":"service_access_tokens",` +
+				`"attributes":{"name":"renamed-after-issue","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},` +
+				`"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}}`))
 		case r.Method == http.MethodPost && r.URL.Path == path:
 			postCount++
 			var request struct {
@@ -102,12 +106,16 @@ func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Error(err)
 			}
-			if request.Data.Type != "service_access_tokens" || request.Data.Attributes.Name != "c1-req-sat" || len(request.Data.Attributes.Scopes) != 1 || request.Data.Attributes.Scopes[0] != "requested_scope" || request.Data.Attributes.ExpiresAt != nil {
+			if request.Data.Type != "service_access_tokens" || request.Data.Attributes.Name != "c1-req-sat" ||
+				len(request.Data.Attributes.Scopes) != 1 || request.Data.Attributes.Scopes[0] != "requested_scope" ||
+				request.Data.Attributes.ExpiresAt != nil {
 				t.Errorf("incorrect create request: %+v", request)
 			}
 			created = true
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"data":{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"key":"` + tokenValue + `","name":"c1-req-sat","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}}`))
+			_, _ = w.Write([]byte(`{"data":{"id":"` + tokenID + `","type":"service_access_tokens",` +
+				`"attributes":{"key":"` + fixtureValue + `","name":"c1-req-sat","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},` +
+				`"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}}`))
 		case r.Method == http.MethodDelete && r.URL.Path == path+"/"+tokenID:
 			deleted = true
 			w.WriteHeader(http.StatusNoContent)
@@ -129,8 +137,8 @@ func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, out.PlaintextData, 1)
 	require.Equal(t, "service_access_token", out.PlaintextData[0].GetName())
-	require.JSONEq(t, `{"key_value":"`+tokenValue+`","provider":"datadog","key_id":"`+tokenID+`","header_name":"Authorization","scopes":["granted_scope"]}`, string(out.PlaintextData[0].GetBytes()))
-	require.NotContains(t, out.Secret.GetId().GetResource(), tokenValue)
+	require.JSONEq(t, `{"key_value":"`+fixtureValue+`","provider":"datadog","key_id":"`+tokenID+`","header_name":"Authorization","scopes":["granted_scope"]}`, string(out.PlaintextData[0].GetBytes()))
+	require.NotContains(t, out.Secret.GetId().GetResource(), fixtureValue)
 	owner, parsedID, err := parseServiceAccessTokenHandle(out.Secret.GetId().GetResource())
 	require.NoError(t, err)
 	require.Equal(t, "sa-1", owner)
@@ -247,7 +255,9 @@ func TestServiceAccessTokenOwnerMismatchIsNotDelivered(t *testing.T) {
 		switch r.Method {
 		case http.MethodPost:
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"data":{"id":"wrong-owner-id","type":"service_access_tokens","attributes":{"key":"ddsat_must-not-deliver","scopes":["dashboards_read"]},"relationships":{"owned_by":{"data":{"id":"another-sa","type":"service_account"}}}}}`))
+			_, _ = w.Write([]byte(`{"data":{"id":"wrong-owner-id","type":"service_access_tokens",` +
+				`"attributes":{"key":"ddsat_must-not-deliver","scopes":["dashboards_read"]},` +
+				`"relationships":{"owned_by":{"data":{"id":"another-sa","type":"service_account"}}}}}`))
 		case http.MethodDelete:
 			deleted = true
 			w.WriteHeader(http.StatusNoContent)
