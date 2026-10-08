@@ -32,6 +32,8 @@ Issued organization API keys and service account application keys are delivered 
 
 A [service access token](https://docs.datadoghq.com/account_management/service-access-tokens/) is a separate, standalone credential owned by a Datadog service account. With **Sync secrets** and **Sync service account application keys** enabled, C1 can also sync, issue, and revoke these tokens: both service-account-scoped APIs require the same **Service Account Write** permission. Issuance requires at least one scope. The token is vended as a native `api_key_v2` value; the caller uses it with the `Authorization: Bearer` header. The connector does not request a custom expiry.
 
+Enabling the service-account setting also starts listing SATs for every active service account. If Datadog returns 403 or 404 from that list endpoint, the sync fails rather than treating an unreadable token inventory as empty. Verify endpoint availability for your Datadog site and **Service Account Write** before enabling it.
+
 <Warning>
 Service account application key and service access token issuance target a Datadog service account only. C1 re-checks at issuance time that the selected user is still a service account, and refuses to issue those credentials against a human user. An organization API key is org-scoped and has no service-account owner.
 

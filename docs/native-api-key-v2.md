@@ -13,7 +13,7 @@ selector. It does not create a parallel native resource type, duplicate an
 inventory row, or change the provider ID used for sync and revocation. The
 service account application key and organization API key arms previously
 emitted raw plaintext in released connector v0.4.0. Native vending is still
-pre-release and behind a customer feature flag; C1 must bind each exact
+pre-release behind a C1 customer feature flag, not a connector payload flag; C1 must bind each exact
 selector to `api_key_v2` only for compatible connector builds and refuse older
 executors before minting. Existing stored raw credentials must not be
 reinterpreted as typed documents.
@@ -66,6 +66,14 @@ also requires `sync-secrets` and Datadog `service_account_write`. It activates
 both application keys and SATs, whose scoped endpoints require that same
 extra permission. No SAT-specific flag is needed. The organization-key grant
 is unchanged.
+
+This shared service-account setting now causes the connector to list SATs for
+each active service account as well as application keys. A Datadog 403 or 404
+from the SAT list endpoint fails the sync. It cannot be read as an empty
+inventory: C1 would otherwise treat live tokens missing from a completed
+sync as revoked. Before enabling the C1 feature flag for a site, verify that
+the Datadog role has `service_account_write` and the SAT endpoint is
+available there. The setting is off by default.
 
 A repeated request is refused while the exact `c1-<request-id>` provider name
 is present. Datadog permits renaming all three kinds, so name lookup does not

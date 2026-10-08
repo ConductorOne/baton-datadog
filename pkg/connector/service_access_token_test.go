@@ -332,6 +332,43 @@ func TestServiceAccessTokenInventoryRejectsMismatchedOwner(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestServiceAccessTokenListFailsOnUnreadableEndpoint(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		http int
+		code codes.Code
+	}{
+		{"permission denied", http.StatusForbidden, codes.PermissionDenied},
+		{"endpoint unavailable or account disappeared", http.StatusNotFound, codes.NotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/api/v2/users":
+					_, _ = w.Write([]byte(`{"data":[{"id":"sa-1","type":"users","attributes":{"service_account":true}}]}`))
+				case "/api/v2/service_accounts/sa-1/access_tokens":
+					w.WriteHeader(tc.http)
+					_, _ = w.Write([]byte(`{"errors":["unreadable"]}`))
+				default:
+					t.Errorf("unexpected provider request %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+			}))
+			defer server.Close()
+			builder := newServiceAccessTokenBuilder(newLifecycleTestWrapper(server.URL))
+			_, first, err := builder.List(context.Background(), nil, resource.SyncOpAttrs{})
+			require.NoError(t, err)
+			require.NotEmpty(t, first.NextPageToken)
+			items, result, err := builder.List(context.Background(), nil,
+				resource.SyncOpAttrs{PageToken: pagination.Token{Token: first.NextPageToken}})
+			require.Nil(t, items)
+			require.Nil(t, result, "an unreadable inventory must not complete as an empty page")
+			require.Equal(t, tc.code, status.Code(err))
+		})
+	}
+}
+
 func TestServiceAccessTokenSDKIssueEncryptsAndRejectsUnadvertisedKind(t *testing.T) {
 	var mu sync.Mutex
 	providerCalls := 0
