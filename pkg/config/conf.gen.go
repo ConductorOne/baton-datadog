@@ -10,7 +10,6 @@ type Datadog struct {
 	SyncSecrets bool `mapstructure:"sync-secrets"`
 	AllowOrgApiKeyDeletion bool `mapstructure:"allow-org-api-key-deletion"`
 	SyncServiceAccountApplicationKeys bool `mapstructure:"sync-service-account-application-keys"`
-	SyncServiceAccountAccessTokens bool `mapstructure:"sync-service-account-access-tokens"`
 	SyncSchedules bool `mapstructure:"sync-schedules"`
 	BaseUrl string `mapstructure:"base-url"`
 }

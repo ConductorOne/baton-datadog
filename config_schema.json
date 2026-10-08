@@ -150,13 +150,7 @@
     {
       "name": "sync-service-account-application-keys",
       "displayName": "Sync service account application keys",
-      "description": "Sync, issue and revoke Datadog service account application keys. Off by default: needs the service_account_write permission, without which the sync fails.",
-      "boolField": {}
-    },
-    {
-      "name": "sync-service-account-access-tokens",
-      "displayName": "Sync service account access tokens",
-      "description": "Sync, issue and revoke Datadog service account access tokens. Off by default: requires service_account_write and native api_key_v2 consumer support.",
+      "description": "Sync, issue and revoke Datadog service account application keys and access tokens. Off by default: needs the service_account_write permission, without which the sync fails.",
       "boolField": {}
     },
     {
