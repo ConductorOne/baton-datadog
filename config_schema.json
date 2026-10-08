@@ -154,6 +154,12 @@
       "boolField": {}
     },
     {
+      "name": "sync-service-account-access-tokens",
+      "displayName": "Sync service account access tokens",
+      "description": "Sync, issue and revoke Datadog service account access tokens. Off by default: requires service_account_write and native api_key_v2 consumer support.",
+      "boolField": {}
+    },
+    {
       "name": "sync-schedules",
       "displayName": "Sync schedules",
       "description": "Whether to sync on-call schedules or not",
