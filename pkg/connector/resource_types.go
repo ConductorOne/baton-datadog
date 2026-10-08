@@ -22,10 +22,10 @@ var (
 	//
 	// service_account_write is deliberately NOT listed here even though
 	// userResourceType carries CAPABILITY_CREDENTIAL_ISSUE. Issuance of that
-	// kind exists only when sync-secrets and
+	// kinds exist only when sync-secrets and
 	// sync-service-account-application-keys are both on: the first is what
 	// swaps credentialUserBuilder in for userBuilder, the second is what
-	// registers applicationKeyBuilder and puts that kind in the descriptor
+	// registers the application-key and SAT builders and puts those kinds in the descriptor
 	// list. Listing the permission here would tell every install without both
 	// to grant a Datadog Admin permission no code path in that configuration
 	// can reach.
@@ -36,8 +36,8 @@ var (
 	// cmd/baton-datadog/main.go), and CapabilityPermissions has no
 	// conditional form. Scoping the permission to the resource type that only
 	// exists under the flag is therefore how the conditionality is carried:
-	// service_account_write lives on serviceAccountApplicationKeyResourceType,
-	// which is registered only when sync-secrets and
+	// service_account_write lives on serviceAccountApplicationKeyResourceType
+	// and serviceAccountAccessTokenResourceType, which are registered only when sync-secrets and
 	// sync-service-account-application-keys are both on, and the user type's
 	// credential_issue block points at that type via secretResourceTypeId, so
 	// the requirement is still discoverable from the metadata.

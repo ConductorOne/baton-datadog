@@ -1,6 +1,6 @@
 # Datadog `api_key_v2` issuance contract
 
-The three existing issuer selectors have distinct Datadog meanings:
+The three issuer selectors have distinct Datadog meanings:
 
 | Secret resource type | Issue option | Datadog object | Header name |
 | --- | --- | --- | --- |

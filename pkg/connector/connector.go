@@ -38,8 +38,8 @@ type Datadog struct {
 	AllowOrgAPIKeyDeletion bool
 	// SyncServiceAccountApplicationKeys is the operator's attestation that the
 	// connector's Datadog role holds service_account_write. Without it,
-	// listing a service account's application keys 403s and fails the whole
-	// sync, so registering that syncer unconditionally would break every
+	// listing service-account application keys or access tokens 403s and fails
+	// the whole sync, so registering those syncers unconditionally would break every
 	// existing sync-secrets install on upgrade. Off by default for that
 	// reason, not because the capability is optional in itself.
 	SyncServiceAccountApplicationKeys bool

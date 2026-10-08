@@ -15,9 +15,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TestIssuanceAdvertisesBothCredentialKinds is the type-discriminator contract:
-// two kinds of the same API_KEY shape, told apart only by
-// secret_resource_type_id.
+// TestIssuanceAdvertisesBothCredentialKinds checks two API_KEY kinds selected
+// by secret_resource_type_id plus the distinct TOKEN/SAT kind.
 func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 	ctx := context.Background()
 	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true).IssueCapabilityDetails(ctx)
