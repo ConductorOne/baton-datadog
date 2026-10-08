@@ -12,6 +12,7 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/crypto/providers/jwk"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/stretchr/testify/require"
@@ -83,9 +84,9 @@ func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 			if r.URL.Query().Has("filter") {
 				name = "c1-req-sat"
 			}
-			_, _ = w.Write([]byte(`{"data":[{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"name":"` + name + `","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"}}]}`))
+			_, _ = w.Write([]byte(`{"data":[{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"name":"` + name + `","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}]}`))
 		case r.Method == http.MethodGet && r.URL.Path == path+"/"+tokenID:
-			_, _ = w.Write([]byte(`{"data":{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"name":"renamed-after-issue","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"}}}`))
+			_, _ = w.Write([]byte(`{"data":{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"name":"renamed-after-issue","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}}`))
 		case r.Method == http.MethodPost && r.URL.Path == path:
 			postCount++
 			var request struct {
@@ -106,7 +107,7 @@ func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 			}
 			created = true
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"data":{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"key":"` + tokenValue + `","name":"c1-req-sat","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"}}}`))
+			_, _ = w.Write([]byte(`{"data":{"id":"` + tokenID + `","type":"service_access_tokens","attributes":{"key":"` + tokenValue + `","name":"c1-req-sat","scopes":["granted_scope"],"expires_at":"` + expiresAt + `"},"relationships":{"owned_by":{"data":{"id":"sa-1","type":"service_account"}}}}}`))
 		case r.Method == http.MethodDelete && r.URL.Path == path+"/"+tokenID:
 			deleted = true
 			w.WriteHeader(http.StatusNoContent)
@@ -234,4 +235,108 @@ func TestServiceAccessTokenUndeliverableCreateIsRevoked(t *testing.T) {
 	mu.Lock()
 	require.True(t, deleted)
 	mu.Unlock()
+}
+
+func TestServiceAccessTokenOwnerMismatchIsNotDelivered(t *testing.T) {
+	var mu sync.Mutex
+	deleted := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method {
+		case http.MethodPost:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"wrong-owner-id","type":"service_access_tokens","attributes":{"key":"ddsat_must-not-deliver","scopes":["dashboards_read"]},"relationships":{"owned_by":{"data":{"id":"another-sa","type":"service_account"}}}}}`))
+		case http.MethodDelete:
+			deleted = true
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	wrapper := newLifecycleTestWrapper(server.URL)
+	issued, err := wrapper.CreateServiceAccountAccessToken(context.Background(), "sa-1", "c1-req", []string{"dashboards_read"}, nil)
+	require.Nil(t, issued)
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), "ddsat_must-not-deliver")
+	mu.Lock()
+	require.True(t, deleted, "an undeliverable token with a known ID must be revoked")
+	mu.Unlock()
+}
+
+func TestServiceAccessTokenInventoryRejectsMismatchedOwner(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		item := `{"id":"token-id","type":"service_access_tokens","attributes":{"name":"token"},"relationships":{"owned_by":{"data":{"id":"another-sa","type":"service_account"}}}}`
+		if r.URL.Path == "/api/v2/service_accounts/sa-1/access_tokens/token-id" {
+			_, _ = w.Write([]byte(`{"data":` + item + `}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[` + item + `]}`))
+	}))
+	defer server.Close()
+	wrapper := newLifecycleTestWrapper(server.URL)
+	_, err := wrapper.ListServiceAccountAccessTokens(context.Background(), "sa-1", 0, 100)
+	require.Error(t, err)
+	_, err = wrapper.GetServiceAccountAccessToken(context.Background(), "sa-1", "token-id")
+	require.Error(t, err)
+}
+
+func TestServiceAccessTokenSDKIssueEncryptsAndRejectsUnadvertisedKind(t *testing.T) {
+	var mu sync.Mutex
+	providerCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		providerCalls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/users/sa-1":
+			_, _ = w.Write([]byte(`{"data":{"id":"sa-1","type":"users","attributes":{"service_account":true}}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/service_accounts/sa-1/access_tokens":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/service_accounts/sa-1/access_tokens":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"sdk-token-id","type":"service_access_tokens","attributes":{"key":"ddsat_sdk-secret","name":"c1-sdk-test","scopes":["dashboards_read"]}}}`))
+		default:
+			t.Errorf("unexpected provider request %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	ctx := context.Background()
+	encConfig, privateKey, err := (&jwk.JWKEncryptionProvider{}).GenerateKey(ctx)
+	require.NoError(t, err)
+	request := v2.IssueCredentialRequest_builder{
+		IdentityId: v2.ResourceId_builder{ResourceType: userResourceType.Id, Resource: "sa-1"}.Build(),
+		CredentialOptions: v2.CredentialIssueOptions_builder{
+			SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
+			Token:                v2.CredentialIssueOptions_Token_builder{Scopes: []string{"dashboards_read"}}.Build(),
+		}.Build(),
+		EncryptionConfigs: []*v2.EncryptionConfig{encConfig},
+		RequestId:         "sdk-test",
+	}.Build()
+
+	without := &Datadog{wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true}
+	oldSDK, err := connectorbuilder.NewConnector(ctx, without)
+	require.NoError(t, err)
+	_, err = oldSDK.IssueCredential(ctx, request)
+	require.Error(t, err)
+	mu.Lock()
+	require.Zero(t, providerCalls, "unadvertised native kind must fail before provider access")
+	mu.Unlock()
+
+	with := &Datadog{wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true, SyncServiceAccountAccessTokens: true}
+	nativeSDK, err := connectorbuilder.NewConnector(ctx, with)
+	require.NoError(t, err)
+	issued, err := nativeSDK.IssueCredential(ctx, request)
+	require.NoError(t, err)
+	require.Equal(t, serviceAccountAccessTokenResourceType.Id, issued.GetSecret().GetId().GetResourceType())
+	require.Len(t, issued.GetEncryptedData(), 1)
+	plaintext, err := (&jwk.JWKEncryptionProvider{}).Decrypt(ctx, issued.GetEncryptedData()[0], privateKey)
+	require.NoError(t, err)
+	require.Equal(t, "service_access_token", plaintext.GetName())
+	require.JSONEq(t, `{"key_value":"ddsat_sdk-secret","provider":"datadog","key_id":"sdk-token-id","header_name":"Authorization","scopes":["dashboards_read"]}`, string(plaintext.GetBytes()))
 }

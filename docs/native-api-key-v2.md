@@ -3,8 +3,10 @@
 The existing `API_KEY` issuance contract is raw plaintext: `application_key`
 for a service account application key and `api_key` for an organization API
 key. The connector still emits those bytes and advertises the existing
-`service-account-application-key` and `api-key` resource type IDs. This change
-adds an encoder for a future native arm, but does not advertise or mint one.
+`service-account-application-key` and `api-key` resource type IDs. It has an
+encoder for a future native arm for those keys, but does not advertise or
+mint them as native values. The new native path issues a separate Datadog
+service access token, described below.
 
 ## Payload mapping
 
@@ -23,9 +25,10 @@ The schema and strict decoder are in Multipass
 [`definitions.rs`](https://github.com/ductone/multipass/blob/f873f21b2353a72f28bd2bfd7b9b8c00ad07a317/crates/latchkey-client-sdk/src/secret_types/definitions.rs)
 and [`codec.rs`](https://github.com/ductone/multipass/blob/f873f21b2353a72f28bd2bfd7b9b8c00ad07a317/crates/latchkey-client-sdk/src/secret_types/codec.rs).
 The encoder test checks the exact declared field set and traverses a fake
-Datadog create response through the official client. A Rust execution of the
-decoder is still needed before enabling a native selector; this environment
-does not have `cargo`.
+Datadog create response through the official client. The SAT path has its own
+fake-provider and Baton SDK encrypted-issuance fixtures. A Rust execution of
+the decoder is still needed before rollout; this environment does not have
+`cargo`.
 
 ## Why issuance remains raw
 
@@ -67,3 +70,11 @@ the profile has no scheme field. Datadog's [create endpoint](https://docs.datado
 requires scopes and returns the token key only on creation. The connector
 uses the provider ID in `key_id` and provider-returned scopes, and records any
 instant expiry on the resource trait instead of narrowing it to a date.
+
+Inventory and revocation identify a SAT by its provider token ID plus owning
+service-account ID. Renaming a SAT therefore leaves its synced resource ID
+unchanged. A repeat issuance request is refused when the exact
+`c1-<request-id>` name is still present. Datadog permits SAT renames, so
+that name lookup cannot by itself guarantee deduplication after an administrator renames the
+token. C1's mint-once request fence remains necessary; the connector never
+retries a SAT create on an ambiguous transport result.
