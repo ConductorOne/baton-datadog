@@ -119,16 +119,12 @@ func (o *serviceAccessTokenBuilder) listTokenPage(ctx context.Context, bag *pagi
 	if page >= maxApplicationKeyPages {
 		return nil, nil, fmt.Errorf("baton-datadog: exceeded %d service access token pages for %q", maxApplicationKeyPages, serviceAccountID)
 	}
-	resp, err := o.wrapper.ListServiceAccountAccessTokens(ctx, serviceAccountID, page, defaultV2PageSize)
+	tokens, err := o.wrapper.ListServiceAccountAccessTokens(ctx, serviceAccountID, page, defaultV2PageSize)
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-datadog: list access tokens for service account %q: %w", serviceAccountID, err)
 	}
-	tokens := resp.GetData()
 	ret := make([]*v2.Resource, 0, len(tokens))
 	for _, token := range tokens {
-		if token.Id == nil || *token.Id == "" {
-			continue
-		}
 		secret, err := serviceAccessTokenResource(serviceAccountID, &token)
 		if err != nil {
 			return nil, nil, err
@@ -147,31 +143,29 @@ func (o *serviceAccessTokenBuilder) listTokenPage(ctx context.Context, bag *pagi
 	return ret, &resource.SyncOpResults{NextPageToken: next}, nil
 }
 
-func serviceAccessTokenResource(serviceAccountID string, token *datadogV2.ServiceAccessToken) (*v2.Resource, error) {
+func serviceAccessTokenResource(serviceAccountID string, token *client.ServiceAccessToken) (*v2.Resource, error) {
 	owner := &v2.ResourceId{ResourceType: userResourceType.Id, Resource: serviceAccountID}
-	name := *token.Id
+	name := token.ID
 	trait := []resource.SecretTraitOption{
 		resource.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
 		resource.WithSecretDetail("datadog.service_access_token"),
 		resource.WithSecretIdentityID(owner),
 	}
 	options := []resource.ResourceOption{resource.WithParentResourceID(owner)}
-	if attrs := token.Attributes; attrs != nil {
-		if attrs.Name != nil {
-			name = *attrs.Name
-		}
-		if expiry := attrs.ExpiresAt.Get(); expiry != nil {
-			trait = append(trait, resource.WithSecretExpiresAt(*expiry))
-		}
-		if lastUsed := attrs.LastUsedAt.Get(); lastUsed != nil {
-			trait = append(trait, resource.WithSecretLastUsedAt(*lastUsed))
-		}
-		if attrs.CreatedAt != nil {
-			options = append(options, resource.WithResourceCreatedAt(*attrs.CreatedAt))
-		}
-		if attrs.Scopes != nil {
-			options = append(options, applicationKeyProfileOptions(&attrs.Scopes)...)
-		}
+	if token.Name != "" {
+		name = token.Name
 	}
-	return resource.NewSecretResource(name, serviceAccountAccessTokenResourceType, serviceAccessTokenHandle(serviceAccountID, *token.Id), trait, options...)
+	if token.ExpiresAt != nil {
+		trait = append(trait, resource.WithSecretExpiresAt(*token.ExpiresAt))
+	}
+	if token.LastUsedAt != nil {
+		trait = append(trait, resource.WithSecretLastUsedAt(*token.LastUsedAt))
+	}
+	if token.CreatedAt != nil {
+		options = append(options, resource.WithResourceCreatedAt(*token.CreatedAt))
+	}
+	if token.Scopes != nil {
+		options = append(options, applicationKeyProfileOptions(&token.Scopes)...)
+	}
+	return resource.NewSecretResource(name, serviceAccountAccessTokenResourceType, serviceAccessTokenHandle(serviceAccountID, token.ID), trait, options...)
 }

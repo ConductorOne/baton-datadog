@@ -2,96 +2,175 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"time"
 
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
-// IssuedServiceAccessToken contains the one-time key and provider metadata.
+// The pinned Datadog Go client does not generate the newer service access
+// token endpoints. These types cover only the documented request and response
+// fields that this connector uses; transport, auth, server selection and retry
+// still go through its configured official APIClient.
+type ServiceAccessToken struct {
+	ID         string
+	Name       string
+	Scopes     []string
+	CreatedAt  *time.Time
+	ExpiresAt  *time.Time
+	LastUsedAt *time.Time
+}
+
 type IssuedServiceAccessToken struct {
-	ID        string
-	Key       string
-	Name      string
-	Scopes    []string
-	ExpiresAt *time.Time
+	ServiceAccessToken
+	Key string
+}
+
+type serviceAccessTokenJSON struct {
+	ID         string `json:"id"`
+	Type       string `json:"type"`
+	Attributes struct {
+		Name       string     `json:"name"`
+		Key        string     `json:"key"`
+		Scopes     []string   `json:"scopes"`
+		CreatedAt  *time.Time `json:"created_at"`
+		ExpiresAt  *time.Time `json:"expires_at"`
+		LastUsedAt *time.Time `json:"last_used_at"`
+	} `json:"attributes"`
+}
+
+func (v serviceAccessTokenJSON) token() ServiceAccessToken {
+	return ServiceAccessToken{
+		ID: v.ID, Name: v.Attributes.Name, Scopes: v.Attributes.Scopes,
+		CreatedAt: v.Attributes.CreatedAt, ExpiresAt: v.Attributes.ExpiresAt,
+		LastUsedAt: v.Attributes.LastUsedAt,
+	}
+}
+
+func (w *DatadogClient) serviceAccessTokenRequest(ctx context.Context, method, path string, body any, query url.Values) ([]byte, error) {
+	ctx = w.withAuthContext(ctx)
+	// Use a generated operation on the same service-account API for server
+	// selection. An install's configured base URL and Datadog site still apply.
+	base, err := w.officialClient.GetConfig().ServerURLWithContext(ctx, "v2.ServiceAccountsApi.ListServiceAccountApplicationKeys")
+	if err != nil {
+		return nil, fmt.Errorf("resolve Datadog service account API URL: %w", err)
+	}
+	headers := map[string]string{"Accept": "application/json"}
+	if body != nil {
+		headers["Content-Type"] = "application/json"
+	}
+	datadog.SetAuthKeys(ctx, &headers,
+		[2]string{"apiKeyAuth", "DD-API-KEY"},
+		[2]string{"appKeyAuth", "DD-APPLICATION-KEY"})
+	request, err := w.officialClient.PrepareRequest(ctx, base+path, method, body, headers, query, url.Values{}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("prepare Datadog service access token request: %w", err)
+	}
+	var resp *http.Response
+	if method == http.MethodPost {
+		// Issuance is not idempotent. APIClient.CallAPI may retry a POST when
+		// retry is enabled, so execute this request exactly once.
+		resp, err = w.officialClient.GetConfig().HTTPClient.Do(request)
+	} else {
+		resp, err = w.officialClient.CallAPI(request)
+	}
+	if err != nil || resp == nil {
+		return nil, wrapOfficialClientError("service access token request", resp, err)
+	}
+	defer resp.Body.Close()
+	bytes, err := datadog.ReadBody(resp)
+	if err != nil {
+		return nil, wrapOfficialClientError("read service access token response", resp, err)
+	}
+	if resp.StatusCode >= 300 {
+		return nil, wrapOfficialClientError("service access token request", resp, fmt.Errorf("Datadog returned HTTP %d", resp.StatusCode))
+	}
+	return bytes, nil
+}
+
+func serviceAccessTokenPath(serviceAccountID string) string {
+	return "/api/v2/service_accounts/" + url.PathEscape(serviceAccountID) + "/access_tokens"
 }
 
 func (w *DatadogClient) CreateServiceAccountAccessToken(ctx context.Context, serviceAccountID, name string, scopes []string, expiresAt *time.Time) (*IssuedServiceAccessToken, error) {
-	ctx = w.withAuthContext(ctx)
-	api := datadogV2.NewServiceAccountsApi(w.officialClient)
-	attrs := *datadogV2.NewServiceAccountAccessTokenCreateAttributes(name, scopes)
-	if expiresAt != nil {
-		attrs.SetExpiresAt(*expiresAt)
-	}
-	data := *datadogV2.NewServiceAccountAccessTokenCreateData(attrs, datadogV2.SERVICEACCESSTOKENSTYPE_SERVICE_ACCESS_TOKENS)
-	resp, httpResp, err := api.CreateServiceAccountAccessToken(ctx, serviceAccountID, *datadogV2.NewServiceAccountAccessTokenCreateRequest(data))
-	if httpResp != nil {
-		defer httpResp.Body.Close()
-	}
+	attrs := struct {
+		Name      string     `json:"name"`
+		Scopes    []string   `json:"scopes"`
+		ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	}{Name: name, Scopes: scopes, ExpiresAt: expiresAt}
+	body := map[string]any{"data": map[string]any{"type": "service_access_tokens", "attributes": attrs}}
+	bytes, err := w.serviceAccessTokenRequest(ctx, http.MethodPost, serviceAccessTokenPath(serviceAccountID), body, nil)
 	if err != nil {
-		return nil, wrapOfficialClientError("create service account access token", httpResp, err)
+		return nil, err
 	}
-	token := resp.Data
-	if token == nil || token.Id == nil || *token.Id == "" || token.Attributes == nil || token.Attributes.Key == nil || *token.Attributes.Key == "" {
-		return nil, fmt.Errorf("create service account access token response omitted id or key")
+	var response struct {
+		Data serviceAccessTokenJSON `json:"data"`
 	}
-	return &IssuedServiceAccessToken{
-		ID:        *token.Id,
-		Key:       *token.Attributes.Key,
-		Name:      token.Attributes.GetName(),
-		Scopes:    token.Attributes.Scopes,
-		ExpiresAt: token.Attributes.ExpiresAt.Get(),
-	}, nil
+	if err := json.Unmarshal(bytes, &response); err != nil {
+		return nil, fmt.Errorf("decode Datadog service access token create response: %w", err)
+	}
+	data := response.Data
+	if data.Type != "service_access_tokens" || data.ID == "" || data.Attributes.Key == "" {
+		return nil, fmt.Errorf("Datadog service access token create response omitted type, id or key")
+	}
+	return &IssuedServiceAccessToken{ServiceAccessToken: data.token(), Key: data.Attributes.Key}, nil
 }
 
-func (w *DatadogClient) ListServiceAccountAccessTokens(ctx context.Context, serviceAccountID string, page, pageSize int64) (*datadogV2.ListServiceAccessTokensResponse, error) {
-	ctx = w.withAuthContext(ctx)
-	api := datadogV2.NewServiceAccountsApi(w.officialClient)
-	params := *datadogV2.NewListServiceAccountAccessTokensOptionalParameters().WithPageNumber(page).WithPageSize(pageSize)
-	resp, httpResp, err := api.ListServiceAccountAccessTokens(ctx, serviceAccountID, params)
-	if httpResp != nil {
-		defer httpResp.Body.Close()
-	}
+func (w *DatadogClient) ListServiceAccountAccessTokens(ctx context.Context, serviceAccountID string, page, pageSize int64) ([]ServiceAccessToken, error) {
+	query := url.Values{"page[number]": {fmt.Sprint(page)}, "page[size]": {fmt.Sprint(pageSize)}}
+	bytes, err := w.serviceAccessTokenRequest(ctx, http.MethodGet, serviceAccessTokenPath(serviceAccountID), nil, query)
 	if err != nil {
-		return nil, wrapOfficialClientError("list service account access tokens", httpResp, err)
+		return nil, err
 	}
-	return &resp, nil
+	var response struct {
+		Data []serviceAccessTokenJSON `json:"data"`
+	}
+	if err := json.Unmarshal(bytes, &response); err != nil {
+		return nil, fmt.Errorf("decode Datadog service access token list response: %w", err)
+	}
+	out := make([]ServiceAccessToken, 0, len(response.Data))
+	for _, data := range response.Data {
+		if data.Type != "service_access_tokens" || data.ID == "" {
+			return nil, fmt.Errorf("Datadog service access token list response omitted type or id")
+		}
+		out = append(out, data.token())
+	}
+	return out, nil
 }
 
-// FindServiceAccountAccessTokenByName refuses a full filtered page because a
-// retried mint must not mistake a truncated result for absence.
-func (w *DatadogClient) FindServiceAccountAccessTokenByName(ctx context.Context, serviceAccountID, name string) (*datadogV2.ServiceAccessToken, error) {
-	ctx = w.withAuthContext(ctx)
-	api := datadogV2.NewServiceAccountsApi(w.officialClient)
-	params := *datadogV2.NewListServiceAccountAccessTokensOptionalParameters().WithFilter(name).WithPageNumber(0).WithPageSize(nameSearchPageSize)
-	resp, httpResp, err := api.ListServiceAccountAccessTokens(ctx, serviceAccountID, params)
-	if httpResp != nil {
-		defer httpResp.Body.Close()
-	}
+// FindServiceAccountAccessTokenByName refuses a full first page: a filtered
+// response may have more entries, so absence cannot be inferred from it.
+func (w *DatadogClient) FindServiceAccountAccessTokenByName(ctx context.Context, serviceAccountID, name string) (*ServiceAccessToken, error) {
+	query := url.Values{"filter": {name}, "page[number]": {"0"}, "page[size]": {fmt.Sprint(nameSearchPageSize)}}
+	bytes, err := w.serviceAccessTokenRequest(ctx, http.MethodGet, serviceAccessTokenPath(serviceAccountID), nil, query)
 	if err != nil {
-		return nil, wrapOfficialClientError("find service account access token by name", httpResp, err)
+		return nil, err
 	}
-	for _, token := range resp.GetData() {
-		if token.Attributes != nil && token.Attributes.GetName() == name {
+	var response struct {
+		Data []serviceAccessTokenJSON `json:"data"`
+	}
+	if err := json.Unmarshal(bytes, &response); err != nil {
+		return nil, fmt.Errorf("decode Datadog service access token search response: %w", err)
+	}
+	for _, data := range response.Data {
+		if data.Type != "service_access_tokens" || data.ID == "" {
+			return nil, fmt.Errorf("Datadog service access token search response omitted type or id")
+		}
+		if data.Attributes.Name == name {
+			token := data.token()
 			return &token, nil
 		}
 	}
-	if len(resp.GetData()) >= int(nameSearchPageSize) {
-		return nil, fmt.Errorf("find service account access token by name: filter %q returned a full page without an exact match", name)
+	if len(response.Data) >= int(nameSearchPageSize) {
+		return nil, fmt.Errorf("Datadog service access token search returned a full page without exact match")
 	}
 	return nil, nil
 }
 
 func (w *DatadogClient) RevokeServiceAccountAccessToken(ctx context.Context, serviceAccountID, tokenID string) error {
-	ctx = w.withAuthContext(ctx)
-	api := datadogV2.NewServiceAccountsApi(w.officialClient)
-	httpResp, err := api.RevokeServiceAccountAccessToken(ctx, serviceAccountID, tokenID)
-	if httpResp != nil {
-		defer httpResp.Body.Close()
-	}
-	if err != nil {
-		return wrapOfficialClientError("revoke service account access token", httpResp, err)
-	}
-	return nil
+	_, err := w.serviceAccessTokenRequest(ctx, http.MethodDelete, serviceAccessTokenPath(serviceAccountID)+"/"+url.PathEscape(tokenID), nil, nil)
+	return err
 }
