@@ -49,4 +49,21 @@ that sync can read, including after restart, or migrate an entire key kind to
 native with an explicit compatibility plan for existing raw consumers. The
 new selector must have its own discoverable lister and deleter, and C1 must
 reject use by an executor that cannot consume the native payload **before**
-the connector mints a provider key. No such selector or gate is enabled here.
+the connector mints a provider key. No such selector is enabled for API or
+application keys.
+
+## Separate service access token path
+
+Datadog [service access tokens](https://docs.datadoghq.com/account_management/service-access-tokens/)
+are a distinct, standalone credential primitive. They have dedicated
+`/api/v2/service_accounts/{id}/access_tokens` create, list, and revoke
+endpoints, so they can use their own durable inventory selector without
+partitioning either legacy key list. The opt-in
+`service-account-access-token` resource type uses the `TOKEN` issuance shape
+and emits native `api_key_v2` JSON. It is not an alternative representation
+of an application key or an organization API key. Its `Authorization` header
+name is truthful, but callers must add the Bearer scheme themselves because
+the profile has no scheme field. Datadog's [create endpoint](https://docs.datadoghq.com/api/latest/service-accounts/create-an-access-token-for-a-service-account/)
+requires scopes and returns the token key only on creation. The connector
+uses the provider ID in `key_id` and provider-returned scopes, and records any
+instant expiry on the resource trait instead of narrowing it to a date.

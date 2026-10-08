@@ -52,3 +52,23 @@ func encodeDatadogAPIKeyV2(kind datadogKeyKind, keyValue, keyID string, scopes *
 	}
 	return json.Marshal(payload)
 }
+
+// encodeDatadogServiceAccessTokenV2 describes a standalone Datadog SAT.
+// Authorization is a header name; api_key_v2 has no field for its Bearer
+// scheme. Datadog returns an instant expiry, while the profile only has a
+// date, so the expiry remains on the secret trait rather than this payload.
+func encodeDatadogServiceAccessTokenV2(keyValue, keyID string, scopes []string) ([]byte, error) {
+	if keyValue == "" || keyID == "" {
+		return nil, errors.New("Datadog service access token requires a key value and provider token ID")
+	}
+	payload := apiKeyV2Payload{
+		KeyValue:   keyValue,
+		Provider:   "datadog",
+		KeyID:      keyID,
+		HeaderName: "Authorization",
+	}
+	if scopes != nil {
+		payload.Scopes = &scopes
+	}
+	return json.Marshal(payload)
+}

@@ -145,6 +145,16 @@ var (
 			capabilityPermissions("service_account_write", "org_app_keys_read"),
 		),
 	}
+	serviceAccountAccessTokenResourceType = &v2.ResourceType{
+		Id:          "service-account-access-token",
+		DisplayName: "Service Account Access Token",
+		Description: "A standalone Datadog service access token owned by one service account; authenticated with Authorization: Bearer.",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_SECRET},
+		Annotations: annotations.New(
+			&v2.SkipEntitlementsAndGrants{},
+			capabilityPermissions("service_account_write"),
+		),
+	}
 	scheduleResourceType = &v2.ResourceType{
 		Id:          "schedule",
 		DisplayName: "Schedule",

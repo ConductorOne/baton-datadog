@@ -35,14 +35,17 @@ type credentialUserBuilder struct {
 	// sync-service-account-application-keys grant, for the same reason: that
 	// grant is what registers the application-key syncer, and the syncer is
 	// what carries the deleter the SDK requires behind this descriptor.
-	offerServiceAccountAppKey bool
+	offerServiceAccountAppKey      bool
+	offerServiceAccountAccessToken bool
 }
 
-func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool) *credentialUserBuilder {
+func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool, offerSAT ...bool) *credentialUserBuilder {
+	issueSAT := len(offerSAT) != 0 && offerSAT[0]
 	return &credentialUserBuilder{
-		userBuilder:               newUserBuilder(wrapper),
-		offerOrgAPIKey:            offerOrgAPIKey,
-		offerServiceAccountAppKey: offerServiceAccountAppKey,
+		userBuilder:                    newUserBuilder(wrapper),
+		offerOrgAPIKey:                 offerOrgAPIKey,
+		offerServiceAccountAppKey:      offerServiceAccountAppKey,
+		offerServiceAccountAccessToken: issueSAT,
 	}
 }
 
@@ -86,9 +89,21 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// request for this kind before it reaches Issue.
 		}.Build())
 	}
+	if u.offerServiceAccountAccessToken {
+		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
+			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN,
+			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+			SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
+			CustomScopesAllowed:  true,
+		}.Build())
+	}
+	preferredOption := v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY
+	if !u.offerServiceAccountAppKey && !u.offerOrgAPIKey {
+		preferredOption = v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN
+	}
 	return v2.CredentialDetailsCredentialIssue_builder{
 		Options:         options,
-		PreferredOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+		PreferredOption: preferredOption,
 	}.Build(), nil, nil
 }
 
@@ -123,6 +138,11 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 				"baton-datadog: organization API key issuance requires allow-org-api-key-deletion, which also provides the revoke path")
 		}
 		return u.issueOrganizationAPIKey(ctx, input)
+	case serviceAccountAccessTokenResourceType.Id:
+		if !u.offerServiceAccountAccessToken {
+			return nil, status.Error(codes.FailedPrecondition, "baton-datadog: service access token issuance requires sync-service-account-access-tokens")
+		}
+		return u.issueServiceAccountAccessToken(ctx, input)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument,
 			"baton-datadog: unsupported credential secret resource type %q", secretResourceTypeID)
@@ -285,6 +305,71 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 		Secret: secret,
 		PlaintextData: []*v2.PlaintextData{
 			v2.PlaintextData_builder{Name: "api_key", Bytes: []byte(key.Secret)}.Build(),
+		},
+		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+	}, nil
+}
+
+func (u *credentialUserBuilder) issueServiceAccountAccessToken(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
+	if input.ExpiresAt != nil {
+		return nil, status.Error(codes.InvalidArgument, "baton-datadog: caller-selected service access token expiry is not advertised")
+	}
+	scopes := input.CredentialOptions.GetToken().GetScopes()
+	if len(scopes) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "baton-datadog: service access tokens require at least one scope")
+	}
+	serviceAccountID := input.IdentityID.GetResource()
+	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: look up service access token owner %q: %w", serviceAccountID, err)
+	}
+	if !userResp.GetData().Attributes.GetServiceAccount() {
+		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account", serviceAccountID)
+	}
+	name := issuedCredentialName(input.RequestID)
+	existing, err := u.wrapper.FindServiceAccountAccessTokenByName(ctx, serviceAccountID, name)
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: look up service access token for request %q: %w", input.RequestID, err)
+	}
+	if existing != nil {
+		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: service access token for request %q may already exist; refusing duplicate issuance", input.RequestID)
+	}
+	issued, err := u.wrapper.CreateServiceAccountAccessToken(ctx, serviceAccountID, name, scopes, nil)
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: create service access token: %w", err)
+	}
+	cleanup := func() {
+		if deleteErr := u.wrapper.RevokeServiceAccountAccessToken(ctx, serviceAccountID, issued.ID); deleteErr != nil {
+			ctxzap.Extract(ctx).Warn("failed to clean up Datadog service access token after issue error",
+				zap.String("service_account_id", serviceAccountID), zap.String("token_id", issued.ID), zap.Error(deleteErr))
+		}
+	}
+	encoded, err := encodeDatadogServiceAccessTokenV2(issued.Key, issued.ID, issued.Scopes)
+	if err != nil {
+		cleanup()
+		return nil, fmt.Errorf("baton-datadog: encode service access token: %w", err)
+	}
+	traitOptions := []rs.SecretTraitOption{
+		rs.WithSecretIdentityID(input.IdentityID),
+		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
+		rs.WithSecretDetail("datadog.service_access_token"),
+	}
+	if issued.ExpiresAt != nil {
+		traitOptions = append(traitOptions, rs.WithSecretExpiresAt(*issued.ExpiresAt))
+	}
+	resourceOptions := []rs.ResourceOption{rs.WithParentResourceID(input.IdentityID)}
+	if issued.Scopes != nil {
+		resourceOptions = append(resourceOptions, applicationKeyProfileOptions(&issued.Scopes)...)
+	}
+	secret, err := rs.NewSecretResource(name, serviceAccountAccessTokenResourceType, serviceAccessTokenHandle(serviceAccountID, issued.ID), traitOptions, resourceOptions...)
+	if err != nil {
+		cleanup()
+		return nil, fmt.Errorf("baton-datadog: build service access token resource: %w", err)
+	}
+	return &connectorbuilder.CredentialIssueOutput{
+		Secret: secret,
+		PlaintextData: []*v2.PlaintextData{
+			v2.PlaintextData_builder{Name: "service_access_token", Bytes: encoded}.Build(),
 		},
 		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil

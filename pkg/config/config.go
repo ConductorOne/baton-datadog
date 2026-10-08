@@ -61,6 +61,12 @@ var (
 		field.WithDefaultValue(false),
 		field.WithDisplayName("Sync service account application keys"),
 	)
+	SyncServiceAccountAccessTokens = field.BoolField(
+		"sync-service-account-access-tokens",
+		field.WithDescription("Sync, issue and revoke Datadog service account access tokens. Off by default: requires service_account_write and native api_key_v2 consumer support."),
+		field.WithDefaultValue(false),
+		field.WithDisplayName("Sync service account access tokens"),
+	)
 	SyncSchedules = field.BoolField(
 		"sync-schedules",
 		field.WithDescription("Whether to sync on-call schedules or not"),
@@ -89,7 +95,8 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	AppKey,
 	SyncSecrets,
 	AllowOrgAPIKeyDeletion,
-	SyncServiceAccountApplicationKeys,
+		SyncServiceAccountApplicationKeys,
+		SyncServiceAccountAccessTokens,
 	SyncSchedules,
 	BaseURL,
 },

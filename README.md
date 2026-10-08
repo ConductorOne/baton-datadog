@@ -97,6 +97,7 @@ Flags:
       --sync-schedules                                   Whether to sync on-call schedules or not ($BATON_SYNC_SCHEDULES)
       --sync-secrets                                     Whether to sync secrets or not ($BATON_SYNC_SECRETS)
       --sync-service-account-application-keys            Sync, issue and revoke Datadog service account application keys. Off by default: needs the service_account_write permission, without which the sync fails. ($BATON_SYNC_SERVICE_ACCOUNT_APPLICATION_KEYS)
+      --sync-service-account-access-tokens                Sync, issue and revoke Datadog service account access tokens. Off by default: needs service_account_write and native api_key_v2 consumer support. ($BATON_SYNC_SERVICE_ACCOUNT_ACCESS_TOKENS)
       --ticketing                                        This must be set to enable ticketing support ($BATON_TICKETING)
   -v, --version                                          version for baton-datadog
 

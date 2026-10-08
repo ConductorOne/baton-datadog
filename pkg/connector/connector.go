@@ -43,19 +43,21 @@ type Datadog struct {
 	// existing sync-secrets install on upgrade. Off by default for that
 	// reason, not because the capability is optional in itself.
 	SyncServiceAccountApplicationKeys bool
+	SyncServiceAccountAccessTokens    bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
 	offerServiceAccountKey := d.SyncSecrets && d.SyncServiceAccountApplicationKeys
+	offerSAT := d.SyncSecrets && d.SyncServiceAccountAccessTokens
 	offerOrgAPIKey := d.SyncSecrets && d.AllowOrgAPIKeyDeletion
 	// A credential issuer with no advertised kind is not an issuer. With
 	// secrets synced but neither kind granted, the plain user syncer is
 	// registered and CAPABILITY_CREDENTIAL_ISSUE is absent rather than
 	// advertised with an empty option list.
 	userSyncer := connectorbuilder.ResourceSyncerV2(newUserBuilder(d.wrapper))
-	if offerServiceAccountKey || offerOrgAPIKey {
-		userSyncer = newCredentialUserBuilder(d.wrapper, offerOrgAPIKey, offerServiceAccountKey)
+	if offerServiceAccountKey || offerOrgAPIKey || offerSAT {
+		userSyncer = newCredentialUserBuilder(d.wrapper, offerOrgAPIKey, offerServiceAccountKey, offerSAT)
 	}
 	resourceSyncers := []connectorbuilder.ResourceSyncerV2{
 		userSyncer,
@@ -75,6 +77,9 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		resourceSyncers = append(resourceSyncers, apiTokenSyncer)
 		if d.SyncServiceAccountApplicationKeys {
 			resourceSyncers = append(resourceSyncers, newApplicationKeyBuilder(d.wrapper))
+		}
+		if d.SyncServiceAccountAccessTokens {
+			resourceSyncers = append(resourceSyncers, newServiceAccessTokenBuilder(d.wrapper))
 		}
 	}
 
@@ -169,6 +174,7 @@ func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connector
 	syncSchedules := ddc.SyncSchedules
 	allowOrgAPIKeyDeletion := ddc.AllowOrgApiKeyDeletion
 	syncServiceAccountApplicationKeys := ddc.SyncServiceAccountApplicationKeys
+	syncServiceAccountAccessTokens := ddc.SyncServiceAccountAccessTokens
 
 	// Validate input parameters
 	if site == "" {
@@ -222,5 +228,6 @@ func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connector
 		AllowOrgAPIKeyDeletion: allowOrgAPIKeyDeletion,
 
 		SyncServiceAccountApplicationKeys: syncServiceAccountApplicationKeys,
+		SyncServiceAccountAccessTokens:    syncServiceAccountAccessTokens,
 	}, nil, nil
 }
