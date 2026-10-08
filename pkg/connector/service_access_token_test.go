@@ -31,6 +31,44 @@ func satIssueInput(requestID string) *connectorbuilder.CredentialIssueInput {
 	}
 }
 
+func TestServiceAccessTokenUsesExistingServiceAccountPermissionGate(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		secrets    bool
+		serviceKey bool
+		wantSAT    bool
+	}{
+		{"no secret sync", false, true, false},
+		{"secret sync without service account grant", true, false, false},
+		{"secret sync with service account grant", true, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			connector := &Datadog{wrapper: newLifecycleTestWrapper("http://127.0.0.1:1"),
+				SyncSecrets: tc.secrets, SyncServiceAccountApplicationKeys: tc.serviceKey}
+			syncers := connector.ResourceSyncers(context.Background())
+			var foundSAT, foundApp bool
+			for _, syncer := range syncers {
+				switch syncer.ResourceType(context.Background()).Id {
+				case serviceAccountAccessTokenResourceType.Id:
+					foundSAT = true
+				case serviceAccountApplicationKeyResourceType.Id:
+					foundApp = true
+				}
+			}
+			require.Equal(t, tc.wantSAT, foundSAT)
+			require.Equal(t, tc.wantSAT, foundApp)
+			issuer, ok := syncers[0].(*credentialUserBuilder)
+			require.Equal(t, tc.wantSAT, ok)
+			if ok {
+				details, _, err := issuer.IssueCapabilityDetails(context.Background())
+				require.NoError(t, err)
+				require.Len(t, details.GetOptions(), 2)
+				require.Equal(t, serviceAccountAccessTokenResourceType.Id, details.GetOptions()[1].GetSecretResourceTypeId())
+			}
+		})
+	}
+}
+
 func TestServiceAccessTokenOptInRefusesBeforeMint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("provider contacted without opt-in: %s %s", r.Method, r.URL.Path)
@@ -126,12 +164,12 @@ func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 	}))
 	defer server.Close()
 	wrapper := newLifecycleTestWrapper(server.URL)
-	issuer := newCredentialUserBuilder(wrapper, false, false, true)
+	issuer := newCredentialUserBuilder(wrapper, false, true)
 	details, _, err := issuer.IssueCapabilityDetails(context.Background())
 	require.NoError(t, err)
-	require.Len(t, details.GetOptions(), 1)
-	require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN, details.GetOptions()[0].GetOption())
-	require.Equal(t, serviceAccountAccessTokenResourceType.Id, details.GetOptions()[0].GetSecretResourceTypeId())
+	require.Len(t, details.GetOptions(), 2)
+	require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN, details.GetOptions()[1].GetOption())
+	require.Equal(t, serviceAccountAccessTokenResourceType.Id, details.GetOptions()[1].GetSecretResourceTypeId())
 
 	out, err := issuer.Issue(context.Background(), satIssueInput("req-sat"))
 	require.NoError(t, err)
@@ -338,7 +376,7 @@ func TestServiceAccessTokenSDKIssueEncryptsAndRejectsUnadvertisedKind(t *testing
 	require.Zero(t, providerCalls, "unadvertised native kind must fail before provider access")
 	mu.Unlock()
 
-	with := &Datadog{wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true, SyncServiceAccountAccessTokens: true}
+	with := &Datadog{wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true, SyncServiceAccountApplicationKeys: true}
 	nativeSDK, err := connectorbuilder.NewConnector(ctx, with)
 	require.NoError(t, err)
 	issued, err := nativeSDK.IssueCredential(ctx, request)

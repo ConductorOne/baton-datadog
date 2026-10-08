@@ -94,7 +94,7 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 
 	t.Logf("waiting for issued application key id=%s to authenticate", maskedValue(appKeyID))
 	require.Eventually(t, func() bool {
-		ok, err := canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+		ok, err := canAuthenticate(ctx, site, apiKey, typedAPIKeyValue(t, issued.PlaintextData[0].GetBytes()))
 		if err != nil {
 			t.Logf("issued application key not usable yet: %v", err)
 			return false
@@ -108,7 +108,7 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	require.NoError(t, err, "revoke issued Datadog application key")
 	t.Logf("waiting for revoked application key id=%s to stop authenticating", maskedValue(appKeyID))
 	require.Eventually(t, func() bool {
-		ok, err := canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+		ok, err := canAuthenticate(ctx, site, apiKey, typedAPIKeyValue(t, issued.PlaintextData[0].GetBytes()))
 		if err != nil {
 			// Only Datadog refusing the credentials proves revocation. Any
 			// other error means the probe did not answer the question, so

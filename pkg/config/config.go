@@ -57,15 +57,10 @@ var (
 	// a credential absent from a completed sync reads as deleted.
 	SyncServiceAccountApplicationKeys = field.BoolField(
 		"sync-service-account-application-keys",
-		field.WithDescription("Sync, issue and revoke Datadog service account application keys. Off by default: needs the service_account_write permission, without which the sync fails."),
+		field.WithDescription("Sync, issue and revoke Datadog service account application keys and access tokens. "+
+			"Off by default: needs the service_account_write permission, without which the sync fails."),
 		field.WithDefaultValue(false),
 		field.WithDisplayName("Sync service account application keys"),
-	)
-	SyncServiceAccountAccessTokens = field.BoolField(
-		"sync-service-account-access-tokens",
-		field.WithDescription("Sync, issue and revoke Datadog service account access tokens. Off by default: requires service_account_write and native api_key_v2 consumer support."),
-		field.WithDefaultValue(false),
-		field.WithDisplayName("Sync service account access tokens"),
 	)
 	SyncSchedules = field.BoolField(
 		"sync-schedules",
@@ -95,8 +90,7 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	AppKey,
 	SyncSecrets,
 	AllowOrgAPIKeyDeletion,
-		SyncServiceAccountApplicationKeys,
-		SyncServiceAccountAccessTokens,
+	SyncServiceAccountApplicationKeys,
 	SyncSchedules,
 	BaseURL,
 },

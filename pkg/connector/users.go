@@ -33,27 +33,25 @@ type credentialUserBuilder struct {
 	offerOrgAPIKey bool
 	// offerServiceAccountAppKey follows the
 	// sync-service-account-application-keys grant, for the same reason: that
-	// grant is what registers the application-key syncer, and the syncer is
-	// what carries the deleter the SDK requires behind this descriptor.
-	offerServiceAccountAppKey      bool
-	offerServiceAccountAccessToken bool
+	// grant is what registers the application-key and SAT syncers, each with
+	// the deleter the SDK requires behind its descriptor. Both Datadog
+	// endpoints require the same service_account_write permission.
+	offerServiceAccountAppKey bool
 }
 
-func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool, offerSAT ...bool) *credentialUserBuilder {
-	issueSAT := len(offerSAT) != 0 && offerSAT[0]
+func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool) *credentialUserBuilder {
 	return &credentialUserBuilder{
-		userBuilder:                    newUserBuilder(wrapper),
-		offerOrgAPIKey:                 offerOrgAPIKey,
-		offerServiceAccountAppKey:      offerServiceAccountAppKey,
-		offerServiceAccountAccessToken: issueSAT,
+		userBuilder:               newUserBuilder(wrapper),
+		offerOrgAPIKey:            offerOrgAPIKey,
+		offerServiceAccountAppKey: offerServiceAccountAppKey,
 	}
 }
 
 // IssueCapabilityDetails advertises the credential kinds this connector mints.
-// Both are the API_KEY shape and they are distinguished only by
+// The two API/application keys share the API_KEY shape and are distinguished by
 // secret_resource_type_id, which is what that field is for: the closed Option
 // enum names the shape a caller asks for, the open resource type id names the
-// kind that comes back. Datadog's two kinds are genuinely different
+// kind that comes back. Datadog's two key kinds are genuinely different
 // credentials -- a service-account application key is scoped to and owned by
 // one identity, an organization API key is owned by the org and by nobody in
 // it -- so they must stay two descriptors. Collapsing them would leave a
@@ -62,7 +60,7 @@ func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, off
 //
 // The service-account application key is marked preferred: it is the only
 // issuance mapping with an honest owner, so it is the default when a caller
-// asks for the API_KEY shape without choosing a kind.
+// asks for the API_KEY shape without choosing a kind. The SAT uses TOKEN.
 func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.CredentialDetailsCredentialIssue, annotations.Annotations, error) {
 	options := []*v2.CredentialIssueOptionDescriptor{}
 	if u.offerServiceAccountAppKey {
@@ -89,7 +87,7 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// request for this kind before it reaches Issue.
 		}.Build())
 	}
-	if u.offerServiceAccountAccessToken {
+	if u.offerServiceAccountAppKey {
 		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
 			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN,
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
@@ -97,18 +95,14 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			CustomScopesAllowed:  true,
 		}.Build())
 	}
-	preferredOption := v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY
-	if !u.offerServiceAccountAppKey && !u.offerOrgAPIKey {
-		preferredOption = v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN
-	}
 	return v2.CredentialDetailsCredentialIssue_builder{
 		Options:         options,
-		PreferredOption: preferredOption,
+		PreferredOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
 	}.Build(), nil, nil
 }
 
 // Issue dispatches on the credential kind the caller selected. The oneof arm
-// of CredentialIssueOptions gives the shape (API_KEY) and
+// of CredentialIssueOptions gives the shape (API_KEY or TOKEN) and
 // secret_resource_type_id gives the kind within it; the SDK has already
 // resolved that pair against IssueCapabilityDetails and rejected anything not
 // advertised, so this switch only has to route. It deliberately does not fall
@@ -139,8 +133,8 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 		}
 		return u.issueOrganizationAPIKey(ctx, input)
 	case serviceAccountAccessTokenResourceType.Id:
-		if !u.offerServiceAccountAccessToken {
-			return nil, status.Error(codes.FailedPrecondition, "baton-datadog: service access token issuance requires sync-service-account-access-tokens")
+		if !u.offerServiceAccountAppKey {
+			return nil, status.Error(codes.FailedPrecondition, "baton-datadog: service access token issuance requires sync-service-account-application-keys")
 		}
 		return u.issueServiceAccountAccessToken(ctx, input)
 	default:
@@ -199,6 +193,14 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
 	}
+	encoded, err := encodeDatadogAPIKeyV2(serviceAccountApplicationKeyKind, key.Secret, key.ID, key.Scopes)
+	if err != nil {
+		if deleteErr := u.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, key.ID); deleteErr != nil {
+			ctxzap.Extract(ctx).Warn("failed to clean up Datadog service account application key after payload encoding error",
+				zap.String("service_account_id", serviceAccountID), zap.String("application_key_id", key.ID), zap.Error(deleteErr))
+		}
+		return nil, fmt.Errorf("baton-datadog: encode service account application key: %w", err)
+	}
 
 	secretTraitOptions := []rs.SecretTraitOption{
 		rs.WithSecretIdentityID(input.IdentityID),
@@ -226,7 +228,7 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret: secret,
 		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{Name: "application_key", Bytes: []byte(key.Secret)}.Build(),
+			v2.PlaintextData_builder{Name: "application_key", Bytes: encoded}.Build(),
 		},
 		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
@@ -274,6 +276,14 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
 	}
+	encoded, err := encodeDatadogAPIKeyV2(organizationAPIKeyKind, key.Secret, key.ID, nil)
+	if err != nil {
+		if deleteErr := u.wrapper.DeleteAPIKey(ctx, key.ID); deleteErr != nil {
+			ctxzap.Extract(ctx).Warn("failed to clean up Datadog organization API key after payload encoding error",
+				zap.String("api_key_id", key.ID), zap.Error(deleteErr))
+		}
+		return nil, fmt.Errorf("baton-datadog: encode organization API key: %w", err)
+	}
 
 	secretTraitOptions := []rs.SecretTraitOption{
 		rs.WithSecretIdentityID(input.IdentityID),
@@ -304,7 +314,7 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret: secret,
 		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{Name: "api_key", Bytes: []byte(key.Secret)}.Build(),
+			v2.PlaintextData_builder{Name: "api_key", Bytes: encoded}.Build(),
 		},
 		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil

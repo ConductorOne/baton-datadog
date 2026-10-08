@@ -22,16 +22,21 @@ func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 	ctx := context.Background()
 	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true).IssueCapabilityDetails(ctx)
 	require.NoError(t, err)
-	require.Len(t, details.GetOptions(), 2)
+	require.Len(t, details.GetOptions(), 3)
 
 	byType := map[string]*v2.CredentialIssueOptionDescriptor{}
 	for _, o := range details.GetOptions() {
-		require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY, o.GetOption(),
-			"both kinds are the same shape; only the secret resource type separates them")
 		byType[o.GetSecretResourceTypeId()] = o
 	}
 	require.Contains(t, byType, serviceAccountApplicationKeyResourceType.Id)
 	require.Contains(t, byType, apiTokenResourceType.Id)
+	require.Contains(t, byType, serviceAccountAccessTokenResourceType.Id)
+	require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+		byType[serviceAccountApplicationKeyResourceType.Id].GetOption())
+	require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+		byType[apiTokenResourceType.Id].GetOption())
+	require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN,
+		byType[serviceAccountAccessTokenResourceType.Id].GetOption())
 	require.True(t, byType[serviceAccountApplicationKeyResourceType.Id].GetPreferred())
 	require.False(t, byType[apiTokenResourceType.Id].GetPreferred())
 	require.True(t, byType[serviceAccountApplicationKeyResourceType.Id].GetCustomScopesAllowed())
@@ -47,8 +52,9 @@ func TestIssuanceOmitsOrgAPIKeyWithoutGrant(t *testing.T) {
 	ctx := context.Background()
 	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), false, true).IssueCapabilityDetails(ctx)
 	require.NoError(t, err)
-	require.Len(t, details.GetOptions(), 1)
+	require.Len(t, details.GetOptions(), 2)
 	require.Equal(t, serviceAccountApplicationKeyResourceType.Id, details.GetOptions()[0].GetSecretResourceTypeId())
+	require.Equal(t, serviceAccountAccessTokenResourceType.Id, details.GetOptions()[1].GetSecretResourceTypeId())
 
 	out, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), false, true).Issue(ctx, &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
@@ -104,6 +110,8 @@ func TestIssueDispatchesOnRequestedCredentialKind(t *testing.T) {
 	require.Equal(t, "org-key-id", out.Secret.GetId().GetResource())
 	require.Len(t, out.PlaintextData, 1)
 	require.Equal(t, "api_key", out.PlaintextData[0].GetName())
+	require.JSONEq(t, `{"key_value":"org-key-secret","provider":"datadog","key_id":"org-key-id","header_name":"DD-API-KEY"}`,
+		string(out.PlaintextData[0].GetBytes()))
 
 	mu.Lock()
 	defer mu.Unlock()

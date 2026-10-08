@@ -23,18 +23,19 @@ func TestDatadogAPIKeyV2Payload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			const fixtureValue = "fixture-🔑-\"-\n"
+			const fixtureValue = "fixture-🔑-\"-\n-<>&"
 			const id = "provider-handle"
 			encoded, err := encodeDatadogAPIKeyV2(tt.kind, fixtureValue, id, tt.scopes)
 			require.NoError(t, err)
 			require.NotEqual(t, []byte(fixtureValue), encoded, "native plaintext is JSON, not the legacy raw key")
+			require.NotContains(t, string(encoded), `\u003c`, "Multipass JsonV1 does not HTML-escape a key value")
 
 			// Check the exact Multipass api_key_v2 field set. JsonV1 rejects
 			// unknown keys, so an extra connector field would break decoding.
 			var fields map[string]json.RawMessage
 			require.NoError(t, json.Unmarshal(encoded, &fields))
 			wantKeys := []string{"key_value", "provider", "key_id", "header_name"}
-			if tt.scopes != nil {
+			if tt.scopes != nil && len(*tt.scopes) != 0 {
 				wantKeys = append(wantKeys, "scopes")
 			}
 			require.ElementsMatch(t, wantKeys, mapKeys(fields))
@@ -44,7 +45,7 @@ func TestDatadogAPIKeyV2Payload(t *testing.T) {
 			require.Equal(t, `"provider-handle"`, string(fields["key_id"]))
 			require.Equal(t, `"datadog"`, string(fields["provider"]))
 			require.Equal(t, `"`+tt.wantHeader+`"`, string(fields["header_name"]))
-			if tt.scopes != nil {
+			if tt.scopes != nil && len(*tt.scopes) != 0 {
 				var gotScopes []string
 				require.NoError(t, json.Unmarshal(fields["scopes"], &gotScopes))
 				require.Equal(t, *tt.scopes, gotScopes)
@@ -111,4 +112,14 @@ func mapKeys[V any](m map[string]V) []string {
 		keys = append(keys, key)
 	}
 	return keys
+}
+
+func typedAPIKeyValue(t *testing.T, plaintext []byte) string {
+	t.Helper()
+	var payload struct {
+		KeyValue string `json:"key_value"`
+	}
+	require.NoError(t, json.Unmarshal(plaintext, &payload))
+	require.NotEmpty(t, payload.KeyValue)
+	return payload.KeyValue
 }

@@ -106,7 +106,7 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	require.NotNil(t, found, "issued organization API key id=%s not found via ListAPIKeys", maskedValue(orgKeyID))
 	t.Logf("confirmed organization API key id=%s exists in Datadog", maskedValue(orgKeyID))
 
-	issuedKey := string(issued.PlaintextData[0].GetBytes())
+	issuedKey := typedAPIKeyValue(t, issued.PlaintextData[0].GetBytes())
 	t.Logf("waiting for issued organization API key id=%s to authenticate", maskedValue(orgKeyID))
 	require.Eventually(t, func() bool {
 		ok, err := orgAPIKeyValidates(ctx, site, issuedKey)

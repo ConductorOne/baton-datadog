@@ -1,14 +1,12 @@
 package connector
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 )
 
-// datadogKeyKind identifies the Datadog endpoint that minted a key. A native
-// payload can only be selected when the caller has an independent, durable way
-// to associate the provider key with that payload. Datadog permits renaming
-// both kinds of keys, so their names cannot provide that association at sync.
+// datadogKeyKind identifies the Datadog endpoint that minted a key.
 type datadogKeyKind string
 
 const (
@@ -17,21 +15,21 @@ const (
 )
 
 type apiKeyV2Payload struct {
-	KeyValue   string    `json:"key_value"`
-	Provider   string    `json:"provider"`
-	Scopes     *[]string `json:"scopes,omitempty"`
-	KeyID      string    `json:"key_id"`
-	HeaderName string    `json:"header_name"`
+	KeyValue   string   `json:"key_value"`
+	Provider   string   `json:"provider"`
+	Scopes     []string `json:"scopes,omitempty"`
+	KeyID      string   `json:"key_id"`
+	HeaderName string   `json:"header_name"`
 }
 
 // encodeDatadogAPIKeyV2 prepares the Multipass api_key_v2 JsonV1 plaintext.
 // keyValue must be the one-time key secret, while keyID is its provider handle.
 // Service-account application-key scopes must come from Datadog's create
 // response, rather than the requested scopes. Org API keys have no scopes.
-// This encoder does not change the current raw credential Issue contract.
+// The current API_KEY selectors emit this document as their plaintext value.
 func encodeDatadogAPIKeyV2(kind datadogKeyKind, keyValue, keyID string, scopes *[]string) ([]byte, error) {
 	if keyValue == "" || keyID == "" {
-		return nil, errors.New("Datadog native API key requires a key value and provider key ID")
+		return nil, errors.New("datadog native API key requires a key value and provider key ID")
 	}
 	payload := apiKeyV2Payload{
 		KeyValue: keyValue,
@@ -41,16 +39,18 @@ func encodeDatadogAPIKeyV2(kind datadogKeyKind, keyValue, keyID string, scopes *
 	switch kind {
 	case serviceAccountApplicationKeyKind:
 		payload.HeaderName = "DD-APPLICATION-KEY"
-		payload.Scopes = scopes
+		if scopes != nil {
+			payload.Scopes = *scopes
+		}
 	case organizationAPIKeyKind:
 		if scopes != nil {
-			return nil, errors.New("Datadog organization API keys cannot have scopes")
+			return nil, errors.New("datadog organization API keys cannot have scopes")
 		}
 		payload.HeaderName = "DD-API-KEY"
 	default:
-		return nil, errors.New("unsupported Datadog native API key kind")
+		return nil, errors.New("unsupported datadog native API key kind")
 	}
-	return json.Marshal(payload)
+	return marshalAPIKeyV2(payload)
 }
 
 // encodeDatadogServiceAccessTokenV2 describes a standalone Datadog SAT.
@@ -59,7 +59,7 @@ func encodeDatadogAPIKeyV2(kind datadogKeyKind, keyValue, keyID string, scopes *
 // date, so the expiry remains on the secret trait rather than this payload.
 func encodeDatadogServiceAccessTokenV2(keyValue, keyID string, scopes []string) ([]byte, error) {
 	if keyValue == "" || keyID == "" {
-		return nil, errors.New("Datadog service access token requires a key value and provider token ID")
+		return nil, errors.New("datadog service access token requires a key value and provider token ID")
 	}
 	payload := apiKeyV2Payload{
 		KeyValue:   keyValue,
@@ -67,8 +67,19 @@ func encodeDatadogServiceAccessTokenV2(keyValue, keyID string, scopes []string) 
 		KeyID:      keyID,
 		HeaderName: "Authorization",
 	}
-	if scopes != nil {
-		payload.Scopes = &scopes
+	payload.Scopes = scopes
+	return marshalAPIKeyV2(payload)
+}
+
+// Multipass JsonV1 writes declaration-order keys and omits empty optional
+// fields. Encoding the complete struct in that order, without Go's default
+// HTML escaping, makes the plaintext byte-identical after decode/re-encode.
+func marshalAPIKeyV2(payload apiKeyV2Payload) ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(payload); err != nil {
+		return nil, err
 	}
-	return json.Marshal(payload)
+	return bytes.TrimSuffix(buffer.Bytes(), []byte{'\n'}), nil
 }

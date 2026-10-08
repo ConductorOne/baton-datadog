@@ -30,7 +30,6 @@ func main() {
 			AllowOrgAPIKeyDeletion: true,
 
 			SyncServiceAccountApplicationKeys: true,
-			SyncServiceAccountAccessTokens:    true,
 		}),
 	)
 }

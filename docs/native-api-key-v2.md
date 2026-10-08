@@ -1,83 +1,87 @@
-# Datadog native `api_key_v2` preparation
+# Datadog `api_key_v2` issuance contract
 
-The existing `API_KEY` issuance contract is raw plaintext: `application_key`
-for a service account application key and `api_key` for an organization API
-key. The connector still emits those bytes and advertises the existing
-`service-account-application-key` and `api-key` resource type IDs. It has an
-encoder for a future native arm for those keys, but does not advertise or
-mint them as native values. The new native path issues a separate Datadog
-service access token, described below.
+The three existing issuer selectors have distinct Datadog meanings:
 
-## Payload mapping
+| Secret resource type | Issue option | Datadog object | Header name |
+| --- | --- | --- | --- |
+| `service-account-application-key` | `API_KEY` | Application key owned by a service account | `DD-APPLICATION-KEY` |
+| `api-key` | `API_KEY` | Organization API key | `DD-API-KEY` |
+| `service-account-access-token` | `TOKEN` | Standalone service access token (SAT) | `Authorization` |
 
-`api_key_v2` is a Multipass `JsonV1` document. The connector encoder maps the
-provider's one-time `Secret` to `key_value`, the provider's `ID` to `key_id`,
-and uses `provider: "datadog"`. It sends `DD-APPLICATION-KEY` for a service
-account application key and `DD-API-KEY` for an organization API key. Datadog
-documents both headers in its [API reference](https://docs.datadoghq.com/api/latest/).
-Only application keys can carry `scopes`, and those scopes must come from the
-Datadog create response. An absent scopes response is omitted; a provider
-reported empty set is encoded as `[]`. No `base_url` or `expires_at` is
-asserted. A Datadog application key may still need a separate organization
-API key for an endpoint; this one-value profile cannot provide the pair.
+Each Issue arm emits one Multipass `api_key_v2` JsonV1 document on its existing
+selector. It does not create a parallel native resource type, duplicate an
+inventory row, or change the provider ID used for sync and revocation. The
+service account application key and organization API key arms previously
+emitted raw plaintext in released connector v0.4.0. Native vending is still
+pre-release and behind a customer feature flag; C1 must bind each exact
+selector to `api_key_v2` only for compatible connector builds and refuse older
+executors before minting. Existing stored raw credentials must not be
+reinterpreted as typed documents.
 
-The schema and strict decoder are in Multipass
-[`definitions.rs`](https://github.com/ductone/multipass/blob/f873f21b2353a72f28bd2bfd7b9b8c00ad07a317/crates/latchkey-client-sdk/src/secret_types/definitions.rs)
-and [`codec.rs`](https://github.com/ductone/multipass/blob/f873f21b2353a72f28bd2bfd7b9b8c00ad07a317/crates/latchkey-client-sdk/src/secret_types/codec.rs).
-The encoder test checks the exact declared field set and traverses a fake
-Datadog create response through the official client. The SAT path has its own
-fake-provider and Baton SDK encrypted-issuance fixtures. A temporary harness
-at the pinned Multipass commit decoded the exact SAT plaintext obtained after
-SDK encryption and decryption, then re-encoded it byte for byte. It also
-rejected raw, missing-key, nested-value, and unknown-field controls. The run
-used Nix Rust/Cargo 1.98.1 with the repository's locked dependencies; the
-repository pins Rust 1.93.0 for its normal build.
+## Fields
 
-## Why issuance remains raw
+For all three kinds, the one-time provider key becomes `key_value`, the stable
+provider ID becomes `key_id`, and `provider` is `datadog`. The encoder uses the
+header names above. Datadog documents the API and application key headers in
+its [API reference](https://docs.datadoghq.com/api/latest/), and the SAT
+Bearer form in its [SAT guide](https://docs.datadoghq.com/account_management/service-access-tokens/).
+The `Authorization` value needs a `Bearer ` prefix from the caller; the
+Multipass profile has no scheme field.
 
-A native payload needs a distinct, durable `secret_resource_type_id` so C1
-can associate that exact selector with `api_key_v2` before dispatch, and so
-the connector can return the same resource type on later inventory syncs.
-The current SDK requires an advertised discoverable issuance type to have a
-registered lister and deleter. A new selector on Issue alone would fail that
-contract. Listing the same provider keys under both raw and native resource
-types would duplicate inventory and expose ambiguous revocation targets.
+The application-key arm includes `scopes` only when Datadog reports nonempty
+scopes in its create response. The issued resource profile separately retains
+the provider's distinction between absent and explicitly empty scopes. An
+organization API key has no scopes. The SAT arm requires a nonempty set of
+`TOKEN.scopes` before a provider call and includes only provider-reported
+nonempty scopes in the payload. Datadog's [SAT create API](https://docs.datadoghq.com/api/latest/service-accounts/create-an-access-token-for-a-service-account/)
+requires scopes. Neither API-key arm invents `base_url` or `expires_at`. A SAT
+provider instant expiry is kept on SecretTrait; the profile's date-only
+`expires_at` is omitted rather than losing time precision.
 
-A name prefix does not solve the inventory split. Datadog permits name edits
-for both [organization API keys](https://docs.datadoghq.com/api/latest/key-management/edit-an-api-key/)
-and [service account application keys](https://docs.datadoghq.com/api/latest/service-accounts/edit-an-application-key-for-this-service-account/).
-The list responses available to this connector include an ID, mutable name,
-timestamps and key metadata, but no immutable creation-origin field. A rename
-could move an existing key between two listers, or cause both to claim it.
+An application key may need an organization API key alongside it for Datadog
+API authentication. The `api_key_v2` profile carries one key value; the
+application-key arm does not mint or copy a second key from the connector's
+management credentials. A SAT is a separate standalone credential and needs
+no API-key pair.
 
-The next design choice must provide a durable provider-ID to selector mapping
-that sync can read, including after restart, or migrate an entire key kind to
-native with an explicit compatibility plan for existing raw consumers. The
-new selector must have its own discoverable lister and deleter, and C1 must
-reject use by an executor that cannot consume the native payload **before**
-the connector mints a provider key. No such selector is enabled for API or
-application keys.
+## Lifecycle and inputs
 
-## Separate service access token path
+The application-key and SAT arms target an actual service account, rechecked
+at Issue time. Their synced resources retain service-account ownership. The
+organization API key remains org-scoped; its provider `created_by` relationship
+is kept distinct from the recipient identity. All three arms keep their
+existing discoverable inventory and revoke path. SAT inventory/revoke uses a
+stable composite of service-account ID and provider token ID, so a provider
+rename changes only display name. App/API keys stay on their existing bare
+provider IDs and resource types.
 
-Datadog [service access tokens](https://docs.datadoghq.com/account_management/service-access-tokens/)
-are a distinct, standalone credential primitive. They have dedicated
-`/api/v2/service_accounts/{id}/access_tokens` create, list, and revoke
-endpoints, so they can use their own durable inventory selector without
-partitioning either legacy key list. The opt-in
-`service-account-access-token` resource type uses the `TOKEN` issuance shape
-and emits native `api_key_v2` JSON. It is not an alternative representation
-of an application key or an organization API key. Its `Authorization` header
-name is truthful, but callers must add the Bearer scheme themselves because
-the profile has no scheme field. Datadog's [create endpoint](https://docs.datadoghq.com/api/latest/service-accounts/create-an-access-token-for-a-service-account/)
-requires scopes and returns the token key only on creation. The connector
-uses the provider ID in `key_id` and provider-returned scopes, and records any
-instant expiry on the resource trait instead of narrowing it to a date.
+C1 must supply `API_KEY` plus the exact selected secret resource type for each
+of the two API-key arms. It may supply requested scopes for a service-account
+application key; organization API keys reject them. C1 must supply `TOKEN`
+with a nonempty scopes list for SAT. Caller-selected SAT expiry is not
+advertised by this connector, even though Datadog's endpoint supports it; a
+request that asks for one fails before minting. The existing
+`sync-service-account-application-keys` connector flag is off by default and
+also requires `sync-secrets` and Datadog `service_account_write`. It activates
+both application keys and SATs, whose scoped endpoints require that same
+extra permission. No SAT-specific flag is needed. The organization-key grant
+is unchanged.
 
-Inventory and revocation identify a SAT by its provider token ID plus owning
-service-account ID. Renaming a SAT therefore leaves its synced resource ID
-unchanged. A repeat issuance request is refused when the exact
-`c1-<request-id>` name is still present. Datadog permits SAT renames, so
-that name lookup cannot by itself guarantee deduplication after an administrator renames the
-token. C1's mint-once request fence remains necessary; the connector never
-retries a SAT create on an ambiguous transport result.
+A repeated request is refused while the exact `c1-<request-id>` provider name
+is present. Datadog permits renaming all three kinds, so name lookup does not
+provide durable deduplication after an administrator rename. C1's mint-once
+request fence remains necessary. Provider renames do not affect the stable
+inventory IDs or revoke paths.
+
+## Codec proof
+
+The schema and strict decoder are in Multipass at pinned commit
+[`f873f21`](https://github.com/ductone/multipass/blob/f873f21b2353a72f28bd2bfd7b9b8c00ad07a317/crates/latchkey-client-sdk/src/secret_types/definitions.rs)
+and its [codec](https://github.com/ductone/multipass/blob/f873f21b2353a72f28bd2bfd7b9b8c00ad07a317/crates/latchkey-client-sdk/src/secret_types/codec.rs).
+The SAT path was exercised through Baton SDK IssueCredential encryption and
+JWK decryption, then the exact resulting bytes were decoded and re-encoded
+byte-identically by the pinned Rust codec. Raw, missing-key, nested-value,
+and unknown-field controls were rejected. The same end-to-end proof is
+required for the two API-key arms before this contract is enabled. The Rust
+run used Nix Rust/Cargo 1.98.1 with the pinned Cargo.lock; Multipass normally
+pins Rust 1.93.0.
