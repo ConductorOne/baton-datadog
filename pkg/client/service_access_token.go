@@ -114,9 +114,32 @@ func (w *DatadogClient) CreateServiceAccountAccessToken(ctx context.Context, ser
 	}
 	data := response.Data
 	if data.Type != "service_access_tokens" || data.ID == "" || data.Attributes.Key == "" {
+		if data.ID != "" {
+			if revokeErr := w.RevokeServiceAccountAccessToken(ctx, serviceAccountID, data.ID); revokeErr != nil {
+				return nil, fmt.Errorf("Datadog service access token create response omitted type, id or key; revoke of undeliverable token %q failed: %w", data.ID, revokeErr)
+			}
+		}
 		return nil, fmt.Errorf("Datadog service access token create response omitted type, id or key")
 	}
 	return &IssuedServiceAccessToken{ServiceAccessToken: data.token(), Key: data.Attributes.Key}, nil
+}
+
+func (w *DatadogClient) GetServiceAccountAccessToken(ctx context.Context, serviceAccountID, tokenID string) (*ServiceAccessToken, error) {
+	bytes, err := w.serviceAccessTokenRequest(ctx, http.MethodGet, serviceAccessTokenPath(serviceAccountID)+"/"+url.PathEscape(tokenID), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	var response struct {
+		Data serviceAccessTokenJSON `json:"data"`
+	}
+	if err := json.Unmarshal(bytes, &response); err != nil {
+		return nil, fmt.Errorf("decode Datadog service access token get response: %w", err)
+	}
+	if response.Data.Type != "service_access_tokens" || response.Data.ID != tokenID {
+		return nil, fmt.Errorf("Datadog service access token get response did not match requested token")
+	}
+	token := response.Data.token()
+	return &token, nil
 }
 
 func (w *DatadogClient) ListServiceAccountAccessTokens(ctx context.Context, serviceAccountID string, page, pageSize int64) ([]ServiceAccessToken, error) {
