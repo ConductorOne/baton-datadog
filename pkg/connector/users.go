@@ -69,7 +69,6 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
 			CustomScopesAllowed:  true,
-			MinScopes:            0,
 			// Preferred only where it can be: exactly one descriptor per shape
 			// may set it, and it must be set whenever several share a shape.
 			Preferred: u.offerOrgAPIKey,
@@ -83,20 +82,31 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// share an id, and this is the variant registered whenever this
 			// descriptor is advertised.
 			SecretResourceTypeId: deletableAPITokenResourceType.Id,
-			MinScopes:            0,
 			// Datadog organization API keys carry no scopes. Advertising none
 			// and disallowing custom ones makes the SDK reject a scoped
 			// request for this kind before it reaches Issue.
 		}.Build())
 	}
 	if u.offerServiceAccountAppKey {
-		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
+		sat := v2.CredentialIssueOptionDescriptor_builder{
 			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN,
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 			SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
 			CustomScopesAllowed:  true,
-			MinScopes:            1,
-		}.Build())
+		}.Build()
+		// Start with the SDK's synthesized legacy scope rules so the explicit
+		// Field keeps its nonblank-item and uniqueness checks. Add Datadog's
+		// required, nonempty SAT scope constraint to that shared schema.
+		scopeField, err := connectorbuilder.CredentialIssueScopeField(sat)
+		if err != nil {
+			return nil, nil, fmt.Errorf("baton-datadog: build SAT scope field: %w", err)
+		}
+		scopeField.SetIsRequired(true)
+		rules := scopeField.GetStringSliceField().GetRules()
+		rules.SetMinItems(1)
+		rules.SetValidateEmpty(true)
+		sat.SetInputFields(append(sat.GetInputFields(), scopeField))
+		options = append(options, sat)
 	}
 	return v2.CredentialDetailsCredentialIssue_builder{
 		Options:         options,

@@ -67,15 +67,18 @@ both application keys and SATs, whose scoped endpoints require that same
 extra permission. No SAT-specific flag is needed. The organization-key grant
 is unchanged.
 
-The credential descriptors carry the cardinality rule: SAT advertises
-`min_scopes = 1` with custom scopes allowed; the application key advertises
-`min_scopes = 0` with optional custom scopes; the organization API key
-advertises `min_scopes = 0`, no allowed scopes, and custom scopes disallowed.
-The SDK's omitted/default minimum is zero. C1 can derive required, optional,
-or unsupported scope input from the selected descriptor without recognizing
-Datadog resource-type names. The connector also rejects missing SAT scopes
-and unexpected organization-key scopes before any provider create call for
-direct or older SDK callers.
+The SAT descriptor advertises a `scopes` StringSliceField in the SDK's
+existing `input_fields`/Field-rules schema. Its Field is required, and its
+repeated-string rules require at least one nonempty, unique scope. The
+application-key descriptor keeps its optional custom-scope contract; the
+organization API key keeps no allowed scopes and disallows custom scopes.
+Those two kinds omit explicit input fields and use the SDK's legacy Field
+synthesis, which preserves their existing optional and unsupported meanings.
+C1 can resolve the same shared scope Field for all three kinds and derive
+required, optional, or unsupported input without recognizing Datadog
+resource-type names. The connector also rejects missing SAT scopes and
+unexpected organization-key scopes before any provider create call for direct
+or older SDK callers. No separate `min_scopes` proto field is used.
 
 This shared service-account setting now causes the connector to list SATs for
 each active service account as well as application keys. A Datadog 403 or 404

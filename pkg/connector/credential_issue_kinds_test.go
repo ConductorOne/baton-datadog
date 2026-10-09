@@ -10,10 +10,12 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // TestIssuanceAdvertisesBothCredentialKinds checks two API_KEY kinds selected
@@ -40,24 +42,52 @@ func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 	require.True(t, byType[serviceAccountApplicationKeyResourceType.Id].GetPreferred())
 	require.False(t, byType[apiTokenResourceType.Id].GetPreferred())
 	require.True(t, byType[serviceAccountApplicationKeyResourceType.Id].GetCustomScopesAllowed())
-	require.Zero(t, byType[serviceAccountApplicationKeyResourceType.Id].GetMinScopes(), "application-key scopes are optional")
 	require.False(t, byType[apiTokenResourceType.Id].GetCustomScopesAllowed(),
 		"organization API keys carry no scopes")
 	require.Empty(t, byType[apiTokenResourceType.Id].GetScopes())
-	require.Zero(t, byType[apiTokenResourceType.Id].GetMinScopes(), "organization API keys do not support scopes")
 	require.True(t, byType[serviceAccountAccessTokenResourceType.Id].GetCustomScopesAllowed())
-	require.Equal(t, uint32(1), byType[serviceAccountAccessTokenResourceType.Id].GetMinScopes(),
-		"Datadog requires at least one scope for a service access token")
+	sat := byType[serviceAccountAccessTokenResourceType.Id]
+	require.Len(t, sat.GetInputFields(), 1)
+	require.Equal(t, "scopes", sat.GetInputFields()[0].GetName())
+	require.True(t, sat.GetInputFields()[0].GetIsRequired())
+	satField, err := connectorbuilder.CredentialIssueScopeField(sat)
+	require.NoError(t, err)
+	satRules := satField.GetStringSliceField().GetRules()
+	require.True(t, satRules.GetIsRequired())
+	require.Equal(t, uint64(1), satRules.GetMinItems())
+	require.True(t, satRules.GetValidateEmpty())
+	require.True(t, satRules.GetUnique())
+	require.NotEmpty(t, satRules.GetItemRules().GetPattern(), "explicit rules preserve the SDK's nonblank scope validation")
+	require.Error(t, field.ValidateRepeatedStringRules(satRules, nil, "scopes"))
+
+	app := byType[serviceAccountApplicationKeyResourceType.Id]
+	require.Empty(t, app.GetInputFields(), "optional application-key scopes use the legacy shared Field synthesis")
+	appField, err := connectorbuilder.CredentialIssueScopeField(app)
+	require.NoError(t, err)
+	require.False(t, appField.GetIsRequired())
+	require.NoError(t, field.ValidateRepeatedStringRules(appField.GetStringSliceField().GetRules(), nil, "scopes"))
+
+	org := byType[apiTokenResourceType.Id]
+	require.Empty(t, org.GetInputFields(), "unsupported organization-key scopes use the legacy shared Field synthesis")
+	orgField, err := connectorbuilder.CredentialIssueScopeField(org)
+	require.NoError(t, err)
+	require.True(t, orgField.GetStringSliceField().GetRules().HasMaxItems())
+	require.Zero(t, orgField.GetStringSliceField().GetRules().GetMaxItems())
+	require.Error(t, field.ValidateRepeatedStringRules(orgField.GetStringSliceField().GetRules(), []string{"read"}, "scopes"))
 
 	metadata, err := protojson.Marshal(details)
 	require.NoError(t, err)
-	require.Contains(t, string(metadata), `"minScopes":1`)
+	require.Contains(t, string(metadata), `"inputFields"`)
 	restored := &v2.CredentialDetailsCredentialIssue{}
 	require.NoError(t, protojson.Unmarshal(metadata, restored))
 	require.Len(t, restored.GetOptions(), 3)
 	for _, option := range restored.GetOptions() {
-		require.Equal(t, byType[option.GetSecretResourceTypeId()].GetMinScopes(), option.GetMinScopes(),
-			"minimum scope requirement must survive SDK metadata serialization")
+		original := byType[option.GetSecretResourceTypeId()]
+		require.Equal(t, len(original.GetInputFields()), len(option.GetInputFields()))
+		for index, inputField := range option.GetInputFields() {
+			require.True(t, proto.Equal(original.GetInputFields()[index], inputField),
+				"scope Field rules must survive SDK metadata serialization")
+		}
 	}
 }
 
