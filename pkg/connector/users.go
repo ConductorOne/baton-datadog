@@ -69,6 +69,7 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
 			CustomScopesAllowed:  true,
+			MinScopes:            0,
 			// Preferred only where it can be: exactly one descriptor per shape
 			// may set it, and it must be set whenever several share a shape.
 			Preferred: u.offerOrgAPIKey,
@@ -82,6 +83,7 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// share an id, and this is the variant registered whenever this
 			// descriptor is advertised.
 			SecretResourceTypeId: deletableAPITokenResourceType.Id,
+			MinScopes:            0,
 			// Datadog organization API keys carry no scopes. Advertising none
 			// and disallowing custom ones makes the SDK reject a scoped
 			// request for this kind before it reaches Issue.
@@ -93,6 +95,7 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 			SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
 			CustomScopesAllowed:  true,
+			MinScopes:            1,
 		}.Build())
 	}
 	return v2.CredentialDetailsCredentialIssue_builder{

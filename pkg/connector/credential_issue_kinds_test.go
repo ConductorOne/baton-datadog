@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // TestIssuanceAdvertisesBothCredentialKinds checks two API_KEY kinds selected
@@ -39,8 +40,25 @@ func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 	require.True(t, byType[serviceAccountApplicationKeyResourceType.Id].GetPreferred())
 	require.False(t, byType[apiTokenResourceType.Id].GetPreferred())
 	require.True(t, byType[serviceAccountApplicationKeyResourceType.Id].GetCustomScopesAllowed())
+	require.Zero(t, byType[serviceAccountApplicationKeyResourceType.Id].GetMinScopes(), "application-key scopes are optional")
 	require.False(t, byType[apiTokenResourceType.Id].GetCustomScopesAllowed(),
 		"organization API keys carry no scopes")
+	require.Empty(t, byType[apiTokenResourceType.Id].GetScopes())
+	require.Zero(t, byType[apiTokenResourceType.Id].GetMinScopes(), "organization API keys do not support scopes")
+	require.True(t, byType[serviceAccountAccessTokenResourceType.Id].GetCustomScopesAllowed())
+	require.Equal(t, uint32(1), byType[serviceAccountAccessTokenResourceType.Id].GetMinScopes(),
+		"Datadog requires at least one scope for a service access token")
+
+	metadata, err := protojson.Marshal(details)
+	require.NoError(t, err)
+	require.Contains(t, string(metadata), `"minScopes":1`)
+	restored := &v2.CredentialDetailsCredentialIssue{}
+	require.NoError(t, protojson.Unmarshal(metadata, restored))
+	require.Len(t, restored.GetOptions(), 3)
+	for _, option := range restored.GetOptions() {
+		require.Equal(t, byType[option.GetSecretResourceTypeId()].GetMinScopes(), option.GetMinScopes(),
+			"minimum scope requirement must survive SDK metadata serialization")
+	}
 }
 
 // TestIssuanceOmitsOrgAPIKeyWithoutGrant: without the delete grant there is no
