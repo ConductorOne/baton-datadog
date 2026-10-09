@@ -121,6 +121,8 @@ func TestServiceAccessTokenMissingScopesRefusedBeforeProviderCall(t *testing.T) 
 		RequestId:         "missing-scopes-sdk",
 	}.Build())
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "at least 1 scopes are required",
+		"the SDK descriptor must reject the request before invoking the connector's Issue method")
 	mu.Lock()
 	require.Zero(t, providerCalls)
 	mu.Unlock()
