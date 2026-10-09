@@ -268,7 +268,8 @@
             "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN",
             "customScopesAllowed": true,
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
-            "secretResourceTypeId": "service-account-access-token"
+            "secretResourceTypeId": "service-account-access-token",
+            "minScopes": 1
           }
         ],
         "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"
