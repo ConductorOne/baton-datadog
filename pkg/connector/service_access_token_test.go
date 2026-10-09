@@ -85,6 +85,47 @@ func TestServiceAccessTokenOptInRefusesBeforeMint(t *testing.T) {
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
 }
 
+func TestServiceAccessTokenMissingScopesRefusedBeforeProviderCall(t *testing.T) {
+	var mu sync.Mutex
+	providerCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		providerCalls++
+		mu.Unlock()
+		t.Errorf("provider contacted for scope-free SAT request: %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	wrapper := newLifecycleTestWrapper(server.URL)
+	issuer := newCredentialUserBuilder(wrapper, false, true)
+	input := satIssueInput("missing-scopes-direct")
+	input.CredentialOptions = v2.CredentialIssueOptions_builder{
+		SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
+		Token:                v2.CredentialIssueOptions_Token_builder{}.Build(),
+	}.Build()
+	out, err := issuer.Issue(context.Background(), input)
+	require.Nil(t, out)
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+
+	ctx := context.Background()
+	sdk, err := connectorbuilder.NewConnector(ctx, &Datadog{
+		wrapper: wrapper, SyncSecrets: true, SyncServiceAccountApplicationKeys: true,
+	})
+	require.NoError(t, err)
+	encConfig, _, err := (&jwk.JWKEncryptionProvider{}).GenerateKey(ctx)
+	require.NoError(t, err)
+	_, err = sdk.IssueCredential(ctx, v2.IssueCredentialRequest_builder{
+		IdentityId:        input.IdentityID,
+		CredentialOptions: input.CredentialOptions,
+		EncryptionConfigs: []*v2.EncryptionConfig{encConfig},
+		RequestId:         "missing-scopes-sdk",
+	}.Build())
+	require.Error(t, err)
+	mu.Lock()
+	require.Zero(t, providerCalls)
+	mu.Unlock()
+}
+
 func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 	const tokenID = "sat-provider-id"
 	const fixtureValue = "ddsat_fixture-value"
