@@ -269,7 +269,23 @@
             "customScopesAllowed": true,
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
             "secretResourceTypeId": "service-account-access-token",
-            "minScopes": 1
+            "inputFields": [
+              {
+                "name": "scopes",
+                "isRequired": true,
+                "stringSliceField": {
+                  "rules": {
+                    "minItems": "1",
+                    "unique": true,
+                    "itemRules": {
+                      "pattern": "[^\t\n\u000b\f\r    -     　]",
+                      "validateEmpty": true
+                    },
+                    "validateEmpty": true
+                  }
+                }
+              }
+            ]
           }
         ],
         "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"

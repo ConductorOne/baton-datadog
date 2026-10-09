@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	config "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/field"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -93,6 +95,10 @@ func validateCredentialIssueInput(input *CredentialIssueInput, details *v2.Crede
 	if err != nil {
 		return nil, err
 	}
+	scopeField, err := CredentialIssueScopeField(descriptor)
+	if err != nil {
+		return nil, err
+	}
 	if descriptor.GetResourceMode() == v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_UNSPECIFIED {
 		return nil, fmt.Errorf("credential resource mode must be advertised")
 	}
@@ -106,13 +112,15 @@ func validateCredentialIssueInput(input *CredentialIssueInput, details *v2.Crede
 			return nil, fmt.Errorf("requested key generation profile is not advertised by connector")
 		}
 	}
-	if apiKey := input.CredentialOptions.GetApiKey(); apiKey != nil {
-		if err := validateRequestedScopes(apiKey.GetScopes(), descriptor); err != nil {
+	if descriptor.GetOption() == v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY {
+		apiKey := input.CredentialOptions.GetApiKey()
+		if err := validateRequestedScopes(apiKey.GetScopes(), scopeField); err != nil {
 			return nil, err
 		}
 	}
-	if token := input.CredentialOptions.GetToken(); token != nil {
-		if err := validateRequestedScopes(token.GetScopes(), descriptor); err != nil {
+	if descriptor.GetOption() == v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN {
+		token := input.CredentialOptions.GetToken()
+		if err := validateRequestedScopes(token.GetScopes(), scopeField); err != nil {
 			return nil, err
 		}
 		if err := validateRequestedValues("audience", token.GetAudiences(), descriptor.GetAudiences(), descriptor.GetCustomAudiencesAllowed()); err != nil {
@@ -141,11 +149,8 @@ func validateCredentialIssueInput(input *CredentialIssueInput, details *v2.Crede
 	return descriptor, nil
 }
 
-func validateRequestedScopes(requested []string, descriptor *v2.CredentialIssueOptionDescriptor) error {
-	if uint64(len(requested)) < uint64(descriptor.GetMinScopes()) {
-		return fmt.Errorf("at least %d scopes are required", descriptor.GetMinScopes())
-	}
-	return validateRequestedValues("scope", requested, descriptor.GetScopes(), descriptor.GetCustomScopesAllowed())
+func validateRequestedScopes(requested []string, scopeField *config.Field) error {
+	return field.ValidateRepeatedStringRules(scopeField.GetStringSliceField().GetRules(), requested, "scopes")
 }
 
 func validateRequestedValues(kind string, requested []string, advertised []string, customAllowed bool) error {
