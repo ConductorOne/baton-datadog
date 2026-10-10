@@ -189,6 +189,43 @@ func TestIssueRejectsScopesOnOrgAPIKey(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
+func TestDirectIssueRejectsInvalidScopesBeforeProviderCall(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("provider contacted for invalid scopes: %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, true)
+	for _, tc := range []struct {
+		name    string
+		kind    string
+		isToken bool
+		scopes  []string
+	}{
+		{"application key blank", serviceAccountApplicationKeyResourceType.Id, false, []string{"\u00a0"}},
+		{"application key duplicate", serviceAccountApplicationKeyResourceType.Id, false, []string{"read", "read"}},
+		{"SAT blank", serviceAccountAccessTokenResourceType.Id, true, []string{"\u00a0"}},
+		{"SAT duplicate", serviceAccountAccessTokenResourceType.Id, true, []string{"read", "read"}},
+		{"organization key scoped", apiTokenResourceType.Id, false, []string{"read"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			options := v2.CredentialIssueOptions_builder{SecretResourceTypeId: tc.kind}.Build()
+			if tc.isToken {
+				options.SetToken(v2.CredentialIssueOptions_Token_builder{Scopes: tc.scopes}.Build())
+			} else {
+				options.SetApiKey(v2.CredentialIssueOptions_ApiKey_builder{Scopes: tc.scopes}.Build())
+			}
+			issued, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
+				IdentityID:        &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
+				RequestID:         "invalid-scopes",
+				CredentialOptions: options,
+			})
+			require.Nil(t, issued)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+}
+
 // TestIssueRejectsUnknownCredentialKind: an unadvertised secret resource type
 // is a protocol mismatch, not a cue to fall back to the preferred arm.
 func TestIssueRejectsUnknownCredentialKind(t *testing.T) {

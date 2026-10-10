@@ -7,6 +7,7 @@ import (
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
+	config "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -94,17 +95,10 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
 			CustomScopesAllowed:  true,
 		}.Build()
-		// Start with the SDK's synthesized legacy scope rules so the explicit
-		// Field keeps its nonblank-item and uniqueness checks. Add Datadog's
-		// required, nonempty SAT scope constraint to that shared schema.
-		scopeField, err := connectorbuilder.CredentialIssueScopeField(sat)
+		scopeField, err := serviceAccessTokenScopeField()
 		if err != nil {
 			return nil, nil, fmt.Errorf("baton-datadog: build SAT scope field: %w", err)
 		}
-		scopeField.SetIsRequired(true)
-		rules := scopeField.GetStringSliceField().GetRules()
-		rules.SetMinItems(1)
-		rules.SetValidateEmpty(true)
 		sat.SetInputFields(append(sat.GetInputFields(), scopeField))
 		options = append(options, sat)
 	}
@@ -112,6 +106,37 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 		Options:         options,
 		PreferredOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
 	}.Build(), nil, nil
+}
+
+// serviceAccessTokenScopeField starts with the SDK's legacy scope rules, then
+// adds Datadog's required scope cardinality. Issue uses the same Field to
+// protect direct callers that bypass the SDK's preflight.
+func serviceAccessTokenScopeField() (*config.Field, error) {
+	legacy := v2.CredentialIssueOptionDescriptor_builder{
+		Option:              v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN,
+		CustomScopesAllowed: true,
+	}.Build()
+	scopeField, err := connectorbuilder.CredentialIssueScopeField(legacy)
+	if err != nil {
+		return nil, err
+	}
+	scopeField.SetIsRequired(true)
+	rules := scopeField.GetStringSliceField().GetRules()
+	rules.SetMinItems(1)
+	rules.SetValidateEmpty(true)
+	return scopeField, nil
+}
+
+func validateDirectApplicationKeyScopes(scopes []string) error {
+	legacy := v2.CredentialIssueOptionDescriptor_builder{
+		Option:              v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+		CustomScopesAllowed: true,
+	}.Build()
+	scopeField, err := connectorbuilder.CredentialIssueScopeField(legacy)
+	if err != nil {
+		return err
+	}
+	return connectorbuilder.ValidateCredentialIssueScopes(scopes, scopeField)
 }
 
 // Issue dispatches on the credential kind the caller selected. The oneof arm
@@ -179,6 +204,10 @@ func issuedCredentialName(requestID string) string {
 // the service account -- so recording the service account as creator here
 // would repeat the same unsupported claim the sync path used to make.
 func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
+	scopes := input.CredentialOptions.GetApiKey().GetScopes()
+	if err := validateDirectApplicationKeyScopes(scopes); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: invalid application key scopes: %v", err)
+	}
 	serviceAccountID := input.IdentityID.GetResource()
 
 	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
@@ -201,7 +230,6 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
 	}
 
-	scopes := input.CredentialOptions.GetApiKey().GetScopes()
 	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
@@ -340,6 +368,13 @@ func (u *credentialUserBuilder) issueServiceAccountAccessToken(ctx context.Conte
 	scopes := input.CredentialOptions.GetToken().GetScopes()
 	if len(scopes) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: service access tokens require at least one scope")
+	}
+	scopeField, err := serviceAccessTokenScopeField()
+	if err != nil {
+		return nil, fmt.Errorf("baton-datadog: build SAT scope field: %w", err)
+	}
+	if err := connectorbuilder.ValidateCredentialIssueScopes(scopes, scopeField); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: invalid service access token scopes: %v", err)
 	}
 	serviceAccountID := input.IdentityID.GetResource()
 	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)

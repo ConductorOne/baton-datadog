@@ -123,6 +123,19 @@ func TestServiceAccessTokenMissingScopesRefusedBeforeProviderCall(t *testing.T) 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "field scopes of type []string is marked as required",
 		"the SDK descriptor must reject the request before invoking the connector's Issue method")
+	blankOptions := v2.CredentialIssueOptions_builder{
+		SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
+		Token:                v2.CredentialIssueOptions_Token_builder{Scopes: []string{"\u00a0"}}.Build(),
+	}.Build()
+	_, err = sdk.IssueCredential(ctx, v2.IssueCredentialRequest_builder{
+		IdentityId:        input.IdentityID,
+		CredentialOptions: blankOptions,
+		EncryptionConfigs: []*v2.EncryptionConfig{encConfig},
+		RequestId:         "blank-scopes-sdk",
+	}.Build())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "must match pattern",
+		"the shared SDK guard must reject a Unicode blank scope before connector Issue")
 	mu.Lock()
 	require.Zero(t, providerCalls)
 	mu.Unlock()

@@ -76,9 +76,12 @@ Those two kinds omit explicit input fields and use the SDK's legacy Field
 synthesis, which preserves their existing optional and unsupported meanings.
 C1 can resolve the same shared scope Field for all three kinds and derive
 required, optional, or unsupported input without recognizing Datadog
-resource-type names. The connector also rejects missing SAT scopes and
-unexpected organization-key scopes before any provider create call for direct
-or older SDK callers. No separate `min_scopes` proto field is used.
+resource-type names. The connector invokes the SDK's shared scope validator
+for direct SAT and application-key Issue calls before any provider request,
+so blank or duplicate scope entries cannot bypass the preflight. It also
+rejects missing SAT scopes and any organization-key scopes before provider
+create for direct or older SDK callers. No separate `min_scopes` proto field
+is used.
 
 This shared service-account setting now causes the connector to list SATs for
 each active service account as well as application keys. A Datadog 403 or 404
