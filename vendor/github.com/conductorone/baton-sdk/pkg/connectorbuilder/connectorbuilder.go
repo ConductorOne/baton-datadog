@@ -611,7 +611,7 @@ func validateCredentialIssuePreference(
 }
 
 func validateCredentialIssueDescriptorShape(descriptor *v2.CredentialIssueOptionDescriptor) error {
-	hasScopes := len(descriptor.GetScopes()) != 0 || descriptor.GetCustomScopesAllowed()
+	hasScopes := len(descriptor.GetScopes()) != 0 || descriptor.GetCustomScopesAllowed() || len(descriptor.GetInputFields()) != 0
 	hasAudiences := len(descriptor.GetAudiences()) != 0 || descriptor.GetCustomAudiencesAllowed()
 	hasKeyProfiles := len(descriptor.GetKeyProfiles()) != 0
 	switch descriptor.GetOption() {
@@ -637,7 +637,8 @@ func validateCredentialIssueDescriptorShape(descriptor *v2.CredentialIssueOption
 	default:
 		return fmt.Errorf("unsupported issuance option")
 	}
-	return nil
+	_, err := CredentialIssueScopeField(descriptor)
+	return err
 }
 
 func validateIssuanceExpiryCapability(capability *v2.IssuanceExpiryCapability) error {

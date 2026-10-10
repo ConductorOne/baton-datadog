@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	config "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/field"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -93,6 +95,10 @@ func validateCredentialIssueInput(input *CredentialIssueInput, details *v2.Crede
 	if err != nil {
 		return nil, err
 	}
+	scopeField, err := CredentialIssueScopeField(descriptor)
+	if err != nil {
+		return nil, err
+	}
 	if descriptor.GetResourceMode() == v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_UNSPECIFIED {
 		return nil, fmt.Errorf("credential resource mode must be advertised")
 	}
@@ -106,13 +112,15 @@ func validateCredentialIssueInput(input *CredentialIssueInput, details *v2.Crede
 			return nil, fmt.Errorf("requested key generation profile is not advertised by connector")
 		}
 	}
-	if apiKey := input.CredentialOptions.GetApiKey(); apiKey != nil {
-		if err := validateRequestedValues("scope", apiKey.GetScopes(), descriptor.GetScopes(), descriptor.GetCustomScopesAllowed()); err != nil {
+	if descriptor.GetOption() == v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY {
+		apiKey := input.CredentialOptions.GetApiKey()
+		if err := ValidateCredentialIssueScopes(apiKey.GetScopes(), scopeField); err != nil {
 			return nil, err
 		}
 	}
-	if token := input.CredentialOptions.GetToken(); token != nil {
-		if err := validateRequestedValues("scope", token.GetScopes(), descriptor.GetScopes(), descriptor.GetCustomScopesAllowed()); err != nil {
+	if descriptor.GetOption() == v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN {
+		token := input.CredentialOptions.GetToken()
+		if err := ValidateCredentialIssueScopes(token.GetScopes(), scopeField); err != nil {
 			return nil, err
 		}
 		if err := validateRequestedValues("audience", token.GetAudiences(), descriptor.GetAudiences(), descriptor.GetCustomAudiencesAllowed()); err != nil {
@@ -139,6 +147,19 @@ func validateCredentialIssueInput(input *CredentialIssueInput, details *v2.Crede
 		}
 	}
 	return descriptor, nil
+}
+
+// ValidateCredentialIssueScopes applies the nonblank scope-item contract and
+// the effective field's declared rules without changing requested values.
+func ValidateCredentialIssueScopes(requested []string, scopeField *config.Field) error {
+	if scopeField.GetName() != "scopes" || scopeField.GetStringSliceField() == nil {
+		return fmt.Errorf("credential issue scopes field must be a named string slice")
+	}
+	baseline := config.RepeatedStringRules_builder{ItemRules: nonblankScopeRules()}.Build()
+	if err := field.ValidateRepeatedStringRules(baseline, requested, "scopes"); err != nil {
+		return err
+	}
+	return field.ValidateRepeatedStringRules(scopeField.GetStringSliceField().GetRules(), requested, "scopes")
 }
 
 func validateRequestedValues(kind string, requested []string, advertised []string, customAllowed bool) error {

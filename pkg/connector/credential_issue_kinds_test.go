@@ -10,33 +10,85 @@ import (
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
-// TestIssuanceAdvertisesBothCredentialKinds is the type-discriminator contract:
-// two kinds of the same API_KEY shape, told apart only by
-// secret_resource_type_id.
+// TestIssuanceAdvertisesBothCredentialKinds checks two API_KEY kinds selected
+// by secret_resource_type_id plus the distinct TOKEN/SAT kind.
 func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 	ctx := context.Background()
 	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true).IssueCapabilityDetails(ctx)
 	require.NoError(t, err)
-	require.Len(t, details.GetOptions(), 2)
+	require.Len(t, details.GetOptions(), 3)
 
 	byType := map[string]*v2.CredentialIssueOptionDescriptor{}
 	for _, o := range details.GetOptions() {
-		require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY, o.GetOption(),
-			"both kinds are the same shape; only the secret resource type separates them")
 		byType[o.GetSecretResourceTypeId()] = o
 	}
 	require.Contains(t, byType, serviceAccountApplicationKeyResourceType.Id)
 	require.Contains(t, byType, apiTokenResourceType.Id)
+	require.Contains(t, byType, serviceAccountAccessTokenResourceType.Id)
+	require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+		byType[serviceAccountApplicationKeyResourceType.Id].GetOption())
+	require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+		byType[apiTokenResourceType.Id].GetOption())
+	require.Equal(t, v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN,
+		byType[serviceAccountAccessTokenResourceType.Id].GetOption())
 	require.True(t, byType[serviceAccountApplicationKeyResourceType.Id].GetPreferred())
 	require.False(t, byType[apiTokenResourceType.Id].GetPreferred())
 	require.True(t, byType[serviceAccountApplicationKeyResourceType.Id].GetCustomScopesAllowed())
 	require.False(t, byType[apiTokenResourceType.Id].GetCustomScopesAllowed(),
 		"organization API keys carry no scopes")
+	require.Empty(t, byType[apiTokenResourceType.Id].GetScopes())
+	require.True(t, byType[serviceAccountAccessTokenResourceType.Id].GetCustomScopesAllowed())
+	sat := byType[serviceAccountAccessTokenResourceType.Id]
+	require.Len(t, sat.GetInputFields(), 1)
+	require.Equal(t, "scopes", sat.GetInputFields()[0].GetName())
+	require.True(t, sat.GetInputFields()[0].GetIsRequired())
+	satField, err := connectorbuilder.CredentialIssueScopeField(sat)
+	require.NoError(t, err)
+	satRules := satField.GetStringSliceField().GetRules()
+	require.True(t, satRules.GetIsRequired())
+	require.Equal(t, uint64(1), satRules.GetMinItems())
+	require.True(t, satRules.GetValidateEmpty())
+	require.True(t, satRules.GetUnique())
+	require.NotEmpty(t, satRules.GetItemRules().GetPattern(), "explicit rules preserve the SDK's nonblank scope validation")
+	require.Error(t, field.ValidateRepeatedStringRules(satRules, nil, "scopes"))
+
+	app := byType[serviceAccountApplicationKeyResourceType.Id]
+	require.Empty(t, app.GetInputFields(), "optional application-key scopes use the legacy shared Field synthesis")
+	appField, err := connectorbuilder.CredentialIssueScopeField(app)
+	require.NoError(t, err)
+	require.False(t, appField.GetIsRequired())
+	require.NoError(t, field.ValidateRepeatedStringRules(appField.GetStringSliceField().GetRules(), nil, "scopes"))
+
+	org := byType[apiTokenResourceType.Id]
+	require.Empty(t, org.GetInputFields(), "unsupported organization-key scopes use the legacy shared Field synthesis")
+	orgField, err := connectorbuilder.CredentialIssueScopeField(org)
+	require.NoError(t, err)
+	require.True(t, orgField.GetStringSliceField().GetRules().HasMaxItems())
+	require.Zero(t, orgField.GetStringSliceField().GetRules().GetMaxItems())
+	require.Error(t, field.ValidateRepeatedStringRules(orgField.GetStringSliceField().GetRules(), []string{"read"}, "scopes"))
+
+	metadata, err := protojson.Marshal(details)
+	require.NoError(t, err)
+	require.Contains(t, string(metadata), `"inputFields"`)
+	restored := &v2.CredentialDetailsCredentialIssue{}
+	require.NoError(t, protojson.Unmarshal(metadata, restored))
+	require.Len(t, restored.GetOptions(), 3)
+	for _, option := range restored.GetOptions() {
+		original := byType[option.GetSecretResourceTypeId()]
+		require.Equal(t, len(original.GetInputFields()), len(option.GetInputFields()))
+		for index, inputField := range option.GetInputFields() {
+			require.True(t, proto.Equal(original.GetInputFields()[index], inputField),
+				"scope Field rules must survive SDK metadata serialization")
+		}
+	}
 }
 
 // TestIssuanceOmitsOrgAPIKeyWithoutGrant: without the delete grant there is no
@@ -47,8 +99,9 @@ func TestIssuanceOmitsOrgAPIKeyWithoutGrant(t *testing.T) {
 	ctx := context.Background()
 	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), false, true).IssueCapabilityDetails(ctx)
 	require.NoError(t, err)
-	require.Len(t, details.GetOptions(), 1)
+	require.Len(t, details.GetOptions(), 2)
 	require.Equal(t, serviceAccountApplicationKeyResourceType.Id, details.GetOptions()[0].GetSecretResourceTypeId())
+	require.Equal(t, serviceAccountAccessTokenResourceType.Id, details.GetOptions()[1].GetSecretResourceTypeId())
 
 	out, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), false, true).Issue(ctx, &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
@@ -104,6 +157,8 @@ func TestIssueDispatchesOnRequestedCredentialKind(t *testing.T) {
 	require.Equal(t, "org-key-id", out.Secret.GetId().GetResource())
 	require.Len(t, out.PlaintextData, 1)
 	require.Equal(t, "api_key", out.PlaintextData[0].GetName())
+	require.JSONEq(t, `{"key_value":"org-key-secret","provider":"datadog","key_id":"org-key-id","header_name":"DD-API-KEY"}`,
+		string(out.PlaintextData[0].GetBytes()))
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -132,6 +187,43 @@ func TestIssueRejectsScopesOnOrgAPIKey(t *testing.T) {
 	})
 	require.Nil(t, out)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestDirectIssueRejectsInvalidScopesBeforeProviderCall(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("provider contacted for invalid scopes: %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, true)
+	for _, tc := range []struct {
+		name    string
+		kind    string
+		isToken bool
+		scopes  []string
+	}{
+		{"application key blank", serviceAccountApplicationKeyResourceType.Id, false, []string{"\u00a0"}},
+		{"application key duplicate", serviceAccountApplicationKeyResourceType.Id, false, []string{"read", "read"}},
+		{"SAT blank", serviceAccountAccessTokenResourceType.Id, true, []string{"\u00a0"}},
+		{"SAT duplicate", serviceAccountAccessTokenResourceType.Id, true, []string{"read", "read"}},
+		{"organization key scoped", apiTokenResourceType.Id, false, []string{"read"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			options := v2.CredentialIssueOptions_builder{SecretResourceTypeId: tc.kind}.Build()
+			if tc.isToken {
+				options.SetToken(v2.CredentialIssueOptions_Token_builder{Scopes: tc.scopes}.Build())
+			} else {
+				options.SetApiKey(v2.CredentialIssueOptions_ApiKey_builder{Scopes: tc.scopes}.Build())
+			}
+			issued, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
+				IdentityID:        &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
+				RequestID:         "invalid-scopes",
+				CredentialOptions: options,
+			})
+			require.Nil(t, issued)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
 }
 
 // TestIssueRejectsUnknownCredentialKind: an unadvertised secret resource type
