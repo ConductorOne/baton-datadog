@@ -279,7 +279,8 @@
                     "unique": true,
                     "itemRules": {
                       "pattern": "[^\t\n\u000b\f\r    -     　]",
-                      "validateEmpty": true
+                      "validateEmpty": true,
+                      "isRequired": true
                     },
                     "validateEmpty": true
                   }

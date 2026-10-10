@@ -278,7 +278,7 @@ github.com/cockroachdb/swiss
 # github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06
 ## explicit; go 1.19
 github.com/cockroachdb/tokenbucket
-# github.com/conductorone/baton-sdk v0.40.1-0.20261009232358-d8d76ead13b8
+# github.com/conductorone/baton-sdk v0.40.1-0.20261010000231-1c0ead412990
 ## explicit; go 1.27.1
 github.com/conductorone/baton-sdk/internal/atomicfile
 github.com/conductorone/baton-sdk/internal/connector
