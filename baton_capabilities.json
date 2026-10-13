@@ -268,25 +268,7 @@
             "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN",
             "customScopesAllowed": true,
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
-            "secretResourceTypeId": "service-account-access-token",
-            "inputFields": [
-              {
-                "name": "scopes",
-                "isRequired": true,
-                "stringSliceField": {
-                  "rules": {
-                    "minItems": "1",
-                    "unique": true,
-                    "itemRules": {
-                      "pattern": "[^\t\n\u000b\f\r    -     　]",
-                      "validateEmpty": true,
-                      "isRequired": true
-                    },
-                    "validateEmpty": true
-                  }
-                }
-              }
-            ]
+            "secretResourceTypeId": "service-account-access-token"
           }
         ],
         "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"
