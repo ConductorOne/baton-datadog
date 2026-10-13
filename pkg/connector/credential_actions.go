@@ -25,6 +25,12 @@ const (
 
 var issuanceRequestIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
+// These are the Unicode White_Space runes stripped by strings.TrimSpace.
+// Actual Unicode characters keep this class portable across Go's POSIX
+// regular expressions and JavaScript RegExp; neither engine accepts all of
+// the other's escape syntax. U+200B and U+FEFF are deliberately allowed.
+const nonblankScopePattern = "[^\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+
 // The action schema is public metadata. Every secret value is delivered only as
 // encrypted data by RegisterWithSecrets; issued_resource carries the stable
 // provider handle used by the existing inventory and delete paths.
@@ -64,6 +70,9 @@ func issuanceScopeField(required bool) *config.Field {
 	rules := &config.RepeatedStringRules{Unique: true, ValidateEmpty: true}
 	itemRules := &config.StringRules{}
 	itemRules.SetMinLen(1)
+	itemRules.SetPattern(nonblankScopePattern)
+	itemRules.SetValidateEmpty(true)
+	itemRules.SetIsRequired(true)
 	rules.SetItemRules(itemRules)
 	if required {
 		rules.SetMinItems(1)
