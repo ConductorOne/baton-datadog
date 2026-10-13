@@ -15,6 +15,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/crypto/providers/jwe"
+	"github.com/conductorone/baton-sdk/pkg/crypto/providers/jwk"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -192,4 +193,55 @@ func TestDatadogAPIKeyActionsIssueNativePayloads(t *testing.T) {
 	require.Equal(t, 1, orgDeletes)
 	require.Equal(t, 1, satDeletes)
 	mu.Unlock()
+}
+
+// Existing IssueCredential selectors retain their raw plaintext contract while
+// the separate actions supply native api_key_v2 documents.
+func TestDatadogLegacyIssueCredentialKeepsRawBytes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/users/sa-1":
+			_, _ = w.Write([]byte(`{"data":{"id":"sa-1","type":"users","attributes":{"service_account":true}}}`))
+		case r.Method == http.MethodGet && (r.URL.Path == "/api/v2/service_accounts/sa-1/application_keys" || r.URL.Path == "/api/v2/api_keys"):
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/service_accounts/sa-1/application_keys":
+			_, _ = w.Write([]byte(`{"data":{"id":"legacy-app-id","type":"application_keys","attributes":{"key":"legacy-app-value","name":"c1-legacy-app"}}}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/api_keys":
+			_, _ = w.Write([]byte(`{"data":{"id":"legacy-org-id","type":"api_keys","attributes":{"key":"legacy-org-value","name":"c1-legacy-org"}}}`))
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	ctx := context.Background()
+	sdk, err := connectorbuilder.NewConnector(ctx, &Datadog{
+		wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true,
+		AllowOrgAPIKeyDeletion: true, SyncServiceAccountApplicationKeys: true,
+	})
+	require.NoError(t, err)
+	config, privateKey, err := (&jwk.JWKEncryptionProvider{}).GenerateKey(ctx)
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		kind, requestID, identity, want string
+	}{
+		{serviceAccountApplicationKeyResourceType.Id, "legacy-app", "sa-1", "legacy-app-value"},
+		{apiTokenResourceType.Id, "legacy-org", "user-1", "legacy-org-value"},
+	} {
+		response, err := sdk.IssueCredential(ctx, v2.IssueCredentialRequest_builder{
+			IdentityId: v2.ResourceId_builder{ResourceType: userResourceType.Id, Resource: tc.identity}.Build(),
+			CredentialOptions: v2.CredentialIssueOptions_builder{
+				SecretResourceTypeId: tc.kind,
+				ApiKey:               v2.CredentialIssueOptions_ApiKey_builder{}.Build(),
+			}.Build(),
+			EncryptionConfigs: []*v2.EncryptionConfig{config}, RequestId: tc.requestID,
+		}.Build())
+		require.NoError(t, err)
+		require.Len(t, response.GetEncryptedData(), 1)
+		plaintext, err := (&jwk.JWKEncryptionProvider{}).Decrypt(ctx, response.GetEncryptedData()[0], privateKey)
+		require.NoError(t, err)
+		require.Equal(t, []byte(tc.want), plaintext.GetBytes())
+		require.Empty(t, plaintext.GetSchema())
+	}
 }
