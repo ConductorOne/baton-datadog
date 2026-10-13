@@ -26,7 +26,8 @@ type apiKeyV2Payload struct {
 // keyValue must be the one-time key secret, while keyID is its provider handle.
 // Service-account application-key scopes must come from Datadog's create
 // response, rather than the requested scopes. Org API keys have no scopes.
-// The current API_KEY selectors emit this document as their plaintext value.
+// The encrypted issuance actions emit this document. Legacy IssueCredential
+// selectors continue to deliver raw values.
 func encodeDatadogAPIKeyV2(kind datadogKeyKind, keyValue, keyID string, scopes *[]string) ([]byte, error) {
 	if keyValue == "" || keyID == "" {
 		return nil, errors.New("datadog native API key requires a key value and provider key ID")

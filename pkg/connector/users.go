@@ -7,7 +7,6 @@ import (
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
-	config "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -89,18 +88,12 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 		}.Build())
 	}
 	if u.offerServiceAccountAppKey {
-		sat := v2.CredentialIssueOptionDescriptor_builder{
+		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
 			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN,
 			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 			SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
 			CustomScopesAllowed:  true,
-		}.Build()
-		scopeField, err := serviceAccessTokenScopeField()
-		if err != nil {
-			return nil, nil, fmt.Errorf("baton-datadog: build SAT scope field: %w", err)
-		}
-		sat.SetInputFields(append(sat.GetInputFields(), scopeField))
-		options = append(options, sat)
+		}.Build())
 	}
 	return v2.CredentialDetailsCredentialIssue_builder{
 		Options:         options,
@@ -108,37 +101,12 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 	}.Build(), nil, nil
 }
 
-// serviceAccessTokenScopeField starts with the SDK's legacy scope rules, then
-// adds Datadog's required scope cardinality. Issue uses the same Field to
-// protect direct callers that bypass the SDK's preflight.
-func serviceAccessTokenScopeField() (*config.Field, error) {
-	legacy := v2.CredentialIssueOptionDescriptor_builder{
-		Option:              v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN,
-		CustomScopesAllowed: true,
-	}.Build()
-	scopeField, err := connectorbuilder.CredentialIssueScopeField(legacy)
-	if err != nil {
-		return nil, err
-	}
-	scopeField.SetIsRequired(true)
-	rules := scopeField.GetStringSliceField().GetRules()
-	rules.SetMinItems(1)
-	rules.SetValidateEmpty(true)
-	return scopeField, nil
-}
-
 func validateDirectApplicationKeyScopes(scopes []string) error {
-	legacy := v2.CredentialIssueOptionDescriptor_builder{
-		Option:              v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
-		CustomScopesAllowed: true,
-	}.Build()
-	scopeField, err := connectorbuilder.CredentialIssueScopeField(legacy)
-	if err != nil {
-		return err
-	}
-	return connectorbuilder.ValidateCredentialIssueScopes(scopes, scopeField)
+	return validateIssuanceScopes(scopes, false)
 }
 
+// Issue retains the existing raw secret delivery contract. Native api_key_v2
+// values are returned by the separate encrypted issuance actions.
 // Issue dispatches on the credential kind the caller selected. The oneof arm
 // of CredentialIssueOptions gives the shape (API_KEY or TOKEN) and
 // secret_resource_type_id gives the kind within it; the SDK has already
@@ -154,6 +122,10 @@ func validateDirectApplicationKeyScopes(scopes []string) error {
 // walks, and why a mint whose result cannot be returned is cleaned up on the
 // spot: there is no later attempt to recover from either.
 func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
+	return u.issueWithFormat(ctx, input, false)
+}
+
+func (u *credentialUserBuilder) issueWithFormat(ctx context.Context, input *connectorbuilder.CredentialIssueInput, native bool) (*connectorbuilder.CredentialIssueOutput, error) {
 	if input == nil || input.IdentityID == nil || input.IdentityID.GetResourceType() != userResourceType.Id {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: a Datadog user identity is required")
 	}
@@ -163,18 +135,18 @@ func (u *credentialUserBuilder) Issue(ctx context.Context, input *connectorbuild
 			return nil, status.Error(codes.FailedPrecondition,
 				"baton-datadog: service account application key issuance requires sync-service-account-application-keys, which also provides the revoke path")
 		}
-		return u.issueServiceAccountApplicationKey(ctx, input)
+		return u.issueServiceAccountApplicationKey(ctx, input, native)
 	case apiTokenResourceType.Id:
 		if !u.offerOrgAPIKey {
 			return nil, status.Error(codes.FailedPrecondition,
 				"baton-datadog: organization API key issuance requires allow-org-api-key-deletion, which also provides the revoke path")
 		}
-		return u.issueOrganizationAPIKey(ctx, input)
+		return u.issueOrganizationAPIKey(ctx, input, native)
 	case serviceAccountAccessTokenResourceType.Id:
 		if !u.offerServiceAccountAppKey {
 			return nil, status.Error(codes.FailedPrecondition, "baton-datadog: service access token issuance requires sync-service-account-application-keys")
 		}
-		return u.issueServiceAccountAccessToken(ctx, input)
+		return u.issueServiceAccountAccessToken(ctx, input, native)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument,
 			"baton-datadog: unsupported credential secret resource type %q", secretResourceTypeID)
@@ -203,7 +175,7 @@ func issuedCredentialName(requestID string) string {
 // it authenticates as the connector's configured Datadog principal, not as
 // the service account -- so recording the service account as creator here
 // would repeat the same unsupported claim the sync path used to make.
-func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
+func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput, native bool) (*connectorbuilder.CredentialIssueOutput, error) {
 	scopes := input.CredentialOptions.GetApiKey().GetScopes()
 	if err := validateDirectApplicationKeyScopes(scopes); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: invalid application key scopes: %v", err)
@@ -234,7 +206,10 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
 	}
-	encoded, err := encodeDatadogAPIKeyV2(serviceAccountApplicationKeyKind, key.Secret, key.ID, key.Scopes)
+	encoded := []byte(key.Secret)
+	if native {
+		encoded, err = encodeDatadogAPIKeyV2(serviceAccountApplicationKeyKind, key.Secret, key.ID, key.Scopes)
+	}
 	if err != nil {
 		if deleteErr := u.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, key.ID); deleteErr != nil {
 			ctxzap.Extract(ctx).Warn("failed to clean up Datadog service account application key after payload encoding error",
@@ -293,7 +268,7 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 // and creator are frequently different actors here, not just in an edge
 // case. When the response reports no creator, CreatedById is left unset
 // rather than defaulting to the recipient.
-func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
+func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput, native bool) (*connectorbuilder.CredentialIssueOutput, error) {
 	// The SDK rejects requested scopes for this descriptor before Issue runs
 	// (it advertises no scopes and disallows custom ones). Re-checking here
 	// keeps the arm correct for a caller that reaches Issue directly, and
@@ -317,7 +292,10 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
 	}
-	encoded, err := encodeDatadogAPIKeyV2(organizationAPIKeyKind, key.Secret, key.ID, nil)
+	encoded := []byte(key.Secret)
+	if native {
+		encoded, err = encodeDatadogAPIKeyV2(organizationAPIKeyKind, key.Secret, key.ID, nil)
+	}
 	if err != nil {
 		if deleteErr := u.wrapper.DeleteAPIKey(ctx, key.ID); deleteErr != nil {
 			ctxzap.Extract(ctx).Warn("failed to clean up Datadog organization API key after payload encoding error",
@@ -361,7 +339,7 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	}, nil
 }
 
-func (u *credentialUserBuilder) issueServiceAccountAccessToken(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
+func (u *credentialUserBuilder) issueServiceAccountAccessToken(ctx context.Context, input *connectorbuilder.CredentialIssueInput, native bool) (*connectorbuilder.CredentialIssueOutput, error) {
 	if input.ExpiresAt != nil {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: caller-selected service access token expiry is not advertised")
 	}
@@ -369,11 +347,7 @@ func (u *credentialUserBuilder) issueServiceAccountAccessToken(ctx context.Conte
 	if len(scopes) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "baton-datadog: service access tokens require at least one scope")
 	}
-	scopeField, err := serviceAccessTokenScopeField()
-	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: build SAT scope field: %w", err)
-	}
-	if err := connectorbuilder.ValidateCredentialIssueScopes(scopes, scopeField); err != nil {
+	if err := validateIssuanceScopes(scopes, true); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: invalid service access token scopes: %v", err)
 	}
 	serviceAccountID := input.IdentityID.GetResource()
@@ -402,7 +376,10 @@ func (u *credentialUserBuilder) issueServiceAccountAccessToken(ctx context.Conte
 				zap.String("service_account_id", serviceAccountID), zap.String("token_id", issued.ID), zap.Error(deleteErr))
 		}
 	}
-	encoded, err := encodeDatadogServiceAccessTokenV2(issued.Key, issued.ID, issued.Scopes)
+	encoded := []byte(issued.Key)
+	if native {
+		encoded, err = encodeDatadogServiceAccessTokenV2(issued.Key, issued.ID, issued.Scopes)
+	}
 	if err != nil {
 		cleanup()
 		return nil, fmt.Errorf("baton-datadog: encode service access token: %w", err)

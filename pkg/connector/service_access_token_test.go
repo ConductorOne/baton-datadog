@@ -121,8 +121,7 @@ func TestServiceAccessTokenMissingScopesRefusedBeforeProviderCall(t *testing.T) 
 		RequestId:         "missing-scopes-sdk",
 	}.Build())
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "field scopes of type []string is marked as required",
-		"the SDK descriptor must reject the request before invoking the connector's Issue method")
+	require.Contains(t, err.Error(), "service access tokens require at least one scope")
 	blankOptions := v2.CredentialIssueOptions_builder{
 		SecretResourceTypeId: serviceAccountAccessTokenResourceType.Id,
 		Token:                v2.CredentialIssueOptions_Token_builder{Scopes: []string{"\u00a0"}}.Build(),
@@ -231,7 +230,7 @@ func TestServiceAccessTokenIssueSyncRenameAndRevoke(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, out.PlaintextData, 1)
 	require.Equal(t, "service_access_token", out.PlaintextData[0].GetName())
-	require.JSONEq(t, `{"key_value":"`+fixtureValue+`","provider":"datadog","key_id":"`+tokenID+`","header_name":"Authorization","scopes":["granted_scope"]}`, string(out.PlaintextData[0].GetBytes()))
+	require.Equal(t, fixtureValue, string(out.PlaintextData[0].GetBytes()))
 	require.NotContains(t, out.Secret.GetId().GetResource(), fixtureValue)
 	owner, parsedID, err := parseServiceAccessTokenHandle(out.Secret.GetId().GetResource())
 	require.NoError(t, err)
@@ -479,5 +478,5 @@ func TestServiceAccessTokenSDKIssueEncryptsAndRejectsUnadvertisedKind(t *testing
 	plaintext, err := (&jwk.JWKEncryptionProvider{}).Decrypt(ctx, issued.GetEncryptedData()[0], privateKey)
 	require.NoError(t, err)
 	require.Equal(t, "service_access_token", plaintext.GetName())
-	require.JSONEq(t, `{"key_value":"ddsat_sdk-secret","provider":"datadog","key_id":"sdk-token-id","header_name":"Authorization","scopes":["dashboards_read"]}`, string(plaintext.GetBytes()))
+	require.Equal(t, "ddsat_sdk-secret", string(plaintext.GetBytes()))
 }
