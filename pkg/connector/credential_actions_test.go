@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -70,6 +71,12 @@ func TestCredentialActionSchemasFollowPermissionGates(t *testing.T) {
 				require.Len(t, schema.GetArguments(), 3)
 				require.True(t, schema.GetArguments()[2].GetIsRequired())
 				require.Equal(t, uint64(1), schema.GetArguments()[2].GetStringSliceField().GetRules().GetMinItems())
+				serialized, err := protojson.Marshal(schema)
+				require.NoError(t, err)
+				var restored v2.BatonActionSchema
+				require.NoError(t, protojson.Unmarshal(serialized, &restored))
+				require.True(t, restored.GetArguments()[2].GetIsRequired())
+				require.True(t, restored.GetArguments()[2].GetStringSliceField().GetRules().GetUnique())
 			case ActionIssueServiceAccountApplicationKey:
 				require.Len(t, schema.GetArguments(), 3)
 				require.False(t, schema.GetArguments()[2].GetIsRequired())
