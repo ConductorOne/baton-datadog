@@ -2,19 +2,22 @@ package connector
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"filippo.io/hpke"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/crypto/providers/jwk"
+	"github.com/conductorone/baton-sdk/pkg/crypto/providers/jwe"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
-	"time"
 )
 
 // The three new actions return native bytes through the SDK encrypted action
@@ -25,6 +28,7 @@ func TestDatadogAPIKeyActionsIssueNativePayloads(t *testing.T) {
 	const orgValue = "org<>&fixture"
 	var mu sync.Mutex
 	appCreates, orgCreates, satCreates := 0, 0, 0
+	appDeletes, orgDeletes, satDeletes := 0, 0, 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
@@ -55,6 +59,21 @@ func TestDatadogAPIKeyActionsIssueNativePayloads(t *testing.T) {
 			mu.Unlock()
 			_, _ = w.Write([]byte(`{"data":{"id":"org-native-id","type":"api_keys",` +
 				`"attributes":{"key":"` + orgValue + `","name":"c1-native-org"}}}`))
+		case r.Method == http.MethodDelete && r.URL.Path == appPath+"/app-native-id":
+			mu.Lock()
+			appDeletes++
+			mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/v2/api_keys/org-native-id":
+			mu.Lock()
+			orgDeletes++
+			mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/v2/service_accounts/sa-1/access_tokens/sat-native-id":
+			mu.Lock()
+			satDeletes++
+			mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
 		default:
 			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -67,8 +86,22 @@ func TestDatadogAPIKeyActionsIssueNativePayloads(t *testing.T) {
 		AllowOrgAPIKeyDeletion: true, SyncServiceAccountApplicationKeys: true,
 	})
 	require.NoError(t, err)
-	config, privateKey, err := (&jwk.JWKEncryptionProvider{}).GenerateKey(ctx)
+	privateKey, err := hpke.MLKEM768X25519().GenerateKey()
 	require.NoError(t, err)
+	publicBytes := privateKey.PublicKey().Bytes()
+	const keyID = "credential-ticket-key"
+	const aad = "ticket/approved-identity/credential"
+	publicJWK, err := json.Marshal(map[string]string{
+		"kty": "AKP", "alg": jwe.Algorithm, "pub": base64.RawURLEncoding.EncodeToString(publicBytes),
+		"kid": keyID, "use": "enc",
+	})
+	require.NoError(t, err)
+	config := v2.EncryptionConfig_builder{
+		Provider: jwe.EncryptionProvider, KeyId: keyID,
+		JwkPublicKeyConfig: v2.EncryptionConfig_JWKPublicKeyConfig_builder{
+			PubKey: publicJWK, AdditionalAuthenticatedData: []byte(aad),
+		}.Build(),
+	}.Build()
 
 	cases := []struct {
 		name, action, identity, kind, requestID, resourceID, plaintextName, expected string
@@ -118,16 +151,45 @@ func TestDatadogAPIKeyActionsIssueNativePayloads(t *testing.T) {
 			require.Equal(t, tc.resourceID, publicResource.GetId().GetResource())
 			require.NotContains(t, response.GetResponse().String(), tc.expected)
 			require.Len(t, response.GetEncryptedData(), 1)
-			plaintext, err := (&jwk.JWKEncryptionProvider{}).Decrypt(ctx, response.GetEncryptedData()[0], privateKey)
+			encrypted := response.GetEncryptedData()[0]
+			require.Equal(t, jwe.EncryptionProvider, encrypted.GetProvider())
+			require.Equal(t, []string{keyID}, encrypted.GetKeyIds())
+			require.Equal(t, tc.plaintextName, encrypted.GetName())
+			require.Equal(t, "api_key_v2", encrypted.GetSchema())
+			var message jwe.FlattenedJWE
+			require.NoError(t, json.Unmarshal(encrypted.GetEncryptedBytes(), &message))
+			require.Equal(t, base64.RawURLEncoding.EncodeToString([]byte(aad)), message.AAD)
+			enc, err := base64.RawURLEncoding.DecodeString(message.EncryptedKey)
 			require.NoError(t, err)
-			require.Equal(t, tc.plaintextName, plaintext.GetName())
-			require.Equal(t, "api_key_v2", plaintext.GetSchema())
-			require.Equal(t, []byte(tc.expected), plaintext.GetBytes())
+			ciphertext, err := base64.RawURLEncoding.DecodeString(message.Ciphertext)
+			require.NoError(t, err)
+			receiver, err := hpke.NewRecipient(enc, privateKey, hpke.HKDFSHA256(), hpke.ChaCha20Poly1305(), nil)
+			require.NoError(t, err)
+			plaintext, err := receiver.Open([]byte(message.Protected+"."+message.AAD), ciphertext)
+			require.NoError(t, err)
+			require.Equal(t, []byte(tc.expected), plaintext)
+			_, err = sdk.DeleteResourceV2(ctx, v2.DeleteResourceV2Request_builder{
+				ResourceId: publicResource.GetId(), ParentResourceId: publicResource.GetParentResourceId(),
+			}.Build())
+			require.NoError(t, err)
+			// Both AAD and the protected key-id are authenticated. A different
+			// ticket context or recipient key cannot recover the credential.
+			wrongAADReceiver, err := hpke.NewRecipient(enc, privateKey, hpke.HKDFSHA256(), hpke.ChaCha20Poly1305(), nil)
+			require.NoError(t, err)
+			_, err = wrongAADReceiver.Open([]byte(message.Protected+"."+base64.RawURLEncoding.EncodeToString([]byte("wrong-ticket"))), ciphertext)
+			require.Error(t, err)
+			wrongKeyIDReceiver, err := hpke.NewRecipient(enc, privateKey, hpke.HKDFSHA256(), hpke.ChaCha20Poly1305(), nil)
+			require.NoError(t, err)
+			_, err = wrongKeyIDReceiver.Open([]byte("wrong-protected-key-id."+message.AAD), ciphertext)
+			require.Error(t, err)
 		})
 	}
 	mu.Lock()
 	require.Equal(t, 1, appCreates)
 	require.Equal(t, 1, orgCreates)
 	require.Equal(t, 1, satCreates)
+	require.Equal(t, 1, appDeletes)
+	require.Equal(t, 1, orgDeletes)
+	require.Equal(t, 1, satDeletes)
 	mu.Unlock()
 }
