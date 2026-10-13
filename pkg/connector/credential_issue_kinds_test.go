@@ -43,7 +43,6 @@ func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 		"organization API keys carry no scopes")
 	require.Empty(t, byType[apiTokenResourceType.Id].GetScopes())
 	require.True(t, byType[serviceAccountAccessTokenResourceType.Id].GetCustomScopesAllowed())
-
 }
 
 // TestIssuanceOmitsOrgAPIKeyWithoutGrant: without the delete grant there is no

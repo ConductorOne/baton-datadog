@@ -32,8 +32,17 @@ func issuanceActionSchema(name, displayName, secretName string, scopes *config.F
 	requestIDRules := &config.StringRules{}
 	requestIDRules.SetPattern(`^[A-Za-z0-9_-]{1,128}$`)
 	arguments := []*config.Field{
-		{Name: "user_id", DisplayName: "User", Description: "Approved Datadog user identity", Field: &config.Field_ResourceIdField{ResourceIdField: &config.ResourceIdField{Rules: &config.ResourceIDRules{AllowedResourceTypeIds: []string{userResourceType.Id}}}}, IsRequired: true},
-		{Name: "request_id", DisplayName: "Request ID", Description: "Stable credential ticket identifier", Field: &config.Field_StringField{StringField: &config.StringField{Rules: requestIDRules}}, IsRequired: true},
+		{
+			Name: "user_id", DisplayName: "User", Description: "Approved Datadog user identity",
+			Field: &config.Field_ResourceIdField{ResourceIdField: &config.ResourceIdField{
+				Rules: &config.ResourceIDRules{AllowedResourceTypeIds: []string{userResourceType.Id}},
+			}}, IsRequired: true,
+		},
+		{
+			Name: "request_id", DisplayName: "Request ID", Description: "Stable credential ticket identifier",
+			Field:      &config.Field_StringField{StringField: &config.StringField{Rules: requestIDRules}},
+			IsRequired: true,
+		},
 	}
 	if scopes != nil {
 		arguments = append(arguments, scopes)
@@ -60,7 +69,11 @@ func issuanceScopeField(required bool) *config.Field {
 		rules.SetMinItems(1)
 		rules.SetIsRequired(true)
 	}
-	return &config.Field{Name: "scopes", DisplayName: "Scopes", Description: "Datadog permission scopes", Field: &config.Field_StringSliceField{StringSliceField: &config.StringSliceField{Rules: rules}}, IsRequired: required}
+	return &config.Field{
+		Name: "scopes", DisplayName: "Scopes", Description: "Datadog permission scopes",
+		Field:      &config.Field_StringSliceField{StringSliceField: &config.StringSliceField{Rules: rules}},
+		IsRequired: required,
+	}
 }
 
 func validateIssuanceScopes(scopes []string, required bool) error {
@@ -80,15 +93,24 @@ func (u *credentialUserBuilder) ResourceActions(ctx context.Context, registry ac
 		return err
 	}
 	if u.offerServiceAccountAppKey {
-		if err := actions.RegisterWithSecrets(ctx, registry, issuanceActionSchema(ActionIssueServiceAccountApplicationKey, "Issue Service Account Application Key", "application_key", issuanceScopeField(false)), u.issueAction(serviceAccountApplicationKeyResourceType.Id)); err != nil {
+		appSchema := issuanceActionSchema(ActionIssueServiceAccountApplicationKey,
+			"Issue Service Account Application Key", "application_key", issuanceScopeField(false))
+		if err := actions.RegisterWithSecrets(ctx, registry, appSchema,
+			u.issueAction(serviceAccountApplicationKeyResourceType.Id)); err != nil {
 			return err
 		}
-		if err := actions.RegisterWithSecrets(ctx, registry, issuanceActionSchema(ActionIssueServiceAccountAccessToken, "Issue Service Account Access Token", "service_access_token", issuanceScopeField(true)), u.issueAction(serviceAccountAccessTokenResourceType.Id)); err != nil {
+		satSchema := issuanceActionSchema(ActionIssueServiceAccountAccessToken,
+			"Issue Service Account Access Token", "service_access_token", issuanceScopeField(true))
+		if err := actions.RegisterWithSecrets(ctx, registry, satSchema,
+			u.issueAction(serviceAccountAccessTokenResourceType.Id)); err != nil {
 			return err
 		}
 	}
 	if u.offerOrgAPIKey {
-		if err := actions.RegisterWithSecrets(ctx, registry, issuanceActionSchema(ActionIssueOrganizationAPIKey, "Issue Organization API Key", "api_key", nil), u.issueAction(apiTokenResourceType.Id)); err != nil {
+		orgSchema := issuanceActionSchema(ActionIssueOrganizationAPIKey,
+			"Issue Organization API Key", "api_key", nil)
+		if err := actions.RegisterWithSecrets(ctx, registry, orgSchema,
+			u.issueAction(apiTokenResourceType.Id)); err != nil {
 			return err
 		}
 	}

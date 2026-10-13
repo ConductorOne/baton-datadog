@@ -113,13 +113,3 @@ func mapKeys[V any](m map[string]V) []string {
 	}
 	return keys
 }
-
-func typedAPIKeyValue(t *testing.T, plaintext []byte) string {
-	t.Helper()
-	var payload struct {
-		KeyValue string `json:"key_value"`
-	}
-	require.NoError(t, json.Unmarshal(plaintext, &payload))
-	require.NotEmpty(t, payload.KeyValue)
-	return payload.KeyValue
-}

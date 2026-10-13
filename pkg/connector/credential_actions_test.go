@@ -65,14 +65,15 @@ func TestCredentialActionSchemasFollowPermissionGates(t *testing.T) {
 			require.Len(t, schema.GetReturnTypes(), 3)
 			require.Equal(t, "issued_resource", schema.GetReturnTypes()[1].GetName())
 			require.True(t, schema.GetReturnTypes()[2].GetIsSecret())
-			if name == ActionIssueServiceAccountAccessToken {
+			switch name {
+			case ActionIssueServiceAccountAccessToken:
 				require.Len(t, schema.GetArguments(), 3)
 				require.True(t, schema.GetArguments()[2].GetIsRequired())
 				require.Equal(t, uint64(1), schema.GetArguments()[2].GetStringSliceField().GetRules().GetMinItems())
-			} else if name == ActionIssueServiceAccountApplicationKey {
+			case ActionIssueServiceAccountApplicationKey:
 				require.Len(t, schema.GetArguments(), 3)
 				require.False(t, schema.GetArguments()[2].GetIsRequired())
-			} else {
+			default:
 				require.Len(t, schema.GetArguments(), 2)
 			}
 		}
