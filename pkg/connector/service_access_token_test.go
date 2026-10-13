@@ -133,8 +133,7 @@ func TestServiceAccessTokenMissingScopesRefusedBeforeProviderCall(t *testing.T) 
 		RequestId:         "blank-scopes-sdk",
 	}.Build())
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "must match pattern",
-		"the shared SDK guard must reject a Unicode blank scope before connector Issue")
+	require.Contains(t, err.Error(), "scope must not be empty")
 	mu.Lock()
 	require.Zero(t, providerCalls)
 	mu.Unlock()

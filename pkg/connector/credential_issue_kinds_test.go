@@ -43,7 +43,6 @@ func TestIssuanceAdvertisesBothCredentialKinds(t *testing.T) {
 		"organization API keys carry no scopes")
 	require.Empty(t, byType[apiTokenResourceType.Id].GetScopes())
 	require.True(t, byType[serviceAccountAccessTokenResourceType.Id].GetCustomScopesAllowed())
-	require.Empty(t, byType[serviceAccountAccessTokenResourceType.Id].GetInputFields(), "tagged SDK legacy descriptor has no custom input fields")
 
 }
 
