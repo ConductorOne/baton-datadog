@@ -5,6 +5,7 @@ go 1.27.1
 toolchain go1.27.2
 
 require (
+	filippo.io/hpke v0.4.0
 	github.com/DataDog/datadog-api-client-go/v2 v2.43.0
 	github.com/conductorone/baton-sdk v0.40.0
 	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
@@ -19,7 +20,6 @@ require (
 require (
 	filippo.io/age v1.3.1 // indirect
 	filippo.io/edwards25519 v1.1.1 // indirect
-	filippo.io/hpke v0.4.0 // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
