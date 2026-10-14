@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -176,6 +177,8 @@ func TestCredentialActionsRejectInvalidInputsBeforeProviderCall(t *testing.T) {
 func TestCredentialActionStatusCarriesEncryptedResultAfterPending(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releasePost := func() { releaseOnce.Do(func() { close(release) }) }
 	var creates atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -193,6 +196,9 @@ func TestCredentialActionStatusCarriesEncryptedResultAfterPending(t *testing.T) 
 		}
 	}))
 	defer server.Close()
+	// Defer calls run in reverse order: unblock POST before Close waits for it.
+	// A failed require before the explicit release must still finish the test.
+	defer releasePost()
 	ctx := context.Background()
 	sdk, err := connectorbuilder.NewConnector(ctx, &Datadog{
 		wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true, AllowOrgAPIKeyDeletion: true,
@@ -215,7 +221,7 @@ func TestCredentialActionStatusCarriesEncryptedResultAfterPending(t *testing.T) 
 	case <-time.After(3 * time.Second):
 		t.Fatal("provider create did not start")
 	}
-	close(release)
+	releasePost()
 	var settled *v2.GetActionStatusResponse
 	require.Eventually(t, func() bool {
 		var statusErr error
