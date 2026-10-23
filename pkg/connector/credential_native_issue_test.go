@@ -91,7 +91,7 @@ func TestDatadogAPIKeyActionsIssueNativePayloads(t *testing.T) {
 	require.NoError(t, err)
 	publicBytes := privateKey.PublicKey().Bytes()
 	const keyID = "credential-ticket-key"
-	const aad = "ticket/approved-identity/credential"
+	const aad = `{ "purpose":"c1/fk-credential-delivery", "version":1, "content_type":"api_key_v2", "ticket":"approved-fixture" }`
 	publicJWK, err := json.Marshal(map[string]string{
 		"kty": "AKP", "alg": jwe.Algorithm, "pub": base64.RawURLEncoding.EncodeToString(publicBytes),
 		"kid": keyID, "use": "enc",

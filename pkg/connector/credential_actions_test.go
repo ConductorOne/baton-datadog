@@ -12,7 +12,6 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/crypto/providers/jwk"
 	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -161,8 +160,7 @@ func TestCredentialActionsRejectInvalidInputsBeforeProviderCall(t *testing.T) {
 		wrapper: issuer.wrapper, SyncSecrets: true, SyncServiceAccountApplicationKeys: true,
 	})
 	require.NoError(t, err)
-	encryptionConfig, _, err := (&jwk.JWKEncryptionProvider{}).GenerateKey(context.Background())
-	require.NoError(t, err)
+	encryptionConfig, _, _ := datadogActionJWEConfig(t)
 	response, err := serviceSDK.InvokeAction(context.Background(), v2.InvokeActionRequest_builder{
 		Name: ActionIssueServiceAccountAccessToken, ResourceTypeId: userResourceType.Id,
 		Args:              issuanceArgs(t, "sa-1", "whitespace-scope", []any{"\u2003"}),
@@ -204,8 +202,7 @@ func TestCredentialActionStatusCarriesEncryptedResultAfterPending(t *testing.T) 
 		wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true, AllowOrgAPIKeyDeletion: true,
 	})
 	require.NoError(t, err)
-	config, privateKey, err := (&jwk.JWKEncryptionProvider{}).GenerateKey(ctx)
-	require.NoError(t, err)
+	config, privateKey, aad := datadogActionJWEConfig(t)
 	invoked, err := sdk.InvokeAction(ctx, v2.InvokeActionRequest_builder{
 		Name: ActionIssueOrganizationAPIKey, ResourceTypeId: userResourceType.Id,
 		Args:              issuanceArgs(t, "user-1", "pending-ticket", nil),
@@ -234,9 +231,8 @@ func TestCredentialActionStatusCarriesEncryptedResultAfterPending(t *testing.T) 
 	require.Equal(t, apiTokenResourceType.Id, resource.GetId().GetResourceType())
 	require.Equal(t, "pending-org-id", resource.GetId().GetResource())
 	require.NotContains(t, settled.GetResponse().String(), "pending-value")
-	plaintext, err := (&jwk.JWKEncryptionProvider{}).Decrypt(ctx, settled.GetEncryptedData()[0], privateKey)
-	require.NoError(t, err)
-	require.Equal(t, "api_key_v2", plaintext.GetSchema())
-	require.JSONEq(t, `{"key_value":"pending-value","provider":"datadog","key_id":"pending-org-id","header_name":"DD-API-KEY"}`, string(plaintext.GetBytes()))
+	plaintext := openDatadogActionJWE(t, settled.GetEncryptedData()[0], privateKey, aad)
+	require.Equal(t, "api_key_v2", settled.GetEncryptedData()[0].GetSchema())
+	require.JSONEq(t, `{"key_value":"pending-value","provider":"datadog","key_id":"pending-org-id","header_name":"DD-API-KEY"}`, string(plaintext))
 	require.EqualValues(t, 1, creates.Load())
 }
