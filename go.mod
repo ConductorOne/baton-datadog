@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	filippo.io/hpke v0.4.0
 	github.com/DataDog/datadog-api-client-go/v2 v2.43.0
-	github.com/conductorone/baton-sdk v0.42.3
+	github.com/conductorone/baton-sdk v0.42.4-0.20261023000147-899cb2f0457c
 	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/quasilyte/go-ruleguard/dsl v0.3.23

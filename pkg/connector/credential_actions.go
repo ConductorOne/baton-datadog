@@ -14,6 +14,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/field"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -61,7 +62,7 @@ func issuanceActionSchema(name, displayName, secretName string, scopes *config.F
 		ReturnTypes: []*config.Field{
 			{Name: "success", DisplayName: "Success", Field: &config.Field_BoolField{BoolField: &config.BoolField{}}},
 			{Name: "issued_resource", DisplayName: "Issued Resource", Field: &config.Field_ResourceField{ResourceField: &config.ResourceField{}}, IsRequired: true},
-			{Name: secretName, DisplayName: "Credential", Field: &config.Field_StringField{StringField: &config.StringField{}}, IsRequired: true, IsSecret: true},
+			{Name: secretName, DisplayName: "Credential", Field: &config.Field_StringField{StringField: &config.StringField{}}, IsRequired: true, IsSecret: true, SecretContentType: proto.String("api_key_v2")},
 		},
 	}
 }
