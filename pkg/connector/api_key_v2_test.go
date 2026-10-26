@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/conductorone/baton-sdk/pkg/secretcontracts"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,8 +26,11 @@ func TestDatadogAPIKeyV2Payload(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			const fixtureValue = "fixture-🔑-\"-\n-<>&"
 			const id = "provider-handle"
-			encoded, err := encodeDatadogAPIKeyV2(tt.kind, fixtureValue, id, tt.scopes)
+			payload, err := encodeDatadogAPIKeyV2(tt.kind, fixtureValue, id, tt.scopes)
 			require.NoError(t, err)
+			require.Equal(t, "api_key_v2", payload.ContentType, "literal, independent of the helper's exported ID")
+			require.Equal(t, secretcontracts.TypeAPIKeyV2, payload.ContentType)
+			encoded := payload.Bytes
 			require.NotEqual(t, []byte(fixtureValue), encoded, "native plaintext is JSON, not the legacy raw key")
 			require.NotContains(t, string(encoded), `\u003c`, "Multipass JsonV1 does not HTML-escape a key value")
 
@@ -79,13 +83,15 @@ func TestDatadogAPIKeyV2UsesProviderIssuedFields(t *testing.T) {
 	require.NoError(t, err)
 	appPayload, err := encodeDatadogAPIKeyV2(serviceAccountApplicationKeyKind, appKey.Secret, appKey.ID, appKey.Scopes)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"key_value":"app-secret","provider":"datadog","key_id":"app-provider-id","header_name":"DD-APPLICATION-KEY","scopes":["granted_scope"]}`, string(appPayload))
+	require.Equal(t, "api_key_v2", appPayload.ContentType)
+	require.JSONEq(t, `{"key_value":"app-secret","provider":"datadog","key_id":"app-provider-id","header_name":"DD-APPLICATION-KEY","scopes":["granted_scope"]}`, string(appPayload.Bytes))
 
 	orgKey, err := wrapper.CreateAPIKey(ctx, "fixture")
 	require.NoError(t, err)
 	orgPayload, err := encodeDatadogAPIKeyV2(organizationAPIKeyKind, orgKey.Secret, orgKey.ID, nil)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"key_value":"org-secret","provider":"datadog","key_id":"org-provider-id","header_name":"DD-API-KEY"}`, string(orgPayload))
+	require.Equal(t, "api_key_v2", orgPayload.ContentType)
+	require.JSONEq(t, `{"key_value":"org-secret","provider":"datadog","key_id":"org-provider-id","header_name":"DD-API-KEY"}`, string(orgPayload.Bytes))
 }
 
 func TestDatadogAPIKeyV2PayloadRejectsInvalidSource(t *testing.T) {
@@ -100,9 +106,10 @@ func TestDatadogAPIKeyV2PayloadRejectsInvalidSource(t *testing.T) {
 		{organizationAPIKeyKind, "secret", "id", &[]string{"invented_scope"}},
 		{"unknown", "secret", "id", nil},
 	} {
-		encoded, err := encodeDatadogAPIKeyV2(tc.kind, tc.secret, tc.id, tc.scopes)
+		payload, err := encodeDatadogAPIKeyV2(tc.kind, tc.secret, tc.id, tc.scopes)
 		require.Error(t, err)
-		require.Nil(t, encoded)
+		require.Empty(t, payload.ContentType)
+		require.Nil(t, payload.Bytes)
 	}
 }
 

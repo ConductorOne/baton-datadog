@@ -236,3 +236,41 @@ func TestCredentialActionStatusCarriesEncryptedResultAfterPending(t *testing.T) 
 	require.JSONEq(t, `{"key_value":"pending-value","provider":"datadog","key_id":"pending-org-id","header_name":"DD-API-KEY"}`, string(plaintext))
 	require.EqualValues(t, 1, creates.Load())
 }
+
+// The provider create has already happened when a response without a secret is
+// refused, so this is not a pre-provider refusal. The client rejects it before
+// the connector builds a payload: nothing is encrypted or returned. Revoking
+// such a key is not attempted here; the key id is unknown to the connector.
+func TestCredentialActionRefusesProviderResponseWithoutSecret(t *testing.T) {
+	var creates atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/api_keys":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/api_keys":
+			creates.Add(1)
+			_, _ = w.Write([]byte(`{"data":{"id":"empty-org-id","type":"api_keys","attributes":{"key":"","name":"c1-empty-ticket"}}}`))
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	ctx := context.Background()
+	sdk, err := connectorbuilder.NewConnector(ctx, &Datadog{
+		wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true, AllowOrgAPIKeyDeletion: true,
+	})
+	require.NoError(t, err)
+	config, _, _ := datadogActionJWEConfig(t)
+	response, err := sdk.InvokeAction(ctx, v2.InvokeActionRequest_builder{
+		Name: ActionIssueOrganizationAPIKey, ResourceTypeId: userResourceType.Id,
+		Args:              issuanceArgs(t, "user-1", "empty-ticket", nil),
+		EncryptionConfigs: []*v2.EncryptionConfig{config}, InlineWait: durationpb.New(5 * time.Second),
+	}.Build())
+	if err == nil {
+		require.NotEqual(t, v2.BatonActionStatus_BATON_ACTION_STATUS_COMPLETE, response.GetStatus())
+		require.Empty(t, response.GetEncryptedData())
+	}
+	require.EqualValues(t, 1, creates.Load(), "the provider create happened before the response was refused")
+}

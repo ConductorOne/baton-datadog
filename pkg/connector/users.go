@@ -11,6 +11,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/secretcontracts"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -206,9 +207,11 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
 	}
-	encoded := []byte(key.Secret)
+	encoded, contentType := []byte(key.Secret), ""
 	if native {
-		encoded, err = encodeDatadogAPIKeyV2(serviceAccountApplicationKeyKind, key.Secret, key.ID, key.Scopes)
+		var payload secretcontracts.Payload
+		payload, err = encodeDatadogAPIKeyV2(serviceAccountApplicationKeyKind, key.Secret, key.ID, key.Scopes)
+		encoded, contentType = payload.Bytes, payload.ContentType
 	}
 	if err != nil {
 		if deleteErr := u.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, key.ID); deleteErr != nil {
@@ -244,7 +247,7 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret: secret,
 		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{Name: "application_key", Bytes: encoded}.Build(),
+			v2.PlaintextData_builder{Name: "application_key", Bytes: encoded, Schema: contentType}.Build(),
 		},
 		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
@@ -292,9 +295,11 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	if err != nil {
 		return nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
 	}
-	encoded := []byte(key.Secret)
+	encoded, contentType := []byte(key.Secret), ""
 	if native {
-		encoded, err = encodeDatadogAPIKeyV2(organizationAPIKeyKind, key.Secret, key.ID, nil)
+		var payload secretcontracts.Payload
+		payload, err = encodeDatadogAPIKeyV2(organizationAPIKeyKind, key.Secret, key.ID, nil)
+		encoded, contentType = payload.Bytes, payload.ContentType
 	}
 	if err != nil {
 		if deleteErr := u.wrapper.DeleteAPIKey(ctx, key.ID); deleteErr != nil {
@@ -333,7 +338,7 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret: secret,
 		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{Name: "api_key", Bytes: encoded}.Build(),
+			v2.PlaintextData_builder{Name: "api_key", Bytes: encoded, Schema: contentType}.Build(),
 		},
 		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
@@ -376,9 +381,11 @@ func (u *credentialUserBuilder) issueServiceAccountAccessToken(ctx context.Conte
 				zap.String("service_account_id", serviceAccountID), zap.String("token_id", issued.ID), zap.Error(deleteErr))
 		}
 	}
-	encoded := []byte(issued.Key)
+	encoded, contentType := []byte(issued.Key), ""
 	if native {
-		encoded, err = encodeDatadogServiceAccessTokenV2(issued.Key, issued.ID, issued.Scopes)
+		var payload secretcontracts.Payload
+		payload, err = encodeDatadogServiceAccessTokenV2(issued.Key, issued.ID, issued.Scopes)
+		encoded, contentType = payload.Bytes, payload.ContentType
 	}
 	if err != nil {
 		cleanup()
@@ -404,7 +411,7 @@ func (u *credentialUserBuilder) issueServiceAccountAccessToken(ctx context.Conte
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret: secret,
 		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{Name: "service_access_token", Bytes: encoded}.Build(),
+			v2.PlaintextData_builder{Name: "service_access_token", Bytes: encoded, Schema: contentType}.Build(),
 		},
 		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil

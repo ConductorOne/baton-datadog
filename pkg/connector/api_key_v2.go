@@ -1,9 +1,9 @@
 package connector
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
+
+	"github.com/conductorone/baton-sdk/pkg/secretcontracts"
 )
 
 // datadogKeyKind identifies the Datadog endpoint that minted a key.
@@ -14,73 +14,45 @@ const (
 	organizationAPIKeyKind           datadogKeyKind = "api-key"
 )
 
-type apiKeyV2Payload struct {
-	KeyValue   string   `json:"key_value"`
-	Provider   string   `json:"provider"`
-	Scopes     []string `json:"scopes,omitempty"`
-	KeyID      string   `json:"key_id"`
-	HeaderName string   `json:"header_name"`
-}
-
-// encodeDatadogAPIKeyV2 prepares the Multipass api_key_v2 JsonV1 plaintext.
+// encodeDatadogAPIKeyV2 prepares the Multipass api_key_v2 plaintext through the
+// SDK contract helper, which validates it and returns the content type with the
+// bytes.
 // keyValue must be the one-time key secret, while keyID is its provider handle.
 // Service-account application-key scopes must come from Datadog's create
 // response, rather than the requested scopes. Org API keys have no scopes.
 // The encrypted issuance actions emit this document. Legacy IssueCredential
 // selectors continue to deliver raw values.
-func encodeDatadogAPIKeyV2(kind datadogKeyKind, keyValue, keyID string, scopes *[]string) ([]byte, error) {
+func encodeDatadogAPIKeyV2(kind datadogKeyKind, keyValue, keyID string, scopes *[]string) (secretcontracts.Payload, error) {
 	if keyValue == "" || keyID == "" {
-		return nil, errors.New("datadog native API key requires a key value and provider key ID")
+		return secretcontracts.Payload{}, errors.New("datadog native API key requires a key value and provider key ID")
 	}
-	payload := apiKeyV2Payload{
-		KeyValue: keyValue,
-		Provider: "datadog",
-		KeyID:    keyID,
-	}
+	document := secretcontracts.APIKeyV2{KeyValue: keyValue, Provider: "datadog", KeyID: keyID}
 	switch kind {
 	case serviceAccountApplicationKeyKind:
-		payload.HeaderName = "DD-APPLICATION-KEY"
+		document.HeaderName = "DD-APPLICATION-KEY"
 		if scopes != nil {
-			payload.Scopes = *scopes
+			document.Scopes = *scopes
 		}
 	case organizationAPIKeyKind:
 		if scopes != nil {
-			return nil, errors.New("datadog organization API keys cannot have scopes")
+			return secretcontracts.Payload{}, errors.New("datadog organization API keys cannot have scopes")
 		}
-		payload.HeaderName = "DD-API-KEY"
+		document.HeaderName = "DD-API-KEY"
 	default:
-		return nil, errors.New("unsupported datadog native API key kind")
+		return secretcontracts.Payload{}, errors.New("unsupported datadog native API key kind")
 	}
-	return marshalAPIKeyV2(payload)
+	return document.Encode()
 }
 
 // encodeDatadogServiceAccessTokenV2 describes a standalone Datadog SAT.
 // Authorization is a header name; api_key_v2 has no field for its Bearer
 // scheme. Datadog returns an instant expiry, while the profile only has a
 // date, so the expiry remains on the secret trait rather than this payload.
-func encodeDatadogServiceAccessTokenV2(keyValue, keyID string, scopes []string) ([]byte, error) {
+func encodeDatadogServiceAccessTokenV2(keyValue, keyID string, scopes []string) (secretcontracts.Payload, error) {
 	if keyValue == "" || keyID == "" {
-		return nil, errors.New("datadog service access token requires a key value and provider token ID")
+		return secretcontracts.Payload{}, errors.New("datadog service access token requires a key value and provider token ID")
 	}
-	payload := apiKeyV2Payload{
-		KeyValue:   keyValue,
-		Provider:   "datadog",
-		KeyID:      keyID,
-		HeaderName: "Authorization",
-	}
-	payload.Scopes = scopes
-	return marshalAPIKeyV2(payload)
-}
-
-// Multipass JsonV1 writes declaration-order keys and omits empty optional
-// fields. Encoding the complete struct in that order, without Go's default
-// HTML escaping, makes the plaintext byte-identical after decode/re-encode.
-func marshalAPIKeyV2(payload apiKeyV2Payload) ([]byte, error) {
-	var buffer bytes.Buffer
-	encoder := json.NewEncoder(&buffer)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(payload); err != nil {
-		return nil, err
-	}
-	return bytes.TrimSuffix(buffer.Bytes(), []byte{'\n'}), nil
+	return secretcontracts.APIKeyV2{
+		KeyValue: keyValue, Provider: "datadog", KeyID: keyID, HeaderName: "Authorization", Scopes: scopes,
+	}.Encode()
 }
