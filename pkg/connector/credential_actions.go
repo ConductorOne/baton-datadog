@@ -12,8 +12,10 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/field"
+	"github.com/conductorone/baton-sdk/pkg/secretcontracts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -61,7 +63,10 @@ func issuanceActionSchema(name, displayName, secretName string, scopes *config.F
 		ReturnTypes: []*config.Field{
 			{Name: "success", DisplayName: "Success", Field: &config.Field_BoolField{BoolField: &config.BoolField{}}},
 			{Name: "issued_resource", DisplayName: "Issued Resource", Field: &config.Field_ResourceField{ResourceField: &config.ResourceField{}}, IsRequired: true},
-			{Name: secretName, DisplayName: "Credential", Field: &config.Field_StringField{StringField: &config.StringField{}}, IsRequired: true, IsSecret: true},
+			{
+				Name: secretName, DisplayName: "Credential", Field: &config.Field_StringField{StringField: &config.StringField{}},
+				IsRequired: true, IsSecret: true, SecretContentType: proto.String(secretcontracts.TypeAPIKeyV2),
+			},
 		},
 	}
 }
@@ -170,8 +175,11 @@ func (u *credentialUserBuilder) issueAction(kind string) actions.ActionHandlerWi
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("baton-datadog: encode issued resource: %w", err)
 		}
+		// The helper's content type is the declared one; a mismatch is a connector bug.
 		for _, plaintext := range issued.PlaintextData {
-			plaintext.SetSchema("api_key_v2")
+			if plaintext.GetSchema() != secretcontracts.TypeAPIKeyV2 {
+				return nil, nil, nil, status.Error(codes.Internal, "baton-datadog: issued secret does not carry the declared content type")
+			}
 		}
 		return actions.NewReturnValues(true, resource), issued.PlaintextData, issued.Annotations, nil
 	}

@@ -12,7 +12,6 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/crypto/providers/jwk"
 	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -161,8 +160,7 @@ func TestCredentialActionsRejectInvalidInputsBeforeProviderCall(t *testing.T) {
 		wrapper: issuer.wrapper, SyncSecrets: true, SyncServiceAccountApplicationKeys: true,
 	})
 	require.NoError(t, err)
-	encryptionConfig, _, err := (&jwk.JWKEncryptionProvider{}).GenerateKey(context.Background())
-	require.NoError(t, err)
+	encryptionConfig, _, _ := datadogActionJWEConfig(t)
 	response, err := serviceSDK.InvokeAction(context.Background(), v2.InvokeActionRequest_builder{
 		Name: ActionIssueServiceAccountAccessToken, ResourceTypeId: userResourceType.Id,
 		Args:              issuanceArgs(t, "sa-1", "whitespace-scope", []any{"\u2003"}),
@@ -204,8 +202,7 @@ func TestCredentialActionStatusCarriesEncryptedResultAfterPending(t *testing.T) 
 		wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true, AllowOrgAPIKeyDeletion: true,
 	})
 	require.NoError(t, err)
-	config, privateKey, err := (&jwk.JWKEncryptionProvider{}).GenerateKey(ctx)
-	require.NoError(t, err)
+	config, privateKey, aad := datadogActionJWEConfig(t)
 	invoked, err := sdk.InvokeAction(ctx, v2.InvokeActionRequest_builder{
 		Name: ActionIssueOrganizationAPIKey, ResourceTypeId: userResourceType.Id,
 		Args:              issuanceArgs(t, "user-1", "pending-ticket", nil),
@@ -234,9 +231,46 @@ func TestCredentialActionStatusCarriesEncryptedResultAfterPending(t *testing.T) 
 	require.Equal(t, apiTokenResourceType.Id, resource.GetId().GetResourceType())
 	require.Equal(t, "pending-org-id", resource.GetId().GetResource())
 	require.NotContains(t, settled.GetResponse().String(), "pending-value")
-	plaintext, err := (&jwk.JWKEncryptionProvider{}).Decrypt(ctx, settled.GetEncryptedData()[0], privateKey)
-	require.NoError(t, err)
-	require.Equal(t, "api_key_v2", plaintext.GetSchema())
-	require.JSONEq(t, `{"key_value":"pending-value","provider":"datadog","key_id":"pending-org-id","header_name":"DD-API-KEY"}`, string(plaintext.GetBytes()))
+	plaintext := openDatadogActionJWE(t, settled.GetEncryptedData()[0], privateKey, aad)
+	require.Equal(t, "api_key_v2", settled.GetEncryptedData()[0].GetSchema())
+	require.JSONEq(t, `{"key_value":"pending-value","provider":"datadog","key_id":"pending-org-id","header_name":"DD-API-KEY"}`, string(plaintext))
 	require.EqualValues(t, 1, creates.Load())
+}
+
+// The provider create has already happened when a response without a secret is
+// refused, so this is not a pre-provider refusal. The client rejects it before
+// the connector builds a payload: nothing is encrypted or returned. Revoking
+// such a key is not attempted here; the key id is unknown to the connector.
+func TestCredentialActionRefusesProviderResponseWithoutSecret(t *testing.T) {
+	var creates atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/api_keys":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/api_keys":
+			creates.Add(1)
+			_, _ = w.Write([]byte(`{"data":{"id":"empty-org-id","type":"api_keys","attributes":{"key":"","name":"c1-empty-ticket"}}}`))
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	ctx := context.Background()
+	sdk, err := connectorbuilder.NewConnector(ctx, &Datadog{
+		wrapper: newLifecycleTestWrapper(server.URL), SyncSecrets: true, AllowOrgAPIKeyDeletion: true,
+	})
+	require.NoError(t, err)
+	config, _, _ := datadogActionJWEConfig(t)
+	response, err := sdk.InvokeAction(ctx, v2.InvokeActionRequest_builder{
+		Name: ActionIssueOrganizationAPIKey, ResourceTypeId: userResourceType.Id,
+		Args:              issuanceArgs(t, "user-1", "empty-ticket", nil),
+		EncryptionConfigs: []*v2.EncryptionConfig{config}, InlineWait: durationpb.New(5 * time.Second),
+	}.Build())
+	if err == nil {
+		require.NotEqual(t, v2.BatonActionStatus_BATON_ACTION_STATUS_COMPLETE, response.GetStatus())
+		require.Empty(t, response.GetEncryptedData())
+	}
+	require.EqualValues(t, 1, creates.Load(), "the provider create happened before the response was refused")
 }
