@@ -9,13 +9,15 @@ import (
 )
 
 // OutputField declares the credential a descriptor returns: its content type,
-// its tags, and that the value is a secret.
+// its tags, and that the value is a secret. Field.content_type is only defined
+// for the string-shaped fields, so the oneof is set to an empty StringField.
 func OutputField(name, id string) *configv1.Field {
 	return configv1.Field_builder{
 		Name:        name,
 		ContentType: ContentType(id),
 		Tags:        Tags(id),
 		IsSecret:    true,
+		StringField: configv1.StringField_builder{}.Build(),
 	}.Build()
 }
 
