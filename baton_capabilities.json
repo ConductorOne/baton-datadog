@@ -228,7 +228,18 @@
           {
             "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
-            "secretResourceTypeId": "api-key"
+            "secretResourceTypeId": "api-key",
+            "output": {
+              "name": "api_key",
+              "displayName": "Datadog API key",
+              "isSecret": true,
+              "contentType": "application/vnd.multipass.api_key_v2+json",
+              "tags": [
+                "credential",
+                "multipass",
+                "api_key_v2"
+              ]
+            }
           }
         ],
         "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"
