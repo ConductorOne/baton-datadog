@@ -236,6 +236,7 @@
               "contentType": "application/vnd.multipass.api_key_v2+json",
               "tags": [
                 "credential",
+                "api_key",
                 "multipass",
                 "api_key_v2"
               ]
