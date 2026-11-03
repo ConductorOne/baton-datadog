@@ -11,6 +11,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/secret"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -279,28 +280,24 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	// (apiTokenBuilder.List) builds these keys without a parent too. Claiming
 	// the user as a parent here would make the issued resource disagree with
 	// the same key on its next sync.
-	secret, err := rs.NewSecretResource(name, deletableAPITokenResourceType, key.ID, secretTraitOptions)
+	secretResource, err := rs.NewSecretResource(name, deletableAPITokenResourceType, key.ID, secretTraitOptions)
 	if err != nil {
 		u.discardOrganizationAPIKey(ctx, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
 	}
-	// The plaintext is the Multipass api_key_v2 JSON rather than the bare key.
-	// C1 bound this credential's type from the descriptor's Output before
-	// issuance, and Multipass reads the plaintext as that type afterwards;
-	// base_url is the endpoint the key authenticates against, built from the
-	// connector's configured site the way the REST client builds its own base
-	// URL -- not from whatever host a test server happens to use.
-	plaintext, err := organizationAPIKeyPlaintext(organizationAPIKeyPayload(
-		key.Secret,
-		key.ID,
-		fmt.Sprintf(client.DefaultBaseURL, u.wrapper.GetSite()),
-	))
+	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
+	plaintext, err := secret.Plaintext(datadogAPIKeyFieldName, secret.APIKeyV2{
+		KeyValue: key.Secret,
+		KeyID:    key.ID,
+		Provider: datadogProviderName,
+		BaseURL:  fmt.Sprintf(client.DefaultBaseURL, u.wrapper.GetSite()),
+	})
 	if err != nil {
 		u.discardOrganizationAPIKey(ctx, key.ID)
-		return nil, err
+		return nil, fmt.Errorf("baton-datadog: encode organization API key plaintext: %w", err)
 	}
 	return &connectorbuilder.CredentialIssueOutput{
-		Secret:        secret,
+		Secret:        secretResource,
 		PlaintextData: []*v2.PlaintextData{plaintext},
 		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
