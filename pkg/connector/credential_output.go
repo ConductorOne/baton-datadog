@@ -21,7 +21,7 @@ const (
 	datadogAPIKeyFieldName = "api_key"
 
 	// datadogAPIKeyDisplayName is how C1 labels that field.
-	datadogAPIKeyDisplayName = "Datadog API key"
+	datadogAPIKeyDisplayName = "Datadog API key" //nolint:gosec // Display label, not a credential.
 
 	// datadogProviderName is the api_key_v2 "provider" value for a Datadog key.
 	datadogProviderName = "datadog"
