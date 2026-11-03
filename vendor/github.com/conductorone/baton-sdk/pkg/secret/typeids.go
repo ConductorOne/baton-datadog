@@ -6,21 +6,14 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/field"
 )
 
-// Content type IDs, matching content_type in Multipass's
+// Content type IDs a connector can emit, matching content_type in Multipass's
 // crates/latchkey-client-sdk/src/secret_types/definitions.rs.
-//
-// hotp, note and generic use Multipass's UTF8_TEXT_V1 codec rather than a JSON
-// document, so they have no struct here; the constants exist so a connector can
-// still declare them.
 const (
 	TypePasswordV2          = "password_v2"
 	TypeAPIKeyV2            = "api_key_v2" //nolint:gosec // Content type ID, not a credential.
 	TypeSSHKey              = "ssh_key"
 	TypeOAuthClientSecretV2 = "oauth_client_secret_v2" //nolint:gosec // Content type ID, not a credential.
 	TypeCertificate         = "certificate"
-	TypeHOTP                = "hotp"
-	TypeNote                = "note"
-	TypeGeneric             = "generic"
 )
 
 const contentTypePrefix = "application/vnd.multipass."

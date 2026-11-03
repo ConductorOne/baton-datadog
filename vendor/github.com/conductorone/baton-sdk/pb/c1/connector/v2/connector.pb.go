@@ -877,8 +877,11 @@ type CredentialIssueOptionDescriptor struct {
 	// declaration order would not be stable. It selects nothing at issue time --
 	// CredentialIssueOptions.secret_resource_type_id is still required.
 	Preferred bool `protobuf:"varint,10,opt,name=preferred,proto3" json:"preferred,omitempty"`
-	// The returned credential's MIME type and tags, declared here because C1
-	// binds the type before issuance. IssueCredential returns that type.
+	// The credential IssueCredential returns, declared because C1 binds the type
+	// before issuance. Meaningful members: name (the returned
+	// PlaintextData.name), string_field (the value is a string), is_secret,
+	// content_type (decides the type) and tags (informational). Other members
+	// are ignored and should be left unset.
 	Output        *v1.Field `protobuf:"bytes,11,opt,name=output,proto3" json:"output,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1075,8 +1078,11 @@ type CredentialIssueOptionDescriptor_builder struct {
 	// declaration order would not be stable. It selects nothing at issue time --
 	// CredentialIssueOptions.secret_resource_type_id is still required.
 	Preferred bool
-	// The returned credential's MIME type and tags, declared here because C1
-	// binds the type before issuance. IssueCredential returns that type.
+	// The credential IssueCredential returns, declared because C1 binds the type
+	// before issuance. Meaningful members: name (the returned
+	// PlaintextData.name), string_field (the value is a string), is_secret,
+	// content_type (decides the type) and tags (informational). Other members
+	// are ignored and should be left unset.
 	Output *v1.Field
 }
 
