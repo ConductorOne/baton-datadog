@@ -1,6 +1,10 @@
 package secret
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/conductorone/baton-sdk/pkg/field"
+)
 
 // Content type IDs, matching content_type in Multipass's
 // crates/latchkey-client-sdk/src/secret_types/definitions.rs.
@@ -36,8 +40,26 @@ func TypeIDFromContentType(contentType string) (string, bool) {
 	return id, true
 }
 
+// TagMultipass marks a field whose value Multipass stores and types.
+const TagMultipass = "multipass"
+
+// kindTags names the credential kind each Multipass type is a carrying shape
+// for. A type absent here has no kind in field's vocabulary, so its field
+// carries only [credential, multipass, id].
+var kindTags = map[string]field.FieldTag{
+	TypeAPIKeyV2:            field.FieldTagAPIKey,
+	TypePasswordV2:          field.FieldTagPassword,
+	TypeSSHKey:              field.FieldTagSSHKey,
+	TypeOAuthClientSecretV2: field.FieldTagOauthClientSecret,
+	TypeCertificate:         field.FieldTagCertificate,
+}
+
 // Tags classifies a field carrying a credential of the given type, for display
 // and debugging in C1.
 func Tags(id string) []string {
-	return []string{"credential", "multipass", id}
+	kind, ok := kindTags[id]
+	if !ok {
+		return []string{string(field.FieldTagCredential), TagMultipass, id}
+	}
+	return []string{string(field.FieldTagCredential), string(kind), TagMultipass, id}
 }
