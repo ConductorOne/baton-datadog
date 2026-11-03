@@ -37,7 +37,14 @@ func newMultipassOrgKeyServer(t *testing.T) *httptest.Server {
 // fake provider and returns what it produced.
 func issueMultipassOrgKey(t *testing.T, server *httptest.Server) *connectorbuilder.CredentialIssueOutput {
 	t.Helper()
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, true)
+	return issueMultipassOrgKeyAt(t, server, testAPIBaseURL)
+}
+
+// issueMultipassOrgKeyAt is issueMultipassOrgKey with the advertised API
+// endpoint chosen by the caller, so the base-url override path can be covered.
+func issueMultipassOrgKeyAt(t *testing.T, server *httptest.Server, apiBaseURL string) *connectorbuilder.CredentialIssueOutput {
+	t.Helper()
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, true, apiBaseURL)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  "req-multipass",
@@ -78,12 +85,36 @@ func TestOrgAPIKeyIssueEmitsMultipassAPIKeyV2(t *testing.T) {
 		"the schema must name the type the descriptor declares")
 }
 
+// TestOrgAPIKeyBaseURLFollowsOverride: the connector can be pointed at a
+// different Datadog API with base-url, and an issued key has to advertise the
+// endpoint it actually works against rather than the one its site implies.
+func TestOrgAPIKeyBaseURLFollowsOverride(t *testing.T) {
+	const override = "https://dd.example.test"
+	out := issueMultipassOrgKeyAt(t, newMultipassOrgKeyServer(t), override)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(out.PlaintextData[0].GetBytes(), &payload))
+	require.Equal(t, override, payload["base_url"])
+
+	// And the site-derived endpoint must not leak through instead.
+	require.NotEqual(t, "https://api.example.com", payload["base_url"],
+		"the override must win over the site")
+}
+
+// TestDatadogAPIBaseURL: the override wins when set, and the site decides
+// otherwise.
+func TestDatadogAPIBaseURL(t *testing.T) {
+	require.Equal(t, "https://api.datadoghq.eu", (&Datadog{site: "datadoghq.eu"}).apiBaseURL())
+	require.Equal(t, "https://dd.example.test", (&Datadog{site: "datadoghq.eu", baseURL: "https://dd.example.test"}).apiBaseURL(),
+		"the base-url override must win over the site")
+}
+
 // TestOrgAPIKeyDescriptorDeclaresMultipassOutput: the descriptor is where C1
 // learns the type before issuance, so it must name the same type the plaintext
 // is encoded as. The service-account application key is not Multipass typed and
 // must keep declaring nothing.
 func TestOrgAPIKeyDescriptorDeclaresMultipassOutput(t *testing.T) {
-	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true).IssueCapabilityDetails(context.Background())
+	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true, testAPIBaseURL).IssueCapabilityDetails(context.Background())
 	require.NoError(t, err)
 
 	byType := map[string]*v2.CredentialIssueOptionDescriptor{}

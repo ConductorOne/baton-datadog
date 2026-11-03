@@ -45,6 +45,16 @@ type Datadog struct {
 	SyncServiceAccountApplicationKeys bool
 }
 
+// apiBaseURL is the Datadog API endpoint this connector talks to: the base-url
+// override when configured, otherwise the endpoint the site implies. A credential
+// it issues advertises this, so an issued key names the endpoint it works against.
+func (d *Datadog) apiBaseURL() string {
+	if d.baseURL != "" {
+		return d.baseURL
+	}
+	return fmt.Sprintf(client.DefaultBaseURL, d.site)
+}
+
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
 	offerServiceAccountKey := d.SyncSecrets && d.SyncServiceAccountApplicationKeys
@@ -55,7 +65,7 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 	// advertised with an empty option list.
 	userSyncer := connectorbuilder.ResourceSyncerV2(newUserBuilder(d.wrapper))
 	if offerServiceAccountKey || offerOrgAPIKey {
-		userSyncer = newCredentialUserBuilder(d.wrapper, offerOrgAPIKey, offerServiceAccountKey)
+		userSyncer = newCredentialUserBuilder(d.wrapper, offerOrgAPIKey, offerServiceAccountKey, d.apiBaseURL())
 	}
 	resourceSyncers := []connectorbuilder.ResourceSyncerV2{
 		userSyncer,

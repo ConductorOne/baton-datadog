@@ -37,13 +37,19 @@ type credentialUserBuilder struct {
 	// grant is what registers the application-key syncer, and the syncer is
 	// what carries the deleter the SDK requires behind this descriptor.
 	offerServiceAccountAppKey bool
+	// apiBaseURL is the Datadog API endpoint an issued key authenticates
+	// against: the configured base-url override when set, otherwise the
+	// endpoint the site implies. It is resolved by the caller that knows the
+	// configuration, not here.
+	apiBaseURL string
 }
 
-func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool) *credentialUserBuilder {
+func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool, apiBaseURL string) *credentialUserBuilder {
 	return &credentialUserBuilder{
 		userBuilder:               newUserBuilder(wrapper),
 		offerOrgAPIKey:            offerOrgAPIKey,
 		offerServiceAccountAppKey: offerServiceAccountAppKey,
+		apiBaseURL:                apiBaseURL,
 	}
 }
 
@@ -86,12 +92,7 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// and disallowing custom ones makes the SDK reject a scoped
 			// request for this kind before it reaches Issue.
 			//
-			// Output declares the Multipass api_key_v2 credential this kind
-			// returns. C1 binds the type from here before issuance, so it has
-			// to agree with the PlaintextData.Schema issueOrganizationAPIKey
-			// sets; both are built from credential_output.go's constants. The
-			// service-account application key above declares no output: it is
-			// still a bare key, not a Multipass-typed payload.
+			// Output must name the same type as the plaintext Issue returns.
 			Output: organizationAPIKeyOutput(),
 		}.Build())
 	}
@@ -290,7 +291,7 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 		KeyValue: key.Secret,
 		KeyID:    key.ID,
 		Provider: datadogProviderName,
-		BaseURL:  fmt.Sprintf(client.DefaultBaseURL, u.wrapper.GetSite()),
+		BaseURL:  u.apiBaseURL,
 	})
 	if err != nil {
 		u.discardOrganizationAPIKey(ctx, key.ID)
