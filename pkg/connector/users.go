@@ -91,7 +91,7 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// sets; both are built from credential_output.go's constants. The
 			// service-account application key above declares no output: it is
 			// still a bare key, not a Multipass-typed payload.
-			Output: multipassAPIKeyV2Output(),
+			Output: organizationAPIKeyOutput(),
 		}.Build())
 	}
 	return v2.CredentialDetailsCredentialIssue_builder{
@@ -286,31 +286,23 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	}
 	// The plaintext is the Multipass api_key_v2 JSON rather than the bare key.
 	// C1 bound this credential's type from the descriptor's Output before
-	// issuance, and Multipass reads the plaintext as that type afterwards; the
-	// schema below is the same MIME type the descriptor declared, from the same
-	// constants. base_url is the endpoint the key authenticates against, built
-	// from the connector's configured site the way the REST client builds its
-	// own base URL -- not from whatever host a test server happens to use.
-	plaintext, err := encodeMultipassAPIKeyV2(multipassAPIKeyV2{
-		KeyValue: key.Secret,
-		KeyID:    key.ID,
-		Provider: datadogProviderName,
-		BaseURL:  fmt.Sprintf(client.DefaultBaseURL, u.wrapper.GetSite()),
-	})
+	// issuance, and Multipass reads the plaintext as that type afterwards;
+	// base_url is the endpoint the key authenticates against, built from the
+	// connector's configured site the way the REST client builds its own base
+	// URL -- not from whatever host a test server happens to use.
+	plaintext, err := organizationAPIKeyPlaintext(organizationAPIKeyPayload(
+		key.Secret,
+		key.ID,
+		fmt.Sprintf(client.DefaultBaseURL, u.wrapper.GetSite()),
+	))
 	if err != nil {
 		u.discardOrganizationAPIKey(ctx, key.ID)
 		return nil, err
 	}
 	return &connectorbuilder.CredentialIssueOutput{
-		Secret: secret,
-		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{
-				Name:   datadogAPIKeyFieldName,
-				Bytes:  plaintext,
-				Schema: multipassAPIKeyV2ContentType,
-			}.Build(),
-		},
-		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+		Secret:        secret,
+		PlaintextData: []*v2.PlaintextData{plaintext},
+		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
 }
 
