@@ -278,7 +278,11 @@ github.com/cockroachdb/swiss
 # github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06
 ## explicit; go 1.19
 github.com/cockroachdb/tokenbucket
+<<<<<<< HEAD
 # github.com/conductorone/baton-sdk v0.44.2
+=======
+# github.com/conductorone/baton-sdk v0.43.1-0.20261103193733-d483c04a2873
+>>>>>>> ddd7cb18 (Bump baton-sdk for pkg/secret)
 ## explicit; go 1.27.3
 github.com/conductorone/baton-sdk/internal/atomicfile
 github.com/conductorone/baton-sdk/internal/connector
@@ -327,6 +331,7 @@ github.com/conductorone/baton-sdk/pkg/provisioner
 github.com/conductorone/baton-sdk/pkg/ratelimit
 github.com/conductorone/baton-sdk/pkg/retry
 github.com/conductorone/baton-sdk/pkg/sdk
+github.com/conductorone/baton-sdk/pkg/secret
 github.com/conductorone/baton-sdk/pkg/session
 github.com/conductorone/baton-sdk/pkg/sourcecache
 github.com/conductorone/baton-sdk/pkg/sync
