@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -95,8 +96,15 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	require.Nil(t, issued.Secret.GetParentResourceId(),
 		"an organization API key belongs to the organization, not to the identity it was vended to")
 	require.Len(t, issued.PlaintextData, 1)
-	require.Equal(t, "api_key", issued.PlaintextData[0].GetName())
-	require.NotEmpty(t, issued.PlaintextData[0].GetBytes())
+	require.Equal(t, datadogAPIKeyFieldName, issued.PlaintextData[0].GetName())
+	require.Equal(t, multipassAPIKeyV2ContentType, issued.PlaintextData[0].GetSchema())
+	// The credential arrives as Multipass api_key_v2 JSON rather than bare
+	// bytes, so the key the provider probe authenticates with has to come out
+	// of key_value.
+	var apiKeyPayload multipassAPIKeyV2
+	require.NoError(t, json.Unmarshal(issued.PlaintextData[0].GetBytes(), &apiKeyPayload),
+		"the issued plaintext must be api_key_v2 JSON")
+	require.NotEmpty(t, apiKeyPayload.KeyValue)
 
 	orgKeyID := issued.Secret.GetId().GetResource()
 	t.Logf("issued organization API key id=%s; plaintext material returned but not logged", maskedValue(orgKeyID))
@@ -106,7 +114,12 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	require.NotNil(t, found, "issued organization API key id=%s not found via ListAPIKeys", maskedValue(orgKeyID))
 	t.Logf("confirmed organization API key id=%s exists in Datadog", maskedValue(orgKeyID))
 
-	issuedKey := string(issued.PlaintextData[0].GetBytes())
+	// key_id is Datadog's id for the key, so it must agree with the id the
+	// issued resource names -- the same key, described two ways.
+	require.Equal(t, orgKeyID, apiKeyPayload.KeyID,
+		"the payload's key_id must be the issued key's id, not a different key")
+
+	issuedKey := apiKeyPayload.KeyValue
 	t.Logf("waiting for issued organization API key id=%s to authenticate", maskedValue(orgKeyID))
 	require.Eventually(t, func() bool {
 		ok, err := orgAPIKeyValidates(ctx, site, issuedKey)
