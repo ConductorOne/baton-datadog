@@ -8,18 +8,27 @@ import (
 
 // Content type IDs, matching content_type in Multipass's
 // crates/latchkey-client-sdk/src/secret_types/definitions.rs.
+//
+// hotp, note and generic use Multipass's UTF8_TEXT_V1 codec rather than a JSON
+// document, so they have no struct here; the constants exist so a connector can
+// still declare them.
 const (
 	TypePasswordV2          = "password_v2"
 	TypeAPIKeyV2            = "api_key_v2" //nolint:gosec // Content type ID, not a credential.
 	TypeSSHKey              = "ssh_key"
 	TypeOAuthClientSecretV2 = "oauth_client_secret_v2" //nolint:gosec // Content type ID, not a credential.
 	TypeCertificate         = "certificate"
+	TypeHOTP                = "hotp"
+	TypeNote                = "note"
+	TypeGeneric             = "generic"
 )
 
 const contentTypePrefix = "application/vnd.multipass."
 const contentTypeSuffix = "+json"
 
 // ContentType returns the MIME type that carries a value of the given type.
+// id must be a well-formed type ID: an ID containing / or empty yields a MIME
+// type that TypeIDFromContentType rejects, so the two do not round-trip.
 func ContentType(id string) string {
 	return contentTypePrefix + id + contentTypeSuffix
 }
@@ -40,8 +49,8 @@ func TypeIDFromContentType(contentType string) (string, bool) {
 	return id, true
 }
 
-// TagMultipass marks a field whose value Multipass stores and types.
-const TagMultipass = "multipass"
+// tagMultipass marks a field whose value Multipass stores and types.
+const tagMultipass = "multipass"
 
 // kindTags names the credential kind each Multipass type is a carrying shape
 // for. A type absent here has no kind in field's vocabulary, so its field
@@ -59,7 +68,7 @@ var kindTags = map[string]field.FieldTag{
 func Tags(id string) []string {
 	kind, ok := kindTags[id]
 	if !ok {
-		return []string{string(field.FieldTagCredential), TagMultipass, id}
+		return []string{string(field.FieldTagCredential), tagMultipass, id}
 	}
-	return []string{string(field.FieldTagCredential), string(kind), TagMultipass, id}
+	return []string{string(field.FieldTagCredential), string(kind), tagMultipass, id}
 }

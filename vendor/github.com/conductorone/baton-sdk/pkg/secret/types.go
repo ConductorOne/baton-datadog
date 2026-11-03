@@ -28,7 +28,8 @@ type APIKeyV2 struct {
 	Scopes     []string `json:"scopes,omitempty"`
 	KeyID      string   `json:"key_id,omitempty"`
 	HeaderName string   `json:"header_name,omitempty"`
-	ExpiresAt  string   `json:"expires_at,omitempty"`
+	// ExpiresAt is a date in YYYY-MM-DD form.
+	ExpiresAt string `json:"expires_at,omitempty"`
 }
 
 func (v APIKeyV2) MultipassTypeID() string { return TypeAPIKeyV2 }
