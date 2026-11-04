@@ -400,7 +400,7 @@ func TestIssueAndDeleteNeverLogSecret(t *testing.T) {
 	ctx := ctxzap.ToContext(context.Background(), logger)
 
 	issued := issueServiceAccountAppKey(t, ctx, wrapper, testServiceAccountID, "req-1")
-	require.Equal(t, secret, string(issued.PlaintextData[0].GetBytes()))
+	require.Equal(t, secret, appKeyPlaintextKeyValue(t, issued))
 
 	deleter := newApplicationKeyBuilder(wrapper)
 	_, err := deleter.Delete(ctx, issued.Secret.GetId(), issued.Secret.GetParentResourceId())
@@ -430,7 +430,7 @@ func TestApplicationKeyBuilderDeleteUsesServiceAccountAPI(t *testing.T) {
 	ctx := context.Background()
 
 	issued := issueServiceAccountAppKey(t, ctx, wrapper, testServiceAccountID, "req-1")
-	require.Equal(t, secret, string(issued.PlaintextData[0].GetBytes()))
+	require.Equal(t, secret, appKeyPlaintextKeyValue(t, issued))
 
 	deleter := newApplicationKeyBuilder(wrapper)
 	_, err := deleter.Delete(ctx, issued.Secret.GetId(), issued.Secret.GetParentResourceId())
