@@ -1,5 +1,5 @@
-// Copied from github.com/conductorone/baton-multipass-sdk/pkg/multipass at b9f4b677.
-// Replace with that module once it is public (<TICKET>).
+// Copied from github.com/conductorone/baton-multipass-sdk/pkg/multipass v0.0.1
+// (b9f4b677). Replace with that module once it is public (IGA-5320).
 
 package multipass
 
