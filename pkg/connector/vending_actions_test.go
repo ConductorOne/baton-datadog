@@ -106,9 +106,13 @@ func TestVendingActionsDeclareTheSameSecretReturnAsIssue(t *testing.T) {
 		require.NotNil(t, secret.GetStringField(), "the secret return is a string field")
 		require.Equal(t, multipass.ContentType(multipass.TypeAPIKeyV2), secret.GetContentType())
 
-		require.ElementsMatch(t,
-			[]string{actionPublicKeyID, actionPublicSecretResourceTypeID, actionPublicSecretResourceID},
-			publicNames)
+		// The application key also names its service account, because
+		// applicationKeyBuilder.Delete needs both halves.
+		wantPublic := []string{actionPublicKeyID, actionPublicSecretResourceTypeID, actionPublicSecretResourceID}
+		if tc.action == ActionIssueServiceAccountApplicationKey {
+			wantPublic = append(wantPublic, actionPublicParentResourceTypeID, actionPublicParentResourceID)
+		}
+		require.ElementsMatch(t, wantPublic, publicNames)
 	}
 }
 
@@ -253,4 +257,80 @@ func TestVendingActionRefusesDuplicateRequestID(t *testing.T) {
 	_, _, _, err = builder.issueOrganizationAPIKeyAction(ctx, args)
 	require.Error(t, err)
 	require.Equal(t, codes.AlreadyExists, status.Code(err))
+}
+
+// TestVendingAppKeyReturnsTheIDsDeleteTakes: the response's identifiers have to
+// be exactly the pair applicationKeyBuilder.Delete consumes -- the bare key id as
+// resourceID, the service account as parentResourceID -- or C1's revoke would
+// look up a key that does not exist. This drives the real Delete against a
+// provider that only answers on that path.
+func TestVendingAppKeyReturnsTheIDsDeleteTakes(t *testing.T) {
+	ctx := context.Background()
+
+	const handle = "app-key-handle"
+	appKeysPath := "/api/v2/service_accounts/" + testServiceAccountID + "/application_keys"
+
+	var deletedPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/users/"+testServiceAccountID:
+			_, _ = w.Write([]byte(`{"data":{"id":"` + testServiceAccountID + `","type":"users","attributes":{"service_account":true}}}`))
+		case r.Method == http.MethodGet && r.URL.Path == appKeysPath:
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == appKeysPath:
+			_, _ = w.Write([]byte(`{"data":{"id":"` + handle + `","type":"application_keys","attributes":{"key":"app-secret","name":"c1-req-ids"}}}`))
+		case r.Method == http.MethodDelete:
+			deletedPath = r.URL.Path
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Errorf("unexpected provider request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	mgr := newVendingRegistry(t)
+	require.NoError(t, newVendingDatadog(server.URL).GlobalActions(ctx, mgr))
+
+	identity, err := filippoage.GenerateX25519Identity()
+	require.NoError(t, err)
+	configs := []*v2.EncryptionConfig{
+		v2.EncryptionConfig_builder{
+			Provider:           ageprovider.EncryptionProviderAge,
+			AgeRecipientConfig: v2.EncryptionConfig_AgeRecipientConfig_builder{Recipient: identity.Recipient().String()}.Build(),
+		}.Build(),
+	}
+
+	args, err := structpb.NewStruct(map[string]any{
+		actionArgRequestID:        "req-ids",
+		actionArgServiceAccountID: testServiceAccountID,
+	})
+	require.NoError(t, err)
+	_, _, response, _, _, err := mgr.InvokeActionWithWaitAndEncryption(
+		ctx, ActionIssueServiceAccountApplicationKey, "", args, time.Second, configs)
+	require.NoError(t, err)
+
+	// Build the resource IDs exactly as C1 would from the response.
+	resourceID := &v2.ResourceId{
+		ResourceType: response.GetFields()[actionPublicSecretResourceTypeID].GetStringValue(),
+		Resource:     response.GetFields()[actionPublicSecretResourceID].GetStringValue(),
+	}
+	parent := &v2.ResourceId{
+		ResourceType: response.GetFields()[actionPublicParentResourceTypeID].GetStringValue(),
+		Resource:     response.GetFields()[actionPublicParentResourceID].GetStringValue(),
+	}
+
+	// The pair has to be the bare key id plus the service account, not a
+	// composite id and no parent.
+	require.Equal(t, serviceAccountApplicationKeyResourceType.Id, resourceID.GetResourceType())
+	require.Equal(t, handle, resourceID.GetResource(), "resourceID must be the bare key id")
+	require.Equal(t, userResourceType.Id, parent.GetResourceType())
+	require.Equal(t, testServiceAccountID, parent.GetResource())
+
+	// And Delete accepts exactly that pair, reaching the provider path that only
+	// exists for this key under its service account.
+	_, err = newApplicationKeyBuilder(newLifecycleTestWrapper(server.URL)).Delete(ctx, resourceID, parent)
+	require.NoError(t, err)
+	require.Equal(t, appKeysPath+"/"+handle, deletedPath)
 }

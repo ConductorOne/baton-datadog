@@ -165,31 +165,12 @@ func issuedCredentialName(requestID string) string {
 // would repeat the same unsupported claim the sync path used to make.
 func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	serviceAccountID := input.IdentityID.GetResource()
-
-	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
-	if err != nil {
-		if client.IsNotFound(err) {
-			return nil, status.Errorf(codes.NotFound, "baton-datadog: Datadog user %q not found", serviceAccountID)
-		}
-		return nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
-	}
-	if !userResp.GetData().Attributes.GetServiceAccount() {
-		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account; credential issuance only targets service accounts", serviceAccountID)
-	}
-
 	name := issuedCredentialName(input.RequestID)
-	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
-	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", input.RequestID, err)
-	}
-	if existing != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
-	}
 
 	scopes := input.CredentialOptions.GetApiKey().GetScopes()
-	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
+	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccountID, input.RequestID, scopes)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
+		return nil, err
 	}
 
 	secretTraitOptions := []rs.SecretTraitOption{
@@ -208,11 +189,6 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	if err != nil {
 		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build service account application key secret resource: %w", err)
-	}
-	plaintext, err := u.serviceAccountApplicationKeyPlaintext(key)
-	if err != nil {
-		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
-		return nil, err
 	}
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret:        secret,
@@ -281,17 +257,9 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	}
 
 	name := issuedCredentialName(input.RequestID)
-	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	key, plaintext, err := u.mintOrganizationAPIKey(ctx, input.RequestID)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: look up organization API key for request %q: %w", input.RequestID, err)
-	}
-	if existing != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: organization API key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
-	}
-
-	key, err := u.wrapper.CreateAPIKey(ctx, name)
-	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
+		return nil, err
 	}
 
 	secretTraitOptions := []rs.SecretTraitOption{
@@ -315,16 +283,75 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 		u.discardOrganizationAPIKey(ctx, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
 	}
-	plaintext, err := u.organizationAPIKeyPlaintext(key)
-	if err != nil {
-		u.discardOrganizationAPIKey(ctx, key.ID)
-		return nil, err
-	}
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret:        secretResource,
 		PlaintextData: []*v2.PlaintextData{plaintext},
 		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
+}
+
+// mintOrganizationAPIKey mints an organization API key for a request and renders
+// its plaintext, or returns an error having minted nothing. Issue and the custom
+// action both call it, so the duplicate guard, the create call and the
+// discard-on-encode-failure cover both paths identically.
+func (u *credentialUserBuilder) mintOrganizationAPIKey(ctx context.Context, requestID string) (*client.IssuedAPIKey, *v2.PlaintextData, error) {
+	name := issuedCredentialName(requestID)
+	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: look up organization API key for request %q: %w", requestID, err)
+	}
+	if existing != nil {
+		return nil, nil, status.Errorf(codes.AlreadyExists, "baton-datadog: organization API key for request %q may already exist; refusing to issue a duplicate", requestID)
+	}
+
+	key, err := u.wrapper.CreateAPIKey(ctx, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
+	}
+
+	plaintext, err := u.organizationAPIKeyPlaintext(key)
+	if err != nil {
+		u.discardOrganizationAPIKey(ctx, key.ID)
+		return nil, nil, err
+	}
+	return key, plaintext, nil
+}
+
+// mintServiceAccountApplicationKey is the application key equivalent: it
+// re-checks that the target is still a service account, refuses a duplicate
+// request, mints, and renders the plaintext.
+func (u *credentialUserBuilder) mintServiceAccountApplicationKey(ctx context.Context, serviceAccountID, requestID string, scopes []string) (*client.IssuedApplicationKey, *v2.PlaintextData, error) {
+	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
+	if err != nil {
+		if client.IsNotFound(err) {
+			return nil, nil, status.Errorf(codes.NotFound, "baton-datadog: Datadog user %q not found", serviceAccountID)
+		}
+		return nil, nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
+	}
+	if !userResp.GetData().Attributes.GetServiceAccount() {
+		return nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account; credential issuance only targets service accounts", serviceAccountID)
+	}
+
+	name := issuedCredentialName(requestID)
+	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", requestID, err)
+	}
+	if existing != nil {
+		return nil, nil, status.Errorf(codes.AlreadyExists, "baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", requestID)
+	}
+
+	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
+	}
+
+	plaintext, err := u.serviceAccountApplicationKeyPlaintext(key)
+	if err != nil {
+		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
+		return nil, nil, err
+	}
+	return key, plaintext, nil
 }
 
 // organizationAPIKeyPlaintext renders the api_key_v2 value for a minted

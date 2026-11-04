@@ -32,6 +32,8 @@ const (
 	actionPublicKeyID                       = "key_id"
 	actionPublicSecretResourceTypeID        = "secret_resource_type_id"
 	actionPublicSecretResourceID            = "secret_resource_id"
+	actionPublicParentResourceTypeID        = "parent_resource_type_id"
+	actionPublicParentResourceID            = "parent_resource_id"
 	datadogVendOrgKeyDisplayName            = "Issue Datadog organization API key"
 	datadogVendAppKeyDisplayName            = "Issue Datadog service account application key"
 )
@@ -88,6 +90,9 @@ var issueServiceAccountApplicationKeyActionSchema = &v2.BatonActionSchema{
 		{Name: actionPublicKeyID, DisplayName: "Datadog key ID", Field: &configv1.Field_StringField{}},
 		{Name: actionPublicSecretResourceTypeID, DisplayName: "Secret resource type", Field: &configv1.Field_StringField{}},
 		{Name: actionPublicSecretResourceID, DisplayName: "Secret resource ID", Field: &configv1.Field_StringField{}},
+		// The key belongs to its service account, and Delete needs both halves.
+		{Name: actionPublicParentResourceTypeID, DisplayName: "Parent resource type", Field: &configv1.Field_StringField{}},
+		{Name: actionPublicParentResourceID, DisplayName: "Parent resource ID", Field: &configv1.Field_StringField{}},
 	},
 }
 
@@ -120,31 +125,13 @@ func (u *credentialUserBuilder) issueOrganizationAPIKeyAction(
 		return nil, nil, nil, err
 	}
 
-	// Same duplicate guard as Issue: Datadog cannot re-issue plaintext for a key
-	// that already exists, so a repeated request is refused rather than minting
-	// a second key.
-	name := issuedCredentialName(requestID)
-	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	key, plaintext, err := u.mintOrganizationAPIKey(ctx, requestID)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("baton-datadog: look up organization API key for request %q: %w", requestID, err)
-	}
-	if existing != nil {
-		return nil, nil, nil, status.Errorf(codes.AlreadyExists,
-			"baton-datadog: organization API key for request %q may already exist; refusing to issue a duplicate", requestID)
-	}
-
-	key, err := u.wrapper.CreateAPIKey(ctx, name)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
-	}
-
-	plaintext, err := u.organizationAPIKeyPlaintext(key)
-	if err != nil {
-		u.discardOrganizationAPIKey(ctx, key.ID)
 		return nil, nil, nil, err
 	}
 
-	return actionSecretResponse(key.ID, deletableAPITokenResourceType.Id, key.ID), []*v2.PlaintextData{plaintext}, nil, nil
+	return actionSecretResponse(key.ID, deletableAPITokenResourceType.Id, key.ID, "", ""),
+		[]*v2.PlaintextData{plaintext}, nil, nil
 }
 
 func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
@@ -165,40 +152,16 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 		scopes = requested
 	}
 
-	// Issue re-checks that the target is still a service account, because its
-	// user record may have changed since the last sync. The action does the
-	// same, so an action cannot mint a key against a human account.
-	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
+	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccountID, requestID, scopes)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
-	}
-	if !userResp.GetData().Attributes.GetServiceAccount() {
-		return nil, nil, nil, status.Errorf(codes.InvalidArgument,
-			"baton-datadog: Datadog user %q is not a service account; key issuance only targets service accounts", serviceAccountID)
-	}
-
-	name := issuedCredentialName(requestID)
-	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", requestID, err)
-	}
-	if existing != nil {
-		return nil, nil, nil, status.Errorf(codes.AlreadyExists,
-			"baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", requestID)
-	}
-
-	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
-	}
-
-	plaintext, err := u.serviceAccountApplicationKeyPlaintext(key)
-	if err != nil {
-		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
 		return nil, nil, nil, err
 	}
 
-	return actionSecretResponse(key.ID, serviceAccountApplicationKeyResourceType.Id, serviceAccountID+"/"+key.ID),
+	// applicationKeyBuilder.Delete takes the bare key id as resourceID and the
+	// service account as parentResourceID, so the response has to name both the
+	// same way; a composite id would be looked up as a key that does not exist.
+	return actionSecretResponse(key.ID, serviceAccountApplicationKeyResourceType.Id, key.ID,
+			userResourceType.Id, serviceAccountID),
 		[]*v2.PlaintextData{plaintext}, nil, nil
 }
 
@@ -213,12 +176,21 @@ func requestIDFromArgs(args *structpb.Struct) (string, error) {
 
 // actionSecretResponse builds the public half of a vending action's result:
 // enough to identify the credential for revocation, and nothing that reveals it.
-func actionSecretResponse(keyID, secretResourceTypeID, secretResourceID string) *structpb.Struct {
-	response, err := structpb.NewStruct(map[string]any{
+// The parent fields are omitted when empty, since an organization API key has no
+// parent resource.
+func actionSecretResponse(keyID, secretResourceTypeID, secretResourceID, parentTypeID, parentResourceID string) *structpb.Struct {
+	fields := map[string]any{
 		actionPublicKeyID:                keyID,
 		actionPublicSecretResourceTypeID: secretResourceTypeID,
 		actionPublicSecretResourceID:     secretResourceID,
-	})
+	}
+	if parentTypeID != "" {
+		fields[actionPublicParentResourceTypeID] = parentTypeID
+	}
+	if parentResourceID != "" {
+		fields[actionPublicParentResourceID] = parentResourceID
+	}
+	response, err := structpb.NewStruct(fields)
 	if err != nil {
 		// The values are plain strings, so this cannot fail; returning an empty
 		// struct rather than nil keeps the handler's contract regardless.
