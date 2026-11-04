@@ -231,11 +231,8 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	}, nil
 }
 
-// scopesOrNil maps Datadog's nullable scopes list onto the payload's, keeping
-// "the provider did not report scopes" (nil) distinct from "reported as
-// unscoped" (empty slice): omitempty drops a nil or empty list, and both mean
-// the key carries no scope list, but a caller inspecting the payload should not
-// see a fabricated empty list in place of missing provider data.
+// scopesOrNil dereferences Datadog's nullable scopes list; nil stays nil, so
+// omitempty leaves "scopes" out.
 func scopesOrNil(scopes *[]string) []string {
 	if scopes == nil {
 		return nil
@@ -332,6 +329,15 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 // credential nobody holds. A failed delete is logged rather than returned: the
 // original error is what the caller needs to see, and the key id is what lets
 // an operator clean up by hand.
+func (u *credentialUserBuilder) discardOrganizationAPIKey(ctx context.Context, keyID string) {
+	if deleteErr := u.wrapper.DeleteAPIKey(ctx, keyID); deleteErr != nil {
+		ctxzap.Extract(ctx).Warn("failed to clean up Datadog organization API key after issuance error",
+			zap.String("api_key_id", keyID),
+			zap.Error(deleteErr),
+		)
+	}
+}
+
 // discardServiceAccountApplicationKey revokes a service account application key
 // whose plaintext cannot be returned. Same reasoning as
 // discardOrganizationAPIKey: issuance is not retried, so a mint that never
@@ -341,15 +347,6 @@ func (u *credentialUserBuilder) discardServiceAccountApplicationKey(ctx context.
 		ctxzap.Extract(ctx).Warn("failed to clean up Datadog service account application key after issuance error",
 			zap.String("service_account_id", serviceAccountID),
 			zap.String("application_key_id", keyID),
-			zap.Error(deleteErr),
-		)
-	}
-}
-
-func (u *credentialUserBuilder) discardOrganizationAPIKey(ctx context.Context, keyID string) {
-	if deleteErr := u.wrapper.DeleteAPIKey(ctx, keyID); deleteErr != nil {
-		ctxzap.Extract(ctx).Warn("failed to clean up Datadog organization API key after issuance error",
-			zap.String("api_key_id", keyID),
 			zap.Error(deleteErr),
 		)
 	}
