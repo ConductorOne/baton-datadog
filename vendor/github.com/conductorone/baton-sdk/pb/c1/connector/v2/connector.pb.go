@@ -875,17 +875,7 @@ type CredentialIssueOptionDescriptor struct {
 	// must whenever several descriptors share that option: a default taken from
 	// declaration order would not be stable. It selects nothing at issue time --
 	// CredentialIssueOptions.secret_resource_type_id is still required.
-<<<<<<< HEAD
 	Preferred     bool `protobuf:"varint,10,opt,name=preferred,proto3" json:"preferred,omitempty"`
-=======
-	Preferred bool `protobuf:"varint,10,opt,name=preferred,proto3" json:"preferred,omitempty"`
-	// The credential IssueCredential returns, declared because C1 binds the type
-	// before issuance. Meaningful members: name (the returned
-	// PlaintextData.name), string_field (the value is a string), is_secret,
-	// content_type (decides the type) and tags (informational). Other members
-	// are ignored and should be left unset.
-	Output        *v1.Field `protobuf:"bytes,11,opt,name=output,proto3" json:"output,omitempty"`
->>>>>>> 8a9867df (Pin baton-sdk 61f186d3)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1059,15 +1049,6 @@ type CredentialIssueOptionDescriptor_builder struct {
 	// declaration order would not be stable. It selects nothing at issue time --
 	// CredentialIssueOptions.secret_resource_type_id is still required.
 	Preferred bool
-<<<<<<< HEAD
-=======
-	// The credential IssueCredential returns, declared because C1 binds the type
-	// before issuance. Meaningful members: name (the returned
-	// PlaintextData.name), string_field (the value is a string), is_secret,
-	// content_type (decides the type) and tags (informational). Other members
-	// are ignored and should be left unset.
-	Output *v1.Field
->>>>>>> 8a9867df (Pin baton-sdk 61f186d3)
 }
 
 func (b0 CredentialIssueOptionDescriptor_builder) Build() *CredentialIssueOptionDescriptor {

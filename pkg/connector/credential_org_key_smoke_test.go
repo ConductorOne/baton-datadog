@@ -10,9 +10,9 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	cfg "github.com/conductorone/baton-datadog/pkg/config"
+	"github.com/conductorone/baton-datadog/pkg/multipass"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/secret"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -98,11 +98,11 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 		"an organization API key belongs to the organization, not to the identity it was vended to")
 	require.Len(t, issued.PlaintextData, 1)
 	require.Equal(t, datadogAPIKeyFieldName, issued.PlaintextData[0].GetName())
-	require.Equal(t, secret.ContentType(secret.TypeAPIKeyV2), issued.PlaintextData[0].GetSchema())
+	require.Equal(t, multipass.ContentType(multipass.TypeAPIKeyV2), issued.PlaintextData[0].GetSchema())
 	// The credential arrives as Multipass api_key_v2 JSON rather than bare
 	// bytes, so the key the provider probe authenticates with has to come out
 	// of key_value.
-	var apiKeyPayload secret.APIKeyV2
+	var apiKeyPayload multipass.APIKeyV2
 	require.NoError(t, json.Unmarshal(issued.PlaintextData[0].GetBytes(), &apiKeyPayload),
 		"the issued plaintext must be api_key_v2 JSON")
 	require.NotEmpty(t, apiKeyPayload.KeyValue)
