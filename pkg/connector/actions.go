@@ -116,7 +116,8 @@ func (d *Datadog) GlobalActions(ctx context.Context, registry actions.ActionRegi
 	if err := registry.Register(ctx, disableUserActionSchema, d.disableUser); err != nil {
 		return fmt.Errorf("baton-datadog: failed to register disable_user action: %w", err)
 	}
-	return nil
+	// Prototype: vend credentials through actions instead of IssueCredential.
+	return d.registerVendingActions(ctx, registry)
 }
 
 func userIDFromArgs(args *structpb.Struct) (string, error) {

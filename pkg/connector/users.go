@@ -209,9 +209,25 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build service account application key secret resource: %w", err)
 	}
-	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
-	// key.Scopes is nil when Datadog did not report scopes, which leaves
-	// "scopes" out entirely rather than asserting the key is unscoped.
+	plaintext, err := u.serviceAccountApplicationKeyPlaintext(key)
+	if err != nil {
+		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
+		return nil, err
+	}
+	return &connectorbuilder.CredentialIssueOutput{
+		Secret:        secret,
+		PlaintextData: []*v2.PlaintextData{plaintext},
+		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+	}, nil
+}
+
+// serviceAccountApplicationKeyPlaintext renders the api_key_v2 value for a
+// minted application key, shared by Issue and the custom actions.
+//
+// Multipass rejects nulls, so the optional fields use omitempty. key.Scopes is
+// nil when Datadog did not report scopes, which leaves "scopes" out entirely
+// rather than asserting the key is unscoped.
+func (u *credentialUserBuilder) serviceAccountApplicationKeyPlaintext(key *client.IssuedApplicationKey) (*v2.PlaintextData, error) {
 	plaintext, err := multipass.Plaintext(datadogApplicationKeyFieldName, multipass.APIKeyV2{
 		KeyValue:   key.Secret,
 		KeyID:      key.ID,
@@ -221,14 +237,9 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 		Scopes:     scopesOrNil(key.Scopes),
 	})
 	if err != nil {
-		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
 		return nil, fmt.Errorf("baton-datadog: encode service account application key plaintext: %w", err)
 	}
-	return &connectorbuilder.CredentialIssueOutput{
-		Secret:        secret,
-		PlaintextData: []*v2.PlaintextData{plaintext},
-		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
-	}, nil
+	return plaintext, nil
 }
 
 // scopesOrNil dereferences Datadog's nullable scopes list; nil stays nil, so
@@ -304,7 +315,24 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 		u.discardOrganizationAPIKey(ctx, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
 	}
-	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
+	plaintext, err := u.organizationAPIKeyPlaintext(key)
+	if err != nil {
+		u.discardOrganizationAPIKey(ctx, key.ID)
+		return nil, err
+	}
+	return &connectorbuilder.CredentialIssueOutput{
+		Secret:        secretResource,
+		PlaintextData: []*v2.PlaintextData{plaintext},
+		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+	}, nil
+}
+
+// organizationAPIKeyPlaintext renders the api_key_v2 value for a minted
+// organization API key. Issue and the custom actions share it, so both deliver
+// the same document under the same name.
+//
+// Multipass rejects nulls, so the optional fields use omitempty.
+func (u *credentialUserBuilder) organizationAPIKeyPlaintext(key *client.IssuedAPIKey) (*v2.PlaintextData, error) {
 	plaintext, err := multipass.Plaintext(datadogAPIKeyFieldName, multipass.APIKeyV2{
 		KeyValue:   key.Secret,
 		KeyID:      key.ID,
@@ -313,14 +341,9 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 		HeaderName: datadogAPIKeyHeaderName,
 	})
 	if err != nil {
-		u.discardOrganizationAPIKey(ctx, key.ID)
 		return nil, fmt.Errorf("baton-datadog: encode organization API key plaintext: %w", err)
 	}
-	return &connectorbuilder.CredentialIssueOutput{
-		Secret:        secretResource,
-		PlaintextData: []*v2.PlaintextData{plaintext},
-		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
-	}, nil
+	return plaintext, nil
 }
 
 // discardOrganizationAPIKey revokes an organization API key whose plaintext
