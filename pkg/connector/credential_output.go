@@ -1,8 +1,8 @@
 package connector
 
 import (
+	"github.com/conductorone/baton-datadog/pkg/multipass"
 	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
-	"github.com/conductorone/baton-sdk/pkg/secret"
 )
 
 const (
@@ -21,9 +21,9 @@ const (
 // organizationAPIKeyOutput declares the type an issued organization API key
 // comes back as. C1 binds the type before issuance, so this and the plaintext
 // the issuance returns must name the same type; both derive from
-// secret.TypeAPIKeyV2.
+// multipass.TypeAPIKeyV2.
 func organizationAPIKeyOutput() *configv1.Field {
-	output := secret.OutputField(datadogAPIKeyFieldName, secret.TypeAPIKeyV2)
+	output := multipass.OutputField(datadogAPIKeyFieldName, multipass.TypeAPIKeyV2)
 	output.SetDisplayName(datadogAPIKeyDisplayName)
 	return output
 }

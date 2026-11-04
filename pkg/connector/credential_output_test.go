@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/conductorone/baton-datadog/pkg/multipass"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/secret"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,7 +81,7 @@ func TestOrgAPIKeyIssueEmitsMultipassAPIKeyV2(t *testing.T) {
 	}
 
 	require.Equal(t, datadogAPIKeyFieldName, plaintext.GetName())
-	require.Equal(t, secret.ContentType(secret.TypeAPIKeyV2), plaintext.GetSchema(),
+	require.Equal(t, multipass.ContentType(multipass.TypeAPIKeyV2), plaintext.GetSchema(),
 		"the schema must name the type the descriptor declares")
 }
 
@@ -126,8 +126,8 @@ func TestOrgAPIKeyDescriptorDeclaresMultipassOutput(t *testing.T) {
 	require.NotNil(t, output, "the organization API key descriptor must declare its output")
 	require.Equal(t, datadogAPIKeyFieldName, output.GetName())
 	require.Equal(t, datadogAPIKeyDisplayName, output.GetDisplayName())
-	require.Equal(t, secret.ContentType(secret.TypeAPIKeyV2), output.GetContentType())
-	require.Equal(t, secret.Tags(secret.TypeAPIKeyV2), output.GetTags())
+	require.Equal(t, multipass.ContentType(multipass.TypeAPIKeyV2), output.GetContentType())
+	require.Equal(t, multipass.Tags(multipass.TypeAPIKeyV2), output.GetTags())
 	require.True(t, output.GetIsSecret(), "the declared output is a credential")
 
 	require.Nil(t, byType[serviceAccountApplicationKeyResourceType.Id].GetOutput(),

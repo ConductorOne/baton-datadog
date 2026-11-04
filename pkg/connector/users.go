@@ -7,11 +7,11 @@ import (
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
+	"github.com/conductorone/baton-datadog/pkg/multipass"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/secret"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -287,7 +287,7 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
 	}
 	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
-	plaintext, err := secret.Plaintext(datadogAPIKeyFieldName, secret.APIKeyV2{
+	plaintext, err := multipass.Plaintext(datadogAPIKeyFieldName, multipass.APIKeyV2{
 		KeyValue: key.Secret,
 		KeyID:    key.ID,
 		Provider: datadogProviderName,
