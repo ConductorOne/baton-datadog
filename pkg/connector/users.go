@@ -67,38 +67,21 @@ func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, off
 // The service-account application key is marked preferred: it is the only
 // issuance mapping with an honest owner, so it is the default when a caller
 // asks for the API_KEY shape without choosing a kind.
+//
+//nolint:staticcheck // deprecated; kept until C1 dispatches actions.
 func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.CredentialDetailsCredentialIssue, annotations.Annotations, error) {
 	options := []*v2.CredentialIssueOptionDescriptor{}
 	if u.offerServiceAccountAppKey {
-		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
-			Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
-			ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
-			SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
-			CustomScopesAllowed:  true,
-			// Preferred only where it can be: exactly one descriptor per shape
-			// may set it, and it must be set whenever several share a shape.
-			Preferred: u.offerOrgAPIKey,
-			// Output must name the same type as the plaintext Issue returns.
-			Output: serviceAccountApplicationKeyOutput(),
-		}.Build())
+		descriptor := serviceAccountApplicationKeyDescriptor()
+		// Preferred only where it can be: exactly one descriptor per shape may
+		// set it, and it must be set whenever several share a shape.
+		descriptor.SetPreferred(u.offerOrgAPIKey)
+		options = append(options, descriptor)
 	}
 	if u.offerOrgAPIKey {
-		options = append(options, v2.CredentialIssueOptionDescriptor_builder{
-			Option:       v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
-			ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
-			// deletableAPITokenResourceType, not apiTokenResourceType: they
-			// share an id, and this is the variant registered whenever this
-			// descriptor is advertised.
-			SecretResourceTypeId: deletableAPITokenResourceType.Id,
-			// Datadog organization API keys carry no scopes. Advertising none
-			// and disallowing custom ones makes the SDK reject a scoped
-			// request for this kind before it reaches Issue.
-			//
-			// Output must name the same type as the plaintext Issue returns.
-			Output: organizationAPIKeyOutput(),
-		}.Build())
+		options = append(options, organizationAPIKeyDescriptor())
 	}
-	return v2.CredentialDetailsCredentialIssue_builder{
+	return v2.CredentialDetailsCredentialIssue_builder{ //nolint:staticcheck // IssueCredential is deprecated but stays until C1 dispatches actions.
 		Options:         options,
 		PreferredOption: v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
 	}.Build(), nil, nil
@@ -165,31 +148,12 @@ func issuedCredentialName(requestID string) string {
 // would repeat the same unsupported claim the sync path used to make.
 func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	serviceAccountID := input.IdentityID.GetResource()
-
-	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
-	if err != nil {
-		if client.IsNotFound(err) {
-			return nil, status.Errorf(codes.NotFound, "baton-datadog: Datadog user %q not found", serviceAccountID)
-		}
-		return nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
-	}
-	if !userResp.GetData().Attributes.GetServiceAccount() {
-		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account; credential issuance only targets service accounts", serviceAccountID)
-	}
-
 	name := issuedCredentialName(input.RequestID)
-	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
-	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", input.RequestID, err)
-	}
-	if existing != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
-	}
 
 	scopes := input.CredentialOptions.GetApiKey().GetScopes()
-	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
+	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccountID, input.RequestID, scopes)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
+		return nil, err
 	}
 
 	secretTraitOptions := []rs.SecretTraitOption{
@@ -208,21 +172,6 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 	if err != nil {
 		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build service account application key secret resource: %w", err)
-	}
-	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
-	// key.Scopes is nil when Datadog did not report scopes, which leaves
-	// "scopes" out entirely rather than asserting the key is unscoped.
-	plaintext, err := multipass.Plaintext(datadogApplicationKeyFieldName, multipass.APIKeyV2{
-		KeyValue:   key.Secret,
-		KeyID:      key.ID,
-		Provider:   datadogProviderName,
-		BaseURL:    u.apiBaseURL,
-		HeaderName: datadogApplicationKeyHeaderName,
-		Scopes:     scopesOrNil(key.Scopes),
-	})
-	if err != nil {
-		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
-		return nil, fmt.Errorf("baton-datadog: encode service account application key plaintext: %w", err)
 	}
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret:        secret,
@@ -270,17 +219,9 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	}
 
 	name := issuedCredentialName(input.RequestID)
-	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	key, plaintext, err := u.mintOrganizationAPIKey(ctx, input.RequestID)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: look up organization API key for request %q: %w", input.RequestID, err)
-	}
-	if existing != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: organization API key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
-	}
-
-	key, err := u.wrapper.CreateAPIKey(ctx, name)
-	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
+		return nil, err
 	}
 
 	secretTraitOptions := []rs.SecretTraitOption{
@@ -303,18 +244,6 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	if err != nil {
 		u.discardOrganizationAPIKey(ctx, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
-	}
-	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
-	plaintext, err := multipass.Plaintext(datadogAPIKeyFieldName, multipass.APIKeyV2{
-		KeyValue:   key.Secret,
-		KeyID:      key.ID,
-		Provider:   datadogProviderName,
-		BaseURL:    u.apiBaseURL,
-		HeaderName: datadogAPIKeyHeaderName,
-	})
-	if err != nil {
-		u.discardOrganizationAPIKey(ctx, key.ID)
-		return nil, fmt.Errorf("baton-datadog: encode organization API key plaintext: %w", err)
 	}
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret:        secretResource,
@@ -352,11 +281,92 @@ func (u *credentialUserBuilder) discardServiceAccountApplicationKey(ctx context.
 	}
 }
 
+// mintOrganizationAPIKey mints an organization API key for a request and renders
+// its plaintext, or returns an error having minted nothing. IssueCredential and
+// the credential-issue action both call it, so the duplicate guard, the create
+// call and the discard-on-encode-failure cover both paths identically.
+func (u *credentialUserBuilder) mintOrganizationAPIKey(ctx context.Context, requestID string) (*client.IssuedAPIKey, *v2.PlaintextData, error) {
+	name := issuedCredentialName(requestID)
+	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: look up organization API key for request %q: %w", requestID, err)
+	}
+	if existing != nil {
+		return nil, nil, status.Errorf(codes.AlreadyExists, "baton-datadog: organization API key for request %q may already exist; refusing to issue a duplicate", requestID)
+	}
+
+	key, err := u.wrapper.CreateAPIKey(ctx, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
+	}
+
+	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
+	plaintext, err := multipass.Plaintext(datadogAPIKeyFieldName, multipass.APIKeyV2{
+		KeyValue:   key.Secret,
+		KeyID:      key.ID,
+		Provider:   datadogProviderName,
+		BaseURL:    u.apiBaseURL,
+		HeaderName: datadogAPIKeyHeaderName,
+	})
+	if err != nil {
+		u.discardOrganizationAPIKey(ctx, key.ID)
+		return nil, nil, fmt.Errorf("baton-datadog: encode organization API key plaintext: %w", err)
+	}
+	return key, plaintext, nil
+}
+
+// mintServiceAccountApplicationKey is the application key equivalent: it
+// re-checks that the target is still a service account, refuses a duplicate
+// request, mints, and renders the plaintext.
+func (u *credentialUserBuilder) mintServiceAccountApplicationKey(ctx context.Context, serviceAccountID, requestID string, scopes []string) (*client.IssuedApplicationKey, *v2.PlaintextData, error) {
+	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
+	if err != nil {
+		if client.IsNotFound(err) {
+			return nil, nil, status.Errorf(codes.NotFound, "baton-datadog: Datadog user %q not found", serviceAccountID)
+		}
+		return nil, nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
+	}
+	if !userResp.GetData().Attributes.GetServiceAccount() {
+		return nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account; credential issuance only targets service accounts", serviceAccountID)
+	}
+
+	name := issuedCredentialName(requestID)
+	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", requestID, err)
+	}
+	if existing != nil {
+		return nil, nil, status.Errorf(codes.AlreadyExists, "baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", requestID)
+	}
+
+	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
+	}
+
+	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
+	// key.Scopes is nil when Datadog did not report scopes, which leaves
+	// "scopes" out entirely rather than asserting the key is unscoped.
+	plaintext, err := multipass.Plaintext(datadogApplicationKeyFieldName, multipass.APIKeyV2{
+		KeyValue:   key.Secret,
+		KeyID:      key.ID,
+		Provider:   datadogProviderName,
+		BaseURL:    u.apiBaseURL,
+		HeaderName: datadogApplicationKeyHeaderName,
+		Scopes:     scopesOrNil(key.Scopes),
+	})
+	if err != nil {
+		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
+		return nil, nil, fmt.Errorf("baton-datadog: encode service account application key plaintext: %w", err)
+	}
+	return key, plaintext, nil
+}
+
 var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
 var _ connectorbuilder.AccountManagerV2 = &userBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &userBuilder{}
-var _ connectorbuilder.CredentialIssuerLimited = &credentialUserBuilder{}
-var _ connectorbuilder.CredentialIssuerV2 = &credentialUserBuilder{}
+var _ connectorbuilder.CredentialIssuerLimited = &credentialUserBuilder{} //nolint:staticcheck // IssueCredential is deprecated but stays until C1 dispatches actions.
+var _ connectorbuilder.CredentialIssuerV2 = &credentialUserBuilder{}      //nolint:staticcheck // IssueCredential is deprecated but stays until C1 dispatches actions.
 var _ connectorbuilder.AccountManagerV2 = &credentialUserBuilder{}
 var _ connectorbuilder.ResourceActionProvider = &credentialUserBuilder{}
 

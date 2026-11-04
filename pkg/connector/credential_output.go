@@ -3,6 +3,7 @@ package connector
 import (
 	"github.com/conductorone/baton-datadog/pkg/multipass"
 	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
+	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 )
 
 const (
@@ -41,11 +42,41 @@ func organizationAPIKeyOutput() *configv1.Field {
 }
 
 // serviceAccountApplicationKeyOutput declares the type an issued service
-// account application key comes back as. Same contract as the organization
-// key: the declared type and the plaintext must derive from
-// multipass.ContentType.
+// account application key comes back as, the same way.
 func serviceAccountApplicationKeyOutput() *configv1.Field {
 	output := multipass.OutputField(datadogApplicationKeyFieldName)
 	output.SetDisplayName(datadogApplicationKeyDisplayName)
 	return output
+}
+
+// organizationAPIKeyDescriptor is the descriptor the connector advertises for
+// the organization API key, and the one its credential-issue action is built
+// from. Declaring it once means the advertised shape, the action's schema and
+// the validated output cannot drift apart.
+func organizationAPIKeyDescriptor() *v2.CredentialIssueOptionDescriptor {
+	return v2.CredentialIssueOptionDescriptor_builder{
+		Option:       v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+		// deletableAPITokenResourceType, not apiTokenResourceType: they share an
+		// id, and this is the variant registered whenever this descriptor is
+		// advertised.
+		SecretResourceTypeId: deletableAPITokenResourceType.Id,
+		// Datadog organization API keys carry no scopes. Advertising none and
+		// disallowing custom ones makes the SDK reject a scoped request for this
+		// kind before it reaches Issue.
+		Output: organizationAPIKeyOutput(),
+	}.Build()
+}
+
+// serviceAccountApplicationKeyDescriptor is the same for the application key.
+// Preferred is left unset here; the capability builder decides it, because it is
+// a property of the advertised set rather than of either kind.
+func serviceAccountApplicationKeyDescriptor() *v2.CredentialIssueOptionDescriptor {
+	return v2.CredentialIssueOptionDescriptor_builder{
+		Option:               v2.CapabilityDetailCredentialOption_CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY,
+		ResourceMode:         v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+		SecretResourceTypeId: serviceAccountApplicationKeyResourceType.Id,
+		CustomScopesAllowed:  true,
+		Output:               serviceAccountApplicationKeyOutput(),
+	}.Build()
 }

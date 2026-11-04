@@ -170,9 +170,9 @@ func TestCredentialIssueFollowsTheKindGrants(t *testing.T) {
 			caps, advertised := advertisedResourceTypeCapabilities(t, d, userResourceType.Id)
 			require.True(t, advertised, "users must sync regardless")
 			if tt.wantIssue {
-				require.Contains(t, caps, v2.Capability_CAPABILITY_CREDENTIAL_ISSUE)
+				require.Contains(t, caps, v2.Capability_CAPABILITY_CREDENTIAL_ISSUE) //nolint:staticcheck // IssueCredential is deprecated but stays until C1 dispatches actions.
 			} else {
-				require.NotContains(t, caps, v2.Capability_CAPABILITY_CREDENTIAL_ISSUE)
+				require.NotContains(t, caps, v2.Capability_CAPABILITY_CREDENTIAL_ISSUE) //nolint:staticcheck // IssueCredential is deprecated but stays until C1 dispatches actions.
 			}
 		})
 	}
