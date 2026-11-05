@@ -46,8 +46,12 @@ func (d *Datadog) registerCredentialIssueActions(ctx context.Context, registry a
 	// alone would advertise an issuer whose keys the connector cannot revoke.
 	if offerOrgAPIKey := d.SyncSecrets && d.AllowOrgAPIKeyDeletion; offerOrgAPIKey {
 		u := newCredentialUserBuilder(d.wrapper, true, false, d.apiBaseURL())
+		// The identity this issuer targets is the user resource type: it is the
+		// syncer newCredentialUserBuilder builds (resourceType: userResourceType,
+		// users.go), the one whose capability carries this descriptor today.
 		schema, err := actions.CredentialIssueSchema(
 			ActionIssueOrganizationAPIKeyAction,
+			userResourceType.Id,
 			organizationAPIKeyDescriptor(),
 		)
 		if err != nil {
@@ -61,8 +65,11 @@ func (d *Datadog) registerCredentialIssueActions(ctx context.Context, registry a
 
 	if d.SyncSecrets && d.SyncServiceAccountApplicationKeys {
 		u := newCredentialUserBuilder(d.wrapper, false, true, d.apiBaseURL())
+		// Same identity resource type as the organization issuer: one issuer
+		// builder advertises both kinds, so both target users.
 		schema, err := actions.CredentialIssueSchema(
 			ActionIssueServiceAccountApplicationKeyAction,
+			userResourceType.Id,
 			serviceAccountApplicationKeyDescriptor(),
 			// Free-form on purpose: the descriptor sets CustomScopesAllowed, so
 			// C1 narrows what a requester may ask for, not the connector.

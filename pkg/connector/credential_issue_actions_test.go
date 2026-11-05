@@ -84,7 +84,13 @@ func requireArgs(t *testing.T, schema *v2.BatonActionSchema, want ...string) {
 	require.ElementsMatch(t, want, got)
 	for _, a := range schema.GetArguments() {
 		switch a.GetName() {
-		case actions.ArgIdentityID, actions.ArgRequestID:
+		case actions.ArgIdentityID:
+			require.True(t, a.GetIsRequired(), "%s is required", a.GetName())
+			// C1 reads the issuer's identity resource type from here.
+			require.Equal(t, []string{userResourceType.Id},
+				a.GetResourceIdField().GetRules().GetAllowedResourceTypeIds(),
+				"identity_id must allow exactly the issuer's identity resource type")
+		case actions.ArgRequestID:
 			require.True(t, a.GetIsRequired(), "%s is required", a.GetName())
 		case actionArgScopes:
 			require.False(t, a.GetIsRequired(), "scopes are optional")
