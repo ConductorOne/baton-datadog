@@ -41,7 +41,10 @@ const (
 // IssueCredential kind: advertising an issuer whose revoke path the connector
 // does not have would mint credentials it cannot clean up.
 func (d *Datadog) registerCredentialIssueActions(ctx context.Context, registry actions.ActionRegistry) error {
-	if d.AllowOrgAPIKeyDeletion {
+	// Both flags, matching IssueCredential: the deletable token syncer that
+	// DeleteResourceV2 needs is registered only under SyncSecrets, so the grant
+	// alone would advertise an issuer whose keys the connector cannot revoke.
+	if offerOrgAPIKey := d.SyncSecrets && d.AllowOrgAPIKeyDeletion; offerOrgAPIKey {
 		u := newCredentialUserBuilder(d.wrapper, true, false, d.apiBaseURL())
 		schema, err := actions.CredentialIssueSchema(
 			ActionIssueOrganizationAPIKeyAction,
@@ -88,7 +91,7 @@ func (u *credentialUserBuilder) issueOrganizationAPIKeyAction(
 	ctx context.Context,
 	args *structpb.Struct,
 ) (*structpb.Struct, []*v2.PlaintextData, annotations.Annotations, error) {
-	identityID, requestID, err := credentialIssueActionArgs(args)
+	_, requestID, err := credentialIssueActionArgs(args)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -98,11 +101,11 @@ func (u *credentialUserBuilder) issueOrganizationAPIKeyAction(
 		return nil, nil, nil, err
 	}
 
-	// The identity is recorded on the secret by CredentialIssueResource, from
-	// the request; the key itself belongs to the organization, which is why the
-	// mint does not parent it to the identity.
-	_ = identityID
-	return credentialIssueActionResponse(key.ID), []*v2.PlaintextData{plaintext}, nil, nil
+	response, err := credentialIssueActionResponse(key.ID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return response, []*v2.PlaintextData{plaintext}, nil, nil
 }
 
 // issueServiceAccountApplicationKeyAction mints an application key for the
@@ -127,7 +130,11 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return credentialIssueActionResponse(key.ID), []*v2.PlaintextData{plaintext}, nil, nil
+	response, err := credentialIssueActionResponse(key.ID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return response, []*v2.PlaintextData{plaintext}, nil, nil
 }
 
 // credentialIssueActionArgs reads the two arguments the SDK fixes for every
@@ -151,14 +158,12 @@ func credentialIssueActionArgs(args *structpb.Struct) (*v2.ResourceId, string, e
 // action result. secret_resource_id is the revoke handle and the only field the
 // SDK requires; expires_at is left out because neither Datadog key kind has a
 // provider expiry.
-func credentialIssueActionResponse(secretResourceID string) *structpb.Struct {
-	// The only value is a plain string, so marshalling cannot fail; the empty
-	// struct is the fallback rather than returning nil into the action manager.
+func credentialIssueActionResponse(secretResourceID string) (*structpb.Struct, error) {
 	response, err := structpb.NewStruct(map[string]any{
 		actions.ReturnSecretResourceID: secretResourceID,
 	})
 	if err != nil {
-		return &structpb.Struct{}
+		return nil, fmt.Errorf("baton-datadog: build credential issue response: %w", err)
 	}
-	return response
+	return response, nil
 }
