@@ -270,6 +270,7 @@ func TestIssueRequiresServiceAccount(t *testing.T) {
 		out := issueServiceAccountAppKey(t, context.Background(), wrapper, testServiceAccountID, "req-accept")
 		require.Equal(t, handle, out.Secret.GetId().GetResource())
 		require.Equal(t, testServiceAccountID, out.Secret.GetParentResourceId().GetResource(), "the issued secret must record its owning service account as its parent resource")
+		require.Equal(t, secret, string(out.PlaintextData[0].GetBytes()))
 	})
 
 	t.Run("rejects a human user", func(t *testing.T) {

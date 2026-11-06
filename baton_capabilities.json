@@ -108,6 +108,40 @@
     },
     {
       "resourceType": {
+        "id": "service-account-access-token",
+        "displayName": "Service Account Access Token",
+        "traits": [
+          "TRAIT_SECRET"
+        ],
+        "annotations": [
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+          },
+          {
+            "@type": "type.googleapis.com/c1.connector.v2.CapabilityPermissions",
+            "permissions": [
+              {
+                "permission": "service_account_write"
+              }
+            ]
+          }
+        ],
+        "description": "A standalone Datadog service access token owned by one service account; authenticated with Authorization: Bearer."
+      },
+      "capabilities": [
+        "CAPABILITY_SYNC",
+        "CAPABILITY_RESOURCE_DELETE"
+      ],
+      "permissions": {
+        "permissions": [
+          {
+            "permission": "service_account_write"
+          }
+        ]
+      }
+    },
+    {
+      "resourceType": {
         "id": "service-account-application-key",
         "displayName": "Service Account Application Key",
         "traits": [
@@ -229,6 +263,12 @@
             "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
             "secretResourceTypeId": "api-key"
+          },
+          {
+            "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_TOKEN",
+            "customScopesAllowed": true,
+            "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
+            "secretResourceTypeId": "service-account-access-token"
           }
         ],
         "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"
