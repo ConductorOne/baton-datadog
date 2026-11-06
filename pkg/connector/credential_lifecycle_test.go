@@ -38,6 +38,11 @@ type recordedRequest struct {
 	body   string
 }
 
+// testAPIBaseURL is the endpoint the credential tests advertise as the
+// credential's base_url. It matches the site the test wrapper is built with, so
+// a payload built from either source agrees.
+const testAPIBaseURL = "https://api.example.com"
+
 func newLifecycleTestWrapper(serverURL string) *client.DatadogClient {
 	cfg := datadog.NewConfiguration()
 	cfg.Servers = datadog.ServerConfigurations{{URL: serverURL}}
@@ -239,7 +244,7 @@ func newServiceAccountAppKeyServer(t *testing.T, serviceAccountID, handle, secre
 
 func issueServiceAccountAppKey(t *testing.T, ctx context.Context, wrapper *client.DatadogClient, serviceAccountID, requestID string) *connectorbuilder.CredentialIssueOutput {
 	t.Helper()
-	issuer := newCredentialUserBuilder(wrapper, false, true)
+	issuer := newCredentialUserBuilder(wrapper, false, true, testAPIBaseURL)
 	out, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: serviceAccountID},
 		RequestID:  requestID,
@@ -291,7 +296,7 @@ func TestIssueRequiresServiceAccount(t *testing.T) {
 		defer server.Close()
 		wrapper := newLifecycleTestWrapper(server.URL)
 
-		issuer := newCredentialUserBuilder(wrapper, false, true)
+		issuer := newCredentialUserBuilder(wrapper, false, true, testAPIBaseURL)
 		out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 			IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: humanUserID},
 			RequestID:  "req-reject",
@@ -336,7 +341,7 @@ func TestIssueRefusesDuplicateRequest(t *testing.T) {
 	defer server.Close()
 	wrapper := newLifecycleTestWrapper(server.URL)
 
-	issuer := newCredentialUserBuilder(wrapper, false, true)
+	issuer := newCredentialUserBuilder(wrapper, false, true, testAPIBaseURL)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  requestID,
@@ -395,7 +400,7 @@ func TestIssueAndDeleteNeverLogSecret(t *testing.T) {
 	ctx := ctxzap.ToContext(context.Background(), logger)
 
 	issued := issueServiceAccountAppKey(t, ctx, wrapper, testServiceAccountID, "req-1")
-	require.Equal(t, secret, string(issued.PlaintextData[0].GetBytes()))
+	require.Equal(t, secret, appKeyPlaintextKeyValue(t, issued))
 
 	deleter := newApplicationKeyBuilder(wrapper)
 	_, err := deleter.Delete(ctx, issued.Secret.GetId(), issued.Secret.GetParentResourceId())
@@ -425,7 +430,7 @@ func TestApplicationKeyBuilderDeleteUsesServiceAccountAPI(t *testing.T) {
 	ctx := context.Background()
 
 	issued := issueServiceAccountAppKey(t, ctx, wrapper, testServiceAccountID, "req-1")
-	require.Equal(t, secret, string(issued.PlaintextData[0].GetBytes()))
+	require.Equal(t, secret, appKeyPlaintextKeyValue(t, issued))
 
 	deleter := newApplicationKeyBuilder(wrapper)
 	_, err := deleter.Delete(ctx, issued.Secret.GetId(), issued.Secret.GetParentResourceId())
@@ -1156,7 +1161,7 @@ func TestIssuePassesScopesToProviderAndProfile(t *testing.T) {
 	}))
 	defer server.Close()
 
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false, true)
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false, true, testAPIBaseURL)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: testServiceAccountID},
 		RequestID:  "req-scoped",
@@ -1621,7 +1626,7 @@ func TestIssueOrganizationAPIKeyUsesProviderCreatedBy(t *testing.T) {
 	}))
 	defer server.Close()
 
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, false)
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, false, testAPIBaseURL)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: recipient},
 		RequestID:  "req-org-creator",
@@ -1662,7 +1667,7 @@ func TestIssueOrganizationAPIKeyOmitsCreatorWhenProviderSilent(t *testing.T) {
 	}))
 	defer server.Close()
 
-	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, false)
+	issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, false, testAPIBaseURL)
 	out, err := issuer.Issue(context.Background(), &connectorbuilder.CredentialIssueInput{
 		IdentityID: &v2.ResourceId{ResourceType: userResourceType.Id, Resource: recipient},
 		RequestID:  "req-org-silent",

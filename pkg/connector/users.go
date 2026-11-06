@@ -7,6 +7,7 @@ import (
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
+	"github.com/conductorone/baton-datadog/pkg/multipass"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
@@ -36,13 +37,19 @@ type credentialUserBuilder struct {
 	// grant is what registers the application-key syncer, and the syncer is
 	// what carries the deleter the SDK requires behind this descriptor.
 	offerServiceAccountAppKey bool
+	// apiBaseURL is the Datadog API endpoint an issued key authenticates
+	// against: the configured base-url override when set, otherwise the
+	// endpoint the site implies. It is resolved by the caller that knows the
+	// configuration, not here.
+	apiBaseURL string
 }
 
-func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool) *credentialUserBuilder {
+func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, offerServiceAccountAppKey bool, apiBaseURL string) *credentialUserBuilder {
 	return &credentialUserBuilder{
 		userBuilder:               newUserBuilder(wrapper),
 		offerOrgAPIKey:            offerOrgAPIKey,
 		offerServiceAccountAppKey: offerServiceAccountAppKey,
+		apiBaseURL:                apiBaseURL,
 	}
 }
 
@@ -71,6 +78,8 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// Preferred only where it can be: exactly one descriptor per shape
 			// may set it, and it must be set whenever several share a shape.
 			Preferred: u.offerOrgAPIKey,
+			// Output must name the same type as the plaintext Issue returns.
+			Output: serviceAccountApplicationKeyOutput(),
 		}.Build())
 	}
 	if u.offerOrgAPIKey {
@@ -84,6 +93,9 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// Datadog organization API keys carry no scopes. Advertising none
 			// and disallowing custom ones makes the SDK reject a scoped
 			// request for this kind before it reaches Issue.
+			//
+			// Output must name the same type as the plaintext Issue returns.
+			Output: organizationAPIKeyOutput(),
 		}.Build())
 	}
 	return v2.CredentialDetailsCredentialIssue_builder{
@@ -194,22 +206,38 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Co
 		applicationKeyProfileOptions(key.Scopes)...)
 	secret, err := rs.NewSecretResource(name, serviceAccountApplicationKeyResourceType, key.ID, secretTraitOptions, resourceOptions...)
 	if err != nil {
-		if deleteErr := u.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, key.ID); deleteErr != nil {
-			ctxzap.Extract(ctx).Warn("failed to clean up Datadog service account application key after resource construction error",
-				zap.String("service_account_id", serviceAccountID),
-				zap.String("application_key_id", key.ID),
-				zap.Error(deleteErr),
-			)
-		}
+		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build service account application key secret resource: %w", err)
 	}
+	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
+	// key.Scopes is nil when Datadog did not report scopes, which leaves
+	// "scopes" out entirely rather than asserting the key is unscoped.
+	plaintext, err := multipass.Plaintext(datadogApplicationKeyFieldName, multipass.APIKeyV2{
+		KeyValue:   key.Secret,
+		KeyID:      key.ID,
+		Provider:   datadogProviderName,
+		BaseURL:    u.apiBaseURL,
+		HeaderName: datadogApplicationKeyHeaderName,
+		Scopes:     scopesOrNil(key.Scopes),
+	})
+	if err != nil {
+		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
+		return nil, fmt.Errorf("baton-datadog: encode service account application key plaintext: %w", err)
+	}
 	return &connectorbuilder.CredentialIssueOutput{
-		Secret: secret,
-		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{Name: "application_key", Bytes: []byte(key.Secret)}.Build(),
-		},
-		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+		Secret:        secret,
+		PlaintextData: []*v2.PlaintextData{plaintext},
+		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
+}
+
+// scopesOrNil dereferences Datadog's nullable scopes list; nil stays nil, so
+// omitempty leaves "scopes" out.
+func scopesOrNil(scopes *[]string) []string {
+	if scopes == nil {
+		return nil
+	}
+	return *scopes
 }
 
 // issueOrganizationAPIKey mints a Datadog organization API key
@@ -271,23 +299,57 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	// (apiTokenBuilder.List) builds these keys without a parent too. Claiming
 	// the user as a parent here would make the issued resource disagree with
 	// the same key on its next sync.
-	secret, err := rs.NewSecretResource(name, deletableAPITokenResourceType, key.ID, secretTraitOptions)
+	secretResource, err := rs.NewSecretResource(name, deletableAPITokenResourceType, key.ID, secretTraitOptions)
 	if err != nil {
-		if deleteErr := u.wrapper.DeleteAPIKey(ctx, key.ID); deleteErr != nil {
-			ctxzap.Extract(ctx).Warn("failed to clean up Datadog organization API key after resource construction error",
-				zap.String("api_key_id", key.ID),
-				zap.Error(deleteErr),
-			)
-		}
+		u.discardOrganizationAPIKey(ctx, key.ID)
 		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
 	}
+	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
+	plaintext, err := multipass.Plaintext(datadogAPIKeyFieldName, multipass.APIKeyV2{
+		KeyValue:   key.Secret,
+		KeyID:      key.ID,
+		Provider:   datadogProviderName,
+		BaseURL:    u.apiBaseURL,
+		HeaderName: datadogAPIKeyHeaderName,
+	})
+	if err != nil {
+		u.discardOrganizationAPIKey(ctx, key.ID)
+		return nil, fmt.Errorf("baton-datadog: encode organization API key plaintext: %w", err)
+	}
 	return &connectorbuilder.CredentialIssueOutput{
-		Secret: secret,
-		PlaintextData: []*v2.PlaintextData{
-			v2.PlaintextData_builder{Name: "api_key", Bytes: []byte(key.Secret)}.Build(),
-		},
-		ResourceMode: v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
+		Secret:        secretResource,
+		PlaintextData: []*v2.PlaintextData{plaintext},
+		ResourceMode:  v2.CredentialResourceMode_CREDENTIAL_RESOURCE_MODE_DISCOVERABLE,
 	}, nil
+}
+
+// discardOrganizationAPIKey revokes an organization API key whose plaintext
+// cannot be returned. Issuance is not retried automatically, so a mint whose
+// result never reaches the caller would otherwise be an orphaned live
+// credential nobody holds. A failed delete is logged rather than returned: the
+// original error is what the caller needs to see, and the key id is what lets
+// an operator clean up by hand.
+func (u *credentialUserBuilder) discardOrganizationAPIKey(ctx context.Context, keyID string) {
+	if deleteErr := u.wrapper.DeleteAPIKey(ctx, keyID); deleteErr != nil {
+		ctxzap.Extract(ctx).Warn("failed to clean up Datadog organization API key after issuance error",
+			zap.String("api_key_id", keyID),
+			zap.Error(deleteErr),
+		)
+	}
+}
+
+// discardServiceAccountApplicationKey revokes a service account application key
+// whose plaintext cannot be returned. Same reasoning as
+// discardOrganizationAPIKey: issuance is not retried, so a mint that never
+// reaches the caller would otherwise be an orphaned live credential.
+func (u *credentialUserBuilder) discardServiceAccountApplicationKey(ctx context.Context, serviceAccountID, keyID string) {
+	if deleteErr := u.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, keyID); deleteErr != nil {
+		ctxzap.Extract(ctx).Warn("failed to clean up Datadog service account application key after issuance error",
+			zap.String("service_account_id", serviceAccountID),
+			zap.String("application_key_id", keyID),
+			zap.Error(deleteErr),
+		)
+	}
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
