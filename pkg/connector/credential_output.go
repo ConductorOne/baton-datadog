@@ -33,9 +33,9 @@ const (
 // organizationAPIKeyOutput declares the type an issued organization API key
 // comes back as. C1 binds the type before issuance, so this and the plaintext
 // the issuance returns must name the same type; both derive from
-// multipass.TypeAPIKeyV2.
+// multipass.ContentType.
 func organizationAPIKeyOutput() *configv1.Field {
-	output := multipass.OutputField(datadogAPIKeyFieldName, multipass.TypeAPIKeyV2)
+	output := multipass.OutputField(datadogAPIKeyFieldName)
 	output.SetDisplayName(datadogAPIKeyDisplayName)
 	return output
 }
@@ -43,9 +43,9 @@ func organizationAPIKeyOutput() *configv1.Field {
 // serviceAccountApplicationKeyOutput declares the type an issued service
 // account application key comes back as. Same contract as the organization
 // key: the declared type and the plaintext must derive from
-// multipass.TypeAPIKeyV2.
+// multipass.ContentType.
 func serviceAccountApplicationKeyOutput() *configv1.Field {
-	output := multipass.OutputField(datadogApplicationKeyFieldName, multipass.TypeAPIKeyV2)
+	output := multipass.OutputField(datadogApplicationKeyFieldName)
 	output.SetDisplayName(datadogApplicationKeyDisplayName)
 	return output
 }

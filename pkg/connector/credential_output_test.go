@@ -96,7 +96,7 @@ func TestOrgAPIKeyIssueEmitsMultipassAPIKeyV2(t *testing.T) {
 	}
 
 	require.Equal(t, datadogAPIKeyFieldName, plaintext.GetName())
-	require.Equal(t, multipass.ContentType(multipass.TypeAPIKeyV2), plaintext.GetSchema(),
+	require.Equal(t, multipass.ContentType, plaintext.GetSchema(),
 		"the schema must name the type the descriptor declares")
 }
 
@@ -140,16 +140,16 @@ func TestOrgAPIKeyDescriptorDeclaresMultipassOutput(t *testing.T) {
 	require.NotNil(t, output, "the organization API key descriptor must declare its output")
 	require.Equal(t, datadogAPIKeyFieldName, output.GetName())
 	require.Equal(t, datadogAPIKeyDisplayName, output.GetDisplayName())
-	require.Equal(t, multipass.ContentType(multipass.TypeAPIKeyV2), output.GetContentType())
-	require.Equal(t, multipass.Tags(multipass.TypeAPIKeyV2), output.GetTags())
+	require.Equal(t, multipass.ContentType, output.GetContentType())
+	require.Equal(t, multipass.Tags(), output.GetTags())
 	require.True(t, output.GetIsSecret(), "the declared output is a credential")
 
 	appKey := byType[serviceAccountApplicationKeyResourceType.Id].GetOutput()
 	require.NotNil(t, appKey, "the application key descriptor must declare its output too")
 	require.Equal(t, datadogApplicationKeyFieldName, appKey.GetName())
 	require.Equal(t, datadogApplicationKeyDisplayName, appKey.GetDisplayName())
-	require.Equal(t, multipass.ContentType(multipass.TypeAPIKeyV2), appKey.GetContentType())
-	require.Equal(t, multipass.Tags(multipass.TypeAPIKeyV2), appKey.GetTags())
+	require.Equal(t, multipass.ContentType, appKey.GetContentType())
+	require.Equal(t, multipass.Tags(), appKey.GetTags())
 	require.True(t, appKey.GetIsSecret(), "the declared output is a credential")
 }
 
@@ -190,7 +190,7 @@ func issueMultipassAppKey(t *testing.T, server *httptest.Server) map[string]any 
 	require.Len(t, issued.PlaintextData, 1)
 	plaintext := issued.PlaintextData[0]
 	require.Equal(t, datadogApplicationKeyFieldName, plaintext.GetName())
-	require.Equal(t, multipass.ContentType(multipass.TypeAPIKeyV2), plaintext.GetSchema(),
+	require.Equal(t, multipass.ContentType, plaintext.GetSchema(),
 		"the schema must name the type the descriptor declares")
 
 	var payload map[string]any
