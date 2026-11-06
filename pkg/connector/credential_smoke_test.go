@@ -51,7 +51,7 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	datadogConnector, ok := builder.(*Datadog)
 	require.True(t, ok)
 
-	issuer := newCredentialUserBuilder(datadogConnector.wrapper, false, true, testAPIBaseURL)
+	issuer := newCredentialUserBuilder(datadogConnector.wrapper, false, true, datadogConnector.apiBaseURL())
 	requestID := "smoke-" + time.Now().UTC().Format("20060102T150405")
 	t.Logf("issuing Datadog service account application key with request id %q", requestID)
 	issued, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
@@ -94,7 +94,7 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 
 	t.Logf("waiting for issued application key id=%s to authenticate", maskedValue(appKeyID))
 	require.Eventually(t, func() bool {
-		ok, err := canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+		ok, err := canAuthenticate(ctx, site, apiKey, appKeyPlaintextKeyValue(t, issued))
 		if err != nil {
 			t.Logf("issued application key not usable yet: %v", err)
 			return false
@@ -108,7 +108,7 @@ func TestCredentialIssueLifecycle(t *testing.T) {
 	require.NoError(t, err, "revoke issued Datadog application key")
 	t.Logf("waiting for revoked application key id=%s to stop authenticating", maskedValue(appKeyID))
 	require.Eventually(t, func() bool {
-		ok, err := canAuthenticate(ctx, site, apiKey, string(issued.PlaintextData[0].GetBytes()))
+		ok, err := canAuthenticate(ctx, site, apiKey, appKeyPlaintextKeyValue(t, issued))
 		if err != nil {
 			// Only Datadog refusing the credentials proves revocation. Any
 			// other error means the probe did not answer the question, so
