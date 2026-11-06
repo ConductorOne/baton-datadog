@@ -331,6 +331,68 @@ func TestCredentialIssueActionFailures(t *testing.T) {
 			wantCode: codes.InvalidArgument,
 		},
 		{
+			name: "org: identity is not a user",
+			call: func(a *structpb.Struct) error {
+				_, _, _, err := orgU.issueOrganizationAPIKeyAction(ctx, a)
+				return err
+			},
+			args: func(t *testing.T) *structpb.Struct {
+				a, err := structpb.NewStruct(map[string]any{actions.ArgRequestID: "r"})
+				require.NoError(t, err)
+				a.Fields[actions.ArgIdentityID] = identityArg(t, "team", testServiceAccountID)
+				return a
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "app: identity is not a user",
+			call: func(a *structpb.Struct) error {
+				_, _, _, err := appU.issueServiceAccountApplicationKeyAction(ctx, a)
+				return err
+			},
+			args: func(t *testing.T) *structpb.Struct {
+				a, err := structpb.NewStruct(map[string]any{actions.ArgRequestID: "r"})
+				require.NoError(t, err)
+				a.Fields[actions.ArgIdentityID] = identityArg(t, "team", testServiceAccountID)
+				return a
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "app: scopes is a string",
+			call: func(a *structpb.Struct) error {
+				_, _, _, err := appU.issueServiceAccountApplicationKeyAction(ctx, a)
+				return err
+			},
+			args: func(t *testing.T) *structpb.Struct {
+				a, err := structpb.NewStruct(map[string]any{actions.ArgRequestID: "r"})
+				require.NoError(t, err)
+				a.Fields[actions.ArgIdentityID] = identityArg(t, userResourceType.Id, testServiceAccountID)
+				scopes, err := structpb.NewValue("logs_read")
+				require.NoError(t, err)
+				a.Fields[actionArgScopes] = scopes
+				return a
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "app: scopes is a mixed list",
+			call: func(a *structpb.Struct) error {
+				_, _, _, err := appU.issueServiceAccountApplicationKeyAction(ctx, a)
+				return err
+			},
+			args: func(t *testing.T) *structpb.Struct {
+				a, err := structpb.NewStruct(map[string]any{actions.ArgRequestID: "r"})
+				require.NoError(t, err)
+				a.Fields[actions.ArgIdentityID] = identityArg(t, userResourceType.Id, testServiceAccountID)
+				scopes, err := structpb.NewValue([]any{"logs_read", 7})
+				require.NoError(t, err)
+				a.Fields[actionArgScopes] = scopes
+				return a
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
 			name: "app: identity is not a service account",
 			call: func(a *structpb.Struct) error {
 				_, _, _, err := appU.issueServiceAccountApplicationKeyAction(ctx, a)

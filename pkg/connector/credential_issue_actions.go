@@ -127,8 +127,14 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 		return nil, nil, nil, err
 	}
 
+	// GetStringSliceArg reports false for an absent and a malformed value alike.
+	// Absent means an unrestricted key; malformed must not silently become one.
 	var scopes []string
-	if requested, ok := actions.GetStringSliceArg(args, actionArgScopes); ok {
+	if _, present := args.GetFields()[actionArgScopes]; present {
+		requested, ok := actions.GetStringSliceArg(args, actionArgScopes)
+		if !ok {
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a list of strings", actionArgScopes)
+		}
 		scopes = requested
 	}
 
@@ -151,8 +157,8 @@ func credentialIssueActionArgs(args *structpb.Struct) (*v2.ResourceId, string, e
 	if err != nil {
 		return nil, "", status.Errorf(codes.InvalidArgument, "baton-datadog: %v", err)
 	}
-	if identityID.GetResource() == "" {
-		return nil, "", status.Errorf(codes.InvalidArgument, "baton-datadog: %s has no resource id", actions.ArgIdentityID)
+	if identityID.GetResourceType() != userResourceType.Id || identityID.GetResource() == "" {
+		return nil, "", status.Error(codes.InvalidArgument, "baton-datadog: a Datadog user identity is required")
 	}
 	requestID, ok := actions.GetStringArg(args, actions.ArgRequestID)
 	if !ok || requestID == "" {
