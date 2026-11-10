@@ -1,0 +1,223 @@
+package connector
+
+import (
+	"context"
+	"testing"
+
+	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
+	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/actions"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/conductorone/baton-datadog/pkg/multipass"
+)
+
+func fullGrantsDatadog(serverURL string) *Datadog {
+	return &Datadog{
+		wrapper:                           newLifecycleTestWrapper(serverURL),
+		baseURL:                           testAPIBaseURL,
+		SyncSecrets:                       true,
+		AllowOrgAPIKeyDeletion:            true,
+		SyncServiceAccountApplicationKeys: true,
+	}
+}
+
+// registeredIssuerSchemas runs the connector's syncers' ResourceActions into one
+// ActionManager and returns the schemas registered for a resource type.
+func registeredIssuerSchemas(t *testing.T, d *Datadog, resourceTypeID string) []*v2.BatonActionSchema {
+	t.Helper()
+	ctx := context.Background()
+	mgr := actions.NewActionManager(ctx)
+	for _, syncer := range d.ResourceSyncers(ctx) {
+		provider, ok := syncer.(connectorbuilder.ResourceActionProvider)
+		if !ok {
+			continue
+		}
+		registry, err := mgr.GetTypeRegistry(ctx, syncer.ResourceType(ctx).GetId())
+		require.NoError(t, err)
+		require.NoError(t, provider.ResourceActions(ctx, registry))
+	}
+	schemas, _, err := mgr.ListActionSchemas(ctx, resourceTypeID)
+	require.NoError(t, err)
+	return schemas
+}
+
+func fieldsByName(fields []*configv1.Field) map[string]*configv1.Field {
+	out := make(map[string]*configv1.Field, len(fields))
+	for _, f := range fields {
+		out[f.GetName()] = f
+	}
+	return out
+}
+
+// requireIssuerShape asserts what C1 keys on to recognize a credential issuer:
+// one RESOURCE_CREATE action, one secret return carrying the Multipass type, and
+// one resource return.
+func requireIssuerShape(t *testing.T, schema *v2.BatonActionSchema, resourceTypeID, secretName string) {
+	t.Helper()
+	require.Equal(t, resourceTypeID, schema.GetResourceTypeId())
+	require.Equal(t, []v2.ActionType{v2.ActionType_ACTION_TYPE_RESOURCE_CREATE}, schema.GetActionType())
+
+	var secrets []*configv1.Field
+	var resources []*configv1.Field
+	for _, f := range schema.GetReturnTypes() {
+		if f.GetIsSecret() {
+			secrets = append(secrets, f)
+		}
+		if f.HasResourceField() {
+			resources = append(resources, f)
+		}
+	}
+	require.Len(t, secrets, 1, "exactly one secret return")
+	require.Equal(t, secretName, secrets[0].GetName())
+	require.Equal(t, multipass.ContentType, secrets[0].GetContentType())
+	require.Contains(t, secrets[0].GetTags(), "api_key")
+	require.Len(t, resources, 1, "exactly one resource return")
+	require.Equal(t, actionReturnResource, resources[0].GetName())
+
+	tickets := 0
+	for _, a := range schema.GetArguments() {
+		for _, tag := range a.GetTags() {
+			if tag == "c1.ticket_id" {
+				tickets++
+				require.Equal(t, actionArgTicketID, a.GetName())
+				require.True(t, a.HasStringField())
+			}
+		}
+	}
+	require.Equal(t, 1, tickets, "one string argument tagged c1.ticket_id")
+}
+
+func TestOrganizationAPIKeyIssuerSchema(t *testing.T) {
+	schemas := registeredIssuerSchemas(t, fullGrantsDatadog("http://127.0.0.1:1"), apiTokenResourceType.Id)
+	byName := schemaByName(schemas)
+	schema, ok := byName[ActionIssueOrganizationAPIKey]
+	require.True(t, ok, "the organization key issuer registers on the api-key type")
+	requireIssuerShape(t, schema, apiTokenResourceType.Id, datadogAPIKeyFieldName)
+
+	// An organization key belongs to the organization: no subject, only the ticket.
+	require.Len(t, schema.GetArguments(), 1)
+}
+
+func TestApplicationKeyIssuerSchema(t *testing.T) {
+	schemas := registeredIssuerSchemas(t, fullGrantsDatadog("http://127.0.0.1:1"), serviceAccountApplicationKeyResourceType.Id)
+	schema, ok := schemaByName(schemas)[ActionIssueServiceAccountApplicationKey]
+	require.True(t, ok, "the application key issuer registers on its own type")
+	requireIssuerShape(t, schema, serviceAccountApplicationKeyResourceType.Id, datadogApplicationKeyFieldName)
+
+	args := fieldsByName(schema.GetArguments())
+	subjects := 0
+	for _, a := range schema.GetArguments() {
+		if a.HasResourceIdField() {
+			subjects++
+		}
+	}
+	require.Equal(t, 1, subjects, "at most one ResourceIdField")
+	subject := args[actionArgServiceAccountID]
+	require.NotNil(t, subject)
+	require.True(t, subject.GetIsRequired())
+	require.Equal(t, []string{userResourceType.Id}, subject.GetResourceIdField().GetRules().GetAllowedResourceTypeIds())
+	require.True(t, args[actionArgScopes].HasStringSliceField())
+}
+
+// TestIssuersFollowTheGrants: an issuer registers only where its secret type's
+// revoke path does, the same gates IssueCredential has.
+func TestIssuersFollowTheGrants(t *testing.T) {
+	d := fullGrantsDatadog("http://127.0.0.1:1")
+	d.AllowOrgAPIKeyDeletion = false
+	require.Empty(t, registeredIssuerSchemas(t, d, apiTokenResourceType.Id), "no org key issuer without allow-org-api-key-deletion")
+	require.NotEmpty(t, registeredIssuerSchemas(t, d, serviceAccountApplicationKeyResourceType.Id))
+
+	d = fullGrantsDatadog("http://127.0.0.1:1")
+	d.SyncServiceAccountApplicationKeys = false
+	require.Empty(t, registeredIssuerSchemas(t, d, serviceAccountApplicationKeyResourceType.Id))
+
+	d = fullGrantsDatadog("http://127.0.0.1:1")
+	d.SyncSecrets = false
+	require.Empty(t, registeredIssuerSchemas(t, d, apiTokenResourceType.Id))
+	require.Empty(t, registeredIssuerSchemas(t, d, serviceAccountApplicationKeyResourceType.Id))
+}
+
+func subjectArg(t *testing.T, resourceType, resource string) *structpb.Value {
+	t.Helper()
+	v, err := structpb.NewValue(map[string]any{"resource_type_id": resourceType, "resource_id": resource})
+	require.NoError(t, err)
+	return v
+}
+
+// requireResourceReturn checks the returned resource's id and that its
+// SecretTrait survived the conversion.
+func requireResourceReturn(t *testing.T, response *structpb.Struct, resourceTypeID, resourceID string) {
+	t.Helper()
+	res := response.GetFields()[actionReturnResource].GetStructValue()
+	require.NotNil(t, res, "the response carries the created secret resource")
+	id := res.GetFields()["resourceId"].GetStructValue().GetFields()
+	require.Equal(t, resourceTypeID, id["resourceTypeId"].GetStringValue())
+	require.Equal(t, resourceID, id["resourceId"].GetStringValue())
+	require.Contains(t, res.GetFields()["annotations"].String(), "SecretTrait")
+}
+
+func TestOrganizationAPIKeyActionResult(t *testing.T) {
+	server := newMultipassOrgKeyServer(t)
+	u := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, false, testAPIBaseURL)
+
+	response, plaintext, _, err := u.issueOrganizationAPIKeyAction(context.Background(), &structpb.Struct{Fields: map[string]*structpb.Value{
+		actionArgTicketID: structpb.NewStringValue("multipass"),
+	}})
+	require.NoError(t, err)
+	requireResourceReturn(t, response, apiTokenResourceType.Id, "org-key-id")
+	require.Len(t, plaintext, 1)
+	require.Equal(t, datadogAPIKeyFieldName, plaintext[0].GetName())
+	require.Equal(t, multipass.ContentType, plaintext[0].GetSchema(), "the SDK does not copy the schema onto the plaintext")
+	require.Contains(t, string(plaintext[0].GetBytes()), `"key_value":"org-key-secret"`)
+}
+
+func TestApplicationKeyActionResult(t *testing.T) {
+	server, requests := newMultipassAppKeyServer(t, "app-key-id", "app-key-secret",
+		`{"key":"app-key-secret","name":"c1-tkt-1","scopes":["logs_read"]}`)
+	u := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false, true, testAPIBaseURL)
+
+	response, plaintext, _, err := u.issueServiceAccountApplicationKeyAction(context.Background(), &structpb.Struct{Fields: map[string]*structpb.Value{
+		actionArgServiceAccountID: subjectArg(t, userResourceType.Id, testServiceAccountID),
+		actionArgTicketID:         structpb.NewStringValue("tkt-1"),
+		actionArgScopes:           structpb.NewListValue(&structpb.ListValue{Values: []*structpb.Value{structpb.NewStringValue("logs_read")}}),
+	}})
+	require.NoError(t, err)
+	requireResourceReturn(t, response, serviceAccountApplicationKeyResourceType.Id, "app-key-id")
+	require.Len(t, plaintext, 1)
+	require.Equal(t, datadogApplicationKeyFieldName, plaintext[0].GetName())
+	require.Equal(t, multipass.ContentType, plaintext[0].GetSchema())
+	require.Contains(t, string(plaintext[0].GetBytes()), `"key_value":"app-key-secret"`)
+
+	var created bool
+	for _, r := range *requests {
+		if r.method == "POST" {
+			created = true
+			require.Contains(t, r.body, `"name":"c1-tkt-1"`, "the key is named for the ticket")
+		}
+	}
+	require.True(t, created)
+}
+
+func TestIssuerActionsRejectBadArguments(t *testing.T) {
+	u := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true, testAPIBaseURL)
+	ctx := context.Background()
+
+	_, _, _, err := u.issueOrganizationAPIKeyAction(ctx, &structpb.Struct{})
+	require.Equal(t, codes.InvalidArgument, status.Code(err), "ticket_id is required")
+
+	_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{Fields: map[string]*structpb.Value{
+		actionArgServiceAccountID: subjectArg(t, teamResourceType.Id, "t-1"),
+		actionArgTicketID:         structpb.NewStringValue("tkt-1"),
+	}})
+	require.Equal(t, codes.InvalidArgument, status.Code(err), "the subject must be a user")
+
+	_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{Fields: map[string]*structpb.Value{
+		actionArgTicketID: structpb.NewStringValue("tkt-1"),
+	}})
+	require.Equal(t, codes.InvalidArgument, status.Code(err), "the subject is required")
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/conductorone/baton-sdk/pkg/actions"
 	"strconv"
 	"time"
 
@@ -23,9 +24,12 @@ import (
 type applicationKeyBuilder struct {
 	resourceType *v2.ResourceType
 	wrapper      *client.DatadogClient
+	// issuer mints application keys; nil means this install does not issue them.
+	issuer *credentialUserBuilder
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &applicationKeyBuilder{}
+var _ connectorbuilder.ResourceActionProvider = &applicationKeyBuilder{}
 var _ connectorbuilder.ResourceDeleterV2Limited = &applicationKeyBuilder{}
 
 func newApplicationKeyBuilder(wrapper *client.DatadogClient) *applicationKeyBuilder {
@@ -33,6 +37,14 @@ func newApplicationKeyBuilder(wrapper *client.DatadogClient) *applicationKeyBuil
 		resourceType: serviceAccountApplicationKeyResourceType,
 		wrapper:      wrapper,
 	}
+}
+
+// ResourceActions registers the application key issuer, when there is one.
+func (o *applicationKeyBuilder) ResourceActions(ctx context.Context, registry actions.ActionRegistry) error {
+	if o.issuer == nil {
+		return nil
+	}
+	return o.issuer.registerServiceAccountApplicationKeyIssuer(ctx, registry)
 }
 
 func (o *applicationKeyBuilder) ResourceType(_ context.Context) *v2.ResourceType {
