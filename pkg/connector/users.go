@@ -78,8 +78,6 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// Preferred only where it can be: exactly one descriptor per shape
 			// may set it, and it must be set whenever several share a shape.
 			Preferred: u.offerOrgAPIKey,
-			// Output must name the same type as the plaintext Issue returns.
-			Output: serviceAccountApplicationKeyOutput(),
 		}.Build())
 	}
 	if u.offerOrgAPIKey {
@@ -93,9 +91,6 @@ func (u *credentialUserBuilder) IssueCapabilityDetails(context.Context) (*v2.Cre
 			// Datadog organization API keys carry no scopes. Advertising none
 			// and disallowing custom ones makes the SDK reject a scoped
 			// request for this kind before it reaches Issue.
-			//
-			// Output must name the same type as the plaintext Issue returns.
-			Output: organizationAPIKeyOutput(),
 		}.Build())
 	}
 	return v2.CredentialDetailsCredentialIssue_builder{

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/conductorone/baton-datadog/pkg/multipass"
+	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/stretchr/testify/require"
@@ -124,33 +125,27 @@ func TestDatadogAPIBaseURL(t *testing.T) {
 		"the base-url override must win over the site")
 }
 
-// TestOrgAPIKeyDescriptorDeclaresMultipassOutput: the descriptor is where C1
-// learns the type before issuance, so it must name the same type the plaintext
-// is encoded as. Both credential kinds now declare one.
-func TestOrgAPIKeyDescriptorDeclaresMultipassOutput(t *testing.T) {
-	details, _, err := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true, testAPIBaseURL).IssueCapabilityDetails(context.Background())
-	require.NoError(t, err)
-
-	byType := map[string]*v2.CredentialIssueOptionDescriptor{}
-	for _, o := range details.GetOptions() {
-		byType[o.GetSecretResourceTypeId()] = o
+// TestIssuerOutputFieldsDeclareMultipass: C1 learns the credential's type from
+// the declared field before issuance, so it must name the same type the
+// plaintext is encoded as. Both credential kinds declare one.
+func TestIssuerOutputFieldsDeclareMultipass(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		output      *configv1.Field
+		wantName    string
+		wantDisplay string
+	}{
+		{"organization API key", organizationAPIKeyOutput(), datadogAPIKeyFieldName, datadogAPIKeyDisplayName},
+		{"application key", serviceAccountApplicationKeyOutput(), datadogApplicationKeyFieldName, datadogApplicationKeyDisplayName},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.wantName, tt.output.GetName())
+			require.Equal(t, tt.wantDisplay, tt.output.GetDisplayName())
+			require.Equal(t, multipass.ContentType, tt.output.GetContentType())
+			require.Equal(t, multipass.Tags(), tt.output.GetTags())
+			require.True(t, tt.output.GetIsSecret(), "the declared output is a credential")
+		})
 	}
-
-	output := byType[apiTokenResourceType.Id].GetOutput()
-	require.NotNil(t, output, "the organization API key descriptor must declare its output")
-	require.Equal(t, datadogAPIKeyFieldName, output.GetName())
-	require.Equal(t, datadogAPIKeyDisplayName, output.GetDisplayName())
-	require.Equal(t, multipass.ContentType, output.GetContentType())
-	require.Equal(t, multipass.Tags(), output.GetTags())
-	require.True(t, output.GetIsSecret(), "the declared output is a credential")
-
-	appKey := byType[serviceAccountApplicationKeyResourceType.Id].GetOutput()
-	require.NotNil(t, appKey, "the application key descriptor must declare its output too")
-	require.Equal(t, datadogApplicationKeyFieldName, appKey.GetName())
-	require.Equal(t, datadogApplicationKeyDisplayName, appKey.GetDisplayName())
-	require.Equal(t, multipass.ContentType, appKey.GetContentType())
-	require.Equal(t, multipass.Tags(), appKey.GetTags())
-	require.True(t, appKey.GetIsSecret(), "the declared output is a credential")
 }
 
 // newMultipassAppKeyServer serves the service-account application key endpoints
