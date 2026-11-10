@@ -84,7 +84,6 @@ func requireIssuerShape(t *testing.T, schema *v2.BatonActionSchema, resourceType
 	require.Contains(t, secrets[0].GetTags(), "api_key")
 	require.Len(t, resources, 1, "exactly one resource return")
 	require.Equal(t, actionReturnResource, resources[0].GetName())
-
 }
 
 func TestOrganizationAPIKeyIssuerSchema(t *testing.T) {

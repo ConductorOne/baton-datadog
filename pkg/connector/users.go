@@ -329,7 +329,11 @@ func (u *credentialUserBuilder) organizationAPIKeyResource(ctx context.Context, 
 // re-checks that the target is still a service account, optionally refuses a
 // duplicate request (non-empty requestID, as in mintOrganizationAPIKey), mints,
 // and renders the plaintext.
-func (u *credentialUserBuilder) mintServiceAccountApplicationKey(ctx context.Context, serviceAccountID, name, requestID string, scopes []string) (*client.IssuedApplicationKey, *v2.PlaintextData, error) {
+func (u *credentialUserBuilder) mintServiceAccountApplicationKey(
+	ctx context.Context,
+	serviceAccountID, name, requestID string,
+	scopes []string,
+) (*client.IssuedApplicationKey, *v2.PlaintextData, error) {
 	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
 	if err != nil {
 		if client.IsNotFound(err) {
