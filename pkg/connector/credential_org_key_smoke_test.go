@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	cfg "github.com/conductorone/baton-datadog/pkg/config"
-	"github.com/conductorone/baton-multipass-sdk/pkg/multipass"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/stretchr/testify/require"

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
+	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
 	"github.com/conductorone/baton-datadog/pkg/client"
-	"github.com/conductorone/baton-multipass-sdk/pkg/multipass"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"

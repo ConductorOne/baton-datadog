@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/conductorone/baton-multipass-sdk/pkg/multipass"
+	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
 )
 
 func fullGrantsDatadog(serverURL string) *Datadog {

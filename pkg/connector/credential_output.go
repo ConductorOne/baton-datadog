@@ -1,7 +1,7 @@
 package connector
 
 import (
-	"github.com/conductorone/baton-multipass-sdk/pkg/multipass"
+	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
 	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 )
 
