@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	filippo.io/age v1.3.1
 	github.com/DataDog/datadog-api-client-go/v2 v2.43.0
+	github.com/conductorone/baton-multipass-sdk v0.0.1
 	github.com/conductorone/baton-sdk v0.44.2
 	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -136,3 +137,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/conductorone/baton-multipass-sdk => ./local_vendor/baton-multipass-sdk

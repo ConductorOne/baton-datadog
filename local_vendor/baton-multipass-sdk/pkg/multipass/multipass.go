@@ -1,5 +1,7 @@
-// Adapted from github.com/conductorone/baton-multipass-sdk/pkg/multipass v0.0.1 (b9f4b677).
-// Replace with that module once it is public (IGA-5320).
+// Temporary trimmed copy of github.com/conductorone/baton-multipass-sdk/pkg/multipass
+// v0.0.1 (commit b9f4b6776da475759bbcdc18f8209fedab389a6c).
+// To be replaced by the public baton-multipass-sdk module when available (IGA-5320).
+// Swap: remove the go.mod `replace` line and this local_vendor directory.
 
 // Package multipass serializes the API key value this connector issues under
 // Multipass's api_key_v2 content type. The struct matches the field names
