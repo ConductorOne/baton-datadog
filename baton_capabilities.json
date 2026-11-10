@@ -223,38 +223,12 @@
             "customScopesAllowed": true,
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
             "secretResourceTypeId": "service-account-application-key",
-            "preferred": true,
-            "output": {
-              "name": "application_key",
-              "displayName": "Datadog application key",
-              "isSecret": true,
-              "contentType": "application/vnd.multipass.api_key_v2+json",
-              "tags": [
-                "credential",
-                "api_key",
-                "multipass",
-                "api_key_v2"
-              ],
-              "stringField": {}
-            }
+            "preferred": true
           },
           {
             "option": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY",
             "resourceMode": "CREDENTIAL_RESOURCE_MODE_DISCOVERABLE",
-            "secretResourceTypeId": "api-key",
-            "output": {
-              "name": "api_key",
-              "displayName": "Datadog API key",
-              "isSecret": true,
-              "contentType": "application/vnd.multipass.api_key_v2+json",
-              "tags": [
-                "credential",
-                "api_key",
-                "multipass",
-                "api_key_v2"
-              ],
-              "stringField": {}
-            }
+            "secretResourceTypeId": "api-key"
           }
         ],
         "preferredOption": "CAPABILITY_DETAIL_CREDENTIAL_OPTION_API_KEY"

@@ -3,6 +3,7 @@ module github.com/conductorone/baton-datadog
 go 1.27.3
 
 require (
+	filippo.io/age v1.3.1
 	github.com/DataDog/datadog-api-client-go/v2 v2.43.0
 	github.com/conductorone/baton-sdk v0.44.2
 	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	filippo.io/age v1.3.1 // indirect
 	filippo.io/edwards25519 v1.1.1 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect

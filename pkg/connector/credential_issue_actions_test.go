@@ -1,8 +1,13 @@
 package connector
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"testing"
+	"time"
+
+	filippoage "filippo.io/age"
 
 	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -220,4 +225,48 @@ func TestIssuerActionsRejectBadArguments(t *testing.T) {
 		actionArgTicketID: structpb.NewStringValue("tkt-1"),
 	}})
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "the subject is required")
+}
+
+// TestIssuerThroughActionManagerEncryptsTheSecret drives the issuer the way the
+// SDK does, with a recipient: the plaintext must leave only as ciphertext whose
+// schema is the Multipass type, and the key must not appear in the response.
+func TestIssuerThroughActionManagerEncryptsTheSecret(t *testing.T) {
+	ctx := context.Background()
+	server := newMultipassOrgKeyServer(t)
+	d := fullGrantsDatadog(server.URL)
+
+	mgr := actions.NewActionManager(ctx)
+	for _, syncer := range d.ResourceSyncers(ctx) {
+		if provider, ok := syncer.(connectorbuilder.ResourceActionProvider); ok {
+			registry, err := mgr.GetTypeRegistry(ctx, syncer.ResourceType(ctx).GetId())
+			require.NoError(t, err)
+			require.NoError(t, provider.ResourceActions(ctx, registry))
+		}
+	}
+
+	identity, err := filippoage.GenerateHybridIdentity()
+	require.NoError(t, err)
+	recipient := v2.EncryptionConfig_builder{
+		AgeRecipientConfig: v2.EncryptionConfig_AgeRecipientConfig_builder{Recipient: identity.Recipient().String()}.Build(),
+	}.Build()
+
+	_, actionStatus, response, encrypted, _, err := mgr.InvokeActionWithWaitAndEncryption(
+		ctx, ActionIssueOrganizationAPIKey, apiTokenResourceType.Id,
+		&structpb.Struct{Fields: map[string]*structpb.Value{actionArgTicketID: structpb.NewStringValue("multipass")}},
+		5*time.Second, []*v2.EncryptionConfig{recipient})
+	require.NoError(t, err)
+	require.Equal(t, v2.BatonActionStatus_BATON_ACTION_STATUS_COMPLETE, actionStatus)
+
+	require.Len(t, encrypted, 1)
+	require.Equal(t, datadogAPIKeyFieldName, encrypted[0].GetName())
+	require.Equal(t, multipass.ContentType, encrypted[0].GetSchema())
+	require.NotContains(t, string(encrypted[0].GetEncryptedBytes()), "org-key-secret")
+	require.NotContains(t, response.String(), "org-key-secret", "the public response never carries the key")
+	requireResourceReturn(t, response, apiTokenResourceType.Id, "org-key-id")
+
+	reader, err := filippoage.Decrypt(bytes.NewReader(encrypted[0].GetEncryptedBytes()), identity)
+	require.NoError(t, err)
+	decrypted, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	require.Contains(t, string(decrypted), `"key_value":"org-key-secret"`)
 }
