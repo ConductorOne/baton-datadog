@@ -161,63 +161,13 @@ func issuedCredentialName(requestID string) string {
 func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	serviceAccountID := input.IdentityID.GetResource()
 
-	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
+	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccountID, input.RequestID, input.CredentialOptions.GetApiKey().GetScopes())
 	if err != nil {
-		if client.IsNotFound(err) {
-			return nil, status.Errorf(codes.NotFound, "baton-datadog: Datadog user %q not found", serviceAccountID)
-		}
-		return nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
+		return nil, err
 	}
-	if !userResp.GetData().Attributes.GetServiceAccount() {
-		return nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account; credential issuance only targets service accounts", serviceAccountID)
-	}
-
-	name := issuedCredentialName(input.RequestID)
-	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
+	secret, err := u.applicationKeyResource(ctx, issuedCredentialName(input.RequestID), key, input.IdentityID)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", input.RequestID, err)
-	}
-	if existing != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
-	}
-
-	scopes := input.CredentialOptions.GetApiKey().GetScopes()
-	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
-	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
-	}
-
-	secretTraitOptions := []rs.SecretTraitOption{
-		rs.WithSecretIdentityID(input.IdentityID),
-		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
-		rs.WithSecretDetail("datadog.service_account_application_key"),
-	}
-	// Carry the key's scopes on the freshly issued resource so a vended key
-	// reports what it can do immediately, rather than only after the next sync
-	// rebuilds it. key.Scopes is what Datadog echoed back rather than what was
-	// requested, so this agrees with what the syncer will later produce for the
-	// same key instead of drifting from it.
-	resourceOptions := append([]rs.ResourceOption{rs.WithParentResourceID(input.IdentityID)},
-		applicationKeyProfileOptions(key.Scopes)...)
-	secret, err := rs.NewSecretResource(name, serviceAccountApplicationKeyResourceType, key.ID, secretTraitOptions, resourceOptions...)
-	if err != nil {
-		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
-		return nil, fmt.Errorf("baton-datadog: build service account application key secret resource: %w", err)
-	}
-	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
-	// key.Scopes is nil when Datadog did not report scopes, which leaves
-	// "scopes" out entirely rather than asserting the key is unscoped.
-	plaintext, err := multipass.Plaintext(datadogApplicationKeyFieldName, multipass.APIKeyV2{
-		KeyValue:   key.Secret,
-		KeyID:      key.ID,
-		Provider:   datadogProviderName,
-		BaseURL:    u.apiBaseURL,
-		HeaderName: datadogApplicationKeyHeaderName,
-		Scopes:     scopesOrNil(key.Scopes),
-	})
-	if err != nil {
-		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
-		return nil, fmt.Errorf("baton-datadog: encode service account application key plaintext: %w", err)
+		return nil, err
 	}
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret:        secret,
@@ -264,52 +214,13 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 			"baton-datadog: Datadog organization API keys cannot be scoped; request a service account application key for a scoped credential")
 	}
 
-	name := issuedCredentialName(input.RequestID)
-	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	key, plaintext, err := u.mintOrganizationAPIKey(ctx, input.RequestID)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: look up organization API key for request %q: %w", input.RequestID, err)
+		return nil, err
 	}
-	if existing != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "baton-datadog: organization API key for request %q may already exist; refusing to issue a duplicate", input.RequestID)
-	}
-
-	key, err := u.wrapper.CreateAPIKey(ctx, name)
+	secretResource, err := u.organizationAPIKeyResource(ctx, issuedCredentialName(input.RequestID), key, input.IdentityID)
 	if err != nil {
-		return nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
-	}
-
-	secretTraitOptions := []rs.SecretTraitOption{
-		rs.WithSecretIdentityID(input.IdentityID),
-		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
-		rs.WithSecretDetail("datadog.api_key"),
-	}
-	if key.CreatedByUserID != "" {
-		secretTraitOptions = append(secretTraitOptions, rs.WithSecretCreatedByID(&v2.ResourceId{
-			ResourceType: userResourceType.Id,
-			Resource:     key.CreatedByUserID,
-		}))
-	}
-	// No parent resource id: an organization API key hangs off the
-	// organization, not off the identity it was vended to, and the syncer
-	// (apiTokenBuilder.List) builds these keys without a parent too. Claiming
-	// the user as a parent here would make the issued resource disagree with
-	// the same key on its next sync.
-	secretResource, err := rs.NewSecretResource(name, deletableAPITokenResourceType, key.ID, secretTraitOptions)
-	if err != nil {
-		u.discardOrganizationAPIKey(ctx, key.ID)
-		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
-	}
-	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
-	plaintext, err := multipass.Plaintext(datadogAPIKeyFieldName, multipass.APIKeyV2{
-		KeyValue:   key.Secret,
-		KeyID:      key.ID,
-		Provider:   datadogProviderName,
-		BaseURL:    u.apiBaseURL,
-		HeaderName: datadogAPIKeyHeaderName,
-	})
-	if err != nil {
-		u.discardOrganizationAPIKey(ctx, key.ID)
-		return nil, fmt.Errorf("baton-datadog: encode organization API key plaintext: %w", err)
+		return nil, err
 	}
 	return &connectorbuilder.CredentialIssueOutput{
 		Secret:        secretResource,
@@ -345,6 +256,142 @@ func (u *credentialUserBuilder) discardServiceAccountApplicationKey(ctx context.
 			zap.Error(deleteErr),
 		)
 	}
+}
+
+// mintOrganizationAPIKey mints an organization API key for a request and renders
+// its plaintext, or returns an error having minted nothing. IssueCredential and
+// the issuer action both call it, so the duplicate guard, the create call and
+// the discard-on-encode-failure behave the same on both paths.
+func (u *credentialUserBuilder) mintOrganizationAPIKey(ctx context.Context, requestID string) (*client.IssuedAPIKey, *v2.PlaintextData, error) {
+	name := issuedCredentialName(requestID)
+	existing, err := u.wrapper.FindAPIKeyByName(ctx, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: look up organization API key for request %q: %w", requestID, err)
+	}
+	if existing != nil {
+		return nil, nil, status.Errorf(codes.AlreadyExists, "baton-datadog: organization API key for request %q may already exist; refusing to issue a duplicate", requestID)
+	}
+
+	key, err := u.wrapper.CreateAPIKey(ctx, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: create organization API key: %w", err)
+	}
+
+	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
+	plaintext, err := multipass.Plaintext(datadogAPIKeyFieldName, multipass.APIKeyV2{
+		KeyValue:   key.Secret,
+		KeyID:      key.ID,
+		Provider:   datadogProviderName,
+		BaseURL:    u.apiBaseURL,
+		HeaderName: datadogAPIKeyHeaderName,
+	})
+	if err != nil {
+		u.discardOrganizationAPIKey(ctx, key.ID)
+		return nil, nil, fmt.Errorf("baton-datadog: encode organization API key plaintext: %w", err)
+	}
+	return key, plaintext, nil
+}
+
+// organizationAPIKeyResource builds the secret resource for a freshly minted
+// organization API key, discarding the key if it cannot be built. identityID is
+// the identity the key is vended to; it is nil when the caller names none.
+func (u *credentialUserBuilder) organizationAPIKeyResource(ctx context.Context, name string, key *client.IssuedAPIKey, identityID *v2.ResourceId) (*v2.Resource, error) {
+	secretTraitOptions := []rs.SecretTraitOption{
+		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
+		rs.WithSecretDetail("datadog.api_key"),
+	}
+	if identityID != nil {
+		secretTraitOptions = append(secretTraitOptions, rs.WithSecretIdentityID(identityID))
+	}
+	if key.CreatedByUserID != "" {
+		secretTraitOptions = append(secretTraitOptions, rs.WithSecretCreatedByID(&v2.ResourceId{
+			ResourceType: userResourceType.Id,
+			Resource:     key.CreatedByUserID,
+		}))
+	}
+	// No parent resource id: an organization API key hangs off the
+	// organization, not off the identity it was vended to, and the syncer
+	// (apiTokenBuilder.List) builds these keys without a parent too. Claiming
+	// the user as a parent here would make the issued resource disagree with
+	// the same key on its next sync.
+	secretResource, err := rs.NewSecretResource(name, deletableAPITokenResourceType, key.ID, secretTraitOptions)
+	if err != nil {
+		u.discardOrganizationAPIKey(ctx, key.ID)
+		return nil, fmt.Errorf("baton-datadog: build organization API key secret resource: %w", err)
+	}
+	return secretResource, nil
+}
+
+// mintServiceAccountApplicationKey is the application key equivalent: it
+// re-checks that the target is still a service account, refuses a duplicate
+// request, mints, and renders the plaintext.
+func (u *credentialUserBuilder) mintServiceAccountApplicationKey(ctx context.Context, serviceAccountID, requestID string, scopes []string) (*client.IssuedApplicationKey, *v2.PlaintextData, error) {
+	userResp, err := u.wrapper.GetUser(ctx, serviceAccountID)
+	if err != nil {
+		if client.IsNotFound(err) {
+			return nil, nil, status.Errorf(codes.NotFound, "baton-datadog: Datadog user %q not found", serviceAccountID)
+		}
+		return nil, nil, fmt.Errorf("baton-datadog: look up Datadog user %q: %w", serviceAccountID, err)
+	}
+	if !userResp.GetData().Attributes.GetServiceAccount() {
+		return nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: Datadog user %q is not a service account; credential issuance only targets service accounts", serviceAccountID)
+	}
+
+	name := issuedCredentialName(requestID)
+	existing, err := u.wrapper.FindServiceAccountApplicationKeyByName(ctx, serviceAccountID, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: look up application key for request %q: %w", requestID, err)
+	}
+	if existing != nil {
+		return nil, nil, status.Errorf(codes.AlreadyExists, "baton-datadog: application key for request %q may already exist; refusing to issue a duplicate", requestID)
+	}
+
+	key, err := u.wrapper.CreateServiceAccountApplicationKey(ctx, serviceAccountID, name, scopes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("baton-datadog: create service account application key: %w", err)
+	}
+
+	// Multipass rejects nulls, so the optional api_key_v2 fields use omitempty.
+	// key.Scopes is nil when Datadog did not report scopes, which leaves
+	// "scopes" out entirely rather than asserting the key is unscoped.
+	plaintext, err := multipass.Plaintext(datadogApplicationKeyFieldName, multipass.APIKeyV2{
+		KeyValue:   key.Secret,
+		KeyID:      key.ID,
+		Provider:   datadogProviderName,
+		BaseURL:    u.apiBaseURL,
+		HeaderName: datadogApplicationKeyHeaderName,
+		Scopes:     scopesOrNil(key.Scopes),
+	})
+	if err != nil {
+		u.discardServiceAccountApplicationKey(ctx, serviceAccountID, key.ID)
+		return nil, nil, fmt.Errorf("baton-datadog: encode service account application key plaintext: %w", err)
+	}
+	return key, plaintext, nil
+}
+
+// applicationKeyResource builds the secret resource for a freshly minted
+// application key, discarding the key if it cannot be built. The key's scopes
+// are carried on it so a vended key reports what it can do immediately rather
+// than after the next sync. key.Scopes is what Datadog echoed back, so this
+// agrees with what the syncer later produces for the same key.
+//
+// CreatedById is deliberately left unset, for the reason applicationKeyResource
+// in application_key.go leaves it unset on sync: Datadog never reports who
+// created an application key, only who owns it.
+func (u *credentialUserBuilder) applicationKeyResource(ctx context.Context, name string, key *client.IssuedApplicationKey, identityID *v2.ResourceId) (*v2.Resource, error) {
+	secretTraitOptions := []rs.SecretTraitOption{
+		rs.WithSecretIdentityID(identityID),
+		rs.WithSecretType(v2.SecretTrait_CREDENTIAL_TYPE_STATIC_SECRET),
+		rs.WithSecretDetail("datadog.service_account_application_key"),
+	}
+	resourceOptions := append([]rs.ResourceOption{rs.WithParentResourceID(identityID)},
+		applicationKeyProfileOptions(key.Scopes)...)
+	secret, err := rs.NewSecretResource(name, serviceAccountApplicationKeyResourceType, key.ID, secretTraitOptions, resourceOptions...)
+	if err != nil {
+		u.discardServiceAccountApplicationKey(ctx, key.ServiceAccountID, key.ID)
+		return nil, fmt.Errorf("baton-datadog: build service account application key secret resource: %w", err)
+	}
+	return secret, nil
 }
 
 var _ connectorbuilder.ResourceSyncerV2 = &userBuilder{}
