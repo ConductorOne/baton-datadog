@@ -2,7 +2,12 @@ package connector
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base32"
 	"fmt"
+	"io"
+	"strings"
+	"time"
 
 	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -24,10 +29,6 @@ const (
 	ActionIssueOrganizationAPIKey           = "issue_organization_api_key"
 	ActionIssueServiceAccountApplicationKey = "issue_service_account_application_key"
 
-	// actionArgTicketID is tagged ticketIDTag, so C1 fills it with the ticket the
-	// key is issued for. It names the key (see issuedCredentialName), which is
-	// how a retried request finds the key its predecessor created.
-	actionArgTicketID = "ticket_id"
 	// actionArgServiceAccountID is the identity an application key is issued
 	// for: a Datadog service account, which is a user resource.
 	actionArgServiceAccountID = "service_account_id"
@@ -39,23 +40,9 @@ const (
 	// SecretTrait.
 	actionReturnResource = "resource"
 
-	// ticketIDTag marks the argument C1 fills with the ticket ID.
-	ticketIDTag = "c1.ticket_id"
-
 	datadogIssueOrgKeyActionDisplayName = "Issue Datadog organization API key"
 	datadogIssueAppKeyActionDisplayName = "Issue Datadog service account application key"
 )
-
-func ticketIDArgument() *configv1.Field {
-	return configv1.Field_builder{
-		Name:        actionArgTicketID,
-		DisplayName: "Ticket ID",
-		Description: "The ticket the key is issued for. Names the key in Datadog.",
-		IsRequired:  true,
-		Tags:        []string{ticketIDTag},
-		StringField: configv1.StringField_builder{}.Build(),
-	}.Build()
-}
 
 // resourceReturnField declares the created secret resource.
 func resourceReturnField() *configv1.Field {
@@ -69,7 +56,7 @@ func resourceReturnField() *configv1.Field {
 }
 
 // organizationAPIKeyActionSchema is the organization API key issuer. An
-// organization key belongs to the organization, so it names no subject.
+// organization key belongs to the organization, so it takes no arguments.
 func organizationAPIKeyActionSchema() *v2.BatonActionSchema {
 	secret := organizationAPIKeyOutput()
 	secret.SetIsRequired(true)
@@ -77,7 +64,6 @@ func organizationAPIKeyActionSchema() *v2.BatonActionSchema {
 		Name:        ActionIssueOrganizationAPIKey,
 		DisplayName: datadogIssueOrgKeyActionDisplayName,
 		Description: "Creates a Datadog organization API key and returns it as a Multipass api_key_v2 secret.",
-		Arguments:   []*configv1.Field{ticketIDArgument()},
 		ReturnTypes: []*configv1.Field{secret, resourceReturnField()},
 		ActionType:  []v2.ActionType{v2.ActionType_ACTION_TYPE_RESOURCE_CREATE},
 	}.Build()
@@ -104,7 +90,6 @@ func serviceAccountApplicationKeyActionSchema() *v2.BatonActionSchema {
 					}.Build(),
 				}.Build(),
 			}.Build(),
-			ticketIDArgument(),
 			configv1.Field_builder{
 				Name:             actionArgScopes,
 				DisplayName:      "Scopes",
@@ -142,15 +127,15 @@ func (u *credentialUserBuilder) issueOrganizationAPIKeyAction(
 	ctx context.Context,
 	args *structpb.Struct,
 ) (*structpb.Struct, []*v2.PlaintextData, annotations.Annotations, error) {
-	ticketID, err := ticketIDArg(args)
+	name, err := newIssuedKeyName(time.Now(), rand.Reader)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	key, plaintext, err := u.mintOrganizationAPIKey(ctx, ticketID)
+	key, plaintext, err := u.mintOrganizationAPIKey(ctx, name, "")
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	secret, err := u.organizationAPIKeyResource(ctx, issuedCredentialName(ticketID), key, nil)
+	secret, err := u.organizationAPIKeyResource(ctx, name, key, nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -170,7 +155,7 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 	if serviceAccount.GetResourceType() != userResourceType.Id || serviceAccount.GetResource() == "" {
 		return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a %s resource", actionArgServiceAccountID, userResourceType.Id)
 	}
-	ticketID, err := ticketIDArg(args)
+	name, err := newIssuedKeyName(time.Now(), rand.Reader)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -179,11 +164,11 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 		scopes = requested
 	}
 
-	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccount.GetResource(), ticketID, scopes)
+	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccount.GetResource(), name, "", scopes)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	secret, err := u.applicationKeyResource(ctx, issuedCredentialName(ticketID), key, serviceAccount)
+	secret, err := u.applicationKeyResource(ctx, name, key, serviceAccount)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -196,14 +181,6 @@ func (u *credentialUserBuilder) discardOrganizationAPIKeyFunc(keyID string) func
 
 func (u *credentialUserBuilder) discardApplicationKeyFunc(serviceAccountID, keyID string) func(context.Context) {
 	return func(ctx context.Context) { u.discardServiceAccountApplicationKey(ctx, serviceAccountID, keyID) }
-}
-
-func ticketIDArg(args *structpb.Struct) (string, error) {
-	ticketID, ok := actions.GetStringArg(args, actionArgTicketID)
-	if !ok || ticketID == "" {
-		return "", status.Errorf(codes.InvalidArgument, "baton-datadog: missing required argument %s", actionArgTicketID)
-	}
-	return ticketID, nil
 }
 
 // issueActionResult builds the handler result: the created secret as a resource
@@ -223,4 +200,20 @@ func issueActionResult(
 		return nil, nil, nil, fmt.Errorf("baton-datadog: build issuer resource return: %w", err)
 	}
 	return actions.NewReturnValues(true, field), []*v2.PlaintextData{plaintext}, nil, nil
+}
+
+// issuedKeyNameSuffixLen is the length of the random suffix of an action-issued
+// key name: 6 base32 characters, 30 bits.
+const issuedKeyNameSuffixLen = 6
+
+// newIssuedKeyName names a key the issuer actions mint: c1-<UTC time>-<random>,
+// e.g. c1-20260102T150405Z-k3x9qa. Every call gets a fresh name, so the issuer
+// needs no duplicate guard.
+func newIssuedKeyName(now time.Time, random io.Reader) (string, error) {
+	buf := make([]byte, 4)
+	if _, err := io.ReadFull(random, buf); err != nil {
+		return "", fmt.Errorf("baton-datadog: generate key name: %w", err)
+	}
+	suffix := strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(buf))[:issuedKeyNameSuffixLen]
+	return "c1-" + now.UTC().Format("20060102T150405Z") + "-" + suffix, nil
 }

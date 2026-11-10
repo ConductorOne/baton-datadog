@@ -3,6 +3,7 @@ package connector
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"io"
 	"testing"
 	"time"
@@ -84,17 +85,6 @@ func requireIssuerShape(t *testing.T, schema *v2.BatonActionSchema, resourceType
 	require.Len(t, resources, 1, "exactly one resource return")
 	require.Equal(t, actionReturnResource, resources[0].GetName())
 
-	tickets := 0
-	for _, a := range schema.GetArguments() {
-		for _, tag := range a.GetTags() {
-			if tag == "c1.ticket_id" {
-				tickets++
-				require.Equal(t, actionArgTicketID, a.GetName())
-				require.True(t, a.HasStringField())
-			}
-		}
-	}
-	require.Equal(t, 1, tickets, "one string argument tagged c1.ticket_id")
 }
 
 func TestOrganizationAPIKeyIssuerSchema(t *testing.T) {
@@ -104,8 +94,8 @@ func TestOrganizationAPIKeyIssuerSchema(t *testing.T) {
 	require.True(t, ok, "the organization key issuer registers on the api-key type")
 	requireIssuerShape(t, schema, apiTokenResourceType.Id, datadogAPIKeyFieldName)
 
-	// An organization key belongs to the organization: no subject, only the ticket.
-	require.Len(t, schema.GetArguments(), 1)
+	// An organization key belongs to the organization: no subject, no arguments.
+	require.Empty(t, schema.GetArguments())
 }
 
 func TestApplicationKeyIssuerSchema(t *testing.T) {
@@ -170,9 +160,7 @@ func TestOrganizationAPIKeyActionResult(t *testing.T) {
 	server := newMultipassOrgKeyServer(t)
 	u := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, false, testAPIBaseURL)
 
-	response, plaintext, _, err := u.issueOrganizationAPIKeyAction(context.Background(), &structpb.Struct{Fields: map[string]*structpb.Value{
-		actionArgTicketID: structpb.NewStringValue("multipass"),
-	}})
+	response, plaintext, _, err := u.issueOrganizationAPIKeyAction(context.Background(), &structpb.Struct{})
 	require.NoError(t, err)
 	requireResourceReturn(t, response, apiTokenResourceType.Id, "org-key-id")
 	require.Len(t, plaintext, 1)
@@ -188,7 +176,6 @@ func TestApplicationKeyActionResult(t *testing.T) {
 
 	response, plaintext, _, err := u.issueServiceAccountApplicationKeyAction(context.Background(), &structpb.Struct{Fields: map[string]*structpb.Value{
 		actionArgServiceAccountID: subjectArg(t, userResourceType.Id, testServiceAccountID),
-		actionArgTicketID:         structpb.NewStringValue("tkt-1"),
 		actionArgScopes:           structpb.NewListValue(&structpb.ListValue{Values: []*structpb.Value{structpb.NewStringValue("logs_read")}}),
 	}})
 	require.NoError(t, err)
@@ -202,7 +189,7 @@ func TestApplicationKeyActionResult(t *testing.T) {
 	for _, r := range *requests {
 		if r.method == "POST" {
 			created = true
-			require.Contains(t, r.body, `"name":"c1-tkt-1"`, "the key is named for the ticket")
+			require.Regexp(t, `"name":"c1-\d{8}T\d{6}Z-[a-z2-7]{6}"`, r.body, "the key is named by timestamp and random suffix")
 		}
 	}
 	require.True(t, created)
@@ -212,18 +199,12 @@ func TestIssuerActionsRejectBadArguments(t *testing.T) {
 	u := newCredentialUserBuilder(newLifecycleTestWrapper("http://127.0.0.1:1"), true, true, testAPIBaseURL)
 	ctx := context.Background()
 
-	_, _, _, err := u.issueOrganizationAPIKeyAction(ctx, &structpb.Struct{})
-	require.Equal(t, codes.InvalidArgument, status.Code(err), "ticket_id is required")
-
-	_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{Fields: map[string]*structpb.Value{
+	_, _, _, err := u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{Fields: map[string]*structpb.Value{
 		actionArgServiceAccountID: subjectArg(t, teamResourceType.Id, "t-1"),
-		actionArgTicketID:         structpb.NewStringValue("tkt-1"),
 	}})
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "the subject must be a user")
 
-	_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{Fields: map[string]*structpb.Value{
-		actionArgTicketID: structpb.NewStringValue("tkt-1"),
-	}})
+	_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "the subject is required")
 }
 
@@ -252,7 +233,7 @@ func TestIssuerThroughActionManagerEncryptsTheSecret(t *testing.T) {
 
 	_, actionStatus, response, encrypted, _, err := mgr.InvokeActionWithWaitAndEncryption(
 		ctx, ActionIssueOrganizationAPIKey, apiTokenResourceType.Id,
-		&structpb.Struct{Fields: map[string]*structpb.Value{actionArgTicketID: structpb.NewStringValue("multipass")}},
+		&structpb.Struct{},
 		5*time.Second, []*v2.EncryptionConfig{recipient})
 	require.NoError(t, err)
 	require.Equal(t, v2.BatonActionStatus_BATON_ACTION_STATUS_COMPLETE, actionStatus)
@@ -269,4 +250,18 @@ func TestIssuerThroughActionManagerEncryptsTheSecret(t *testing.T) {
 	decrypted, err := io.ReadAll(reader)
 	require.NoError(t, err)
 	require.Contains(t, string(decrypted), `"key_value":"org-key-secret"`)
+}
+
+func TestNewIssuedKeyName(t *testing.T) {
+	now := time.Date(2026, 1, 2, 15, 4, 5, 0, time.FixedZone("x", 3600))
+	name, err := newIssuedKeyName(now, bytes.NewReader([]byte{0, 0, 0, 0}))
+	require.NoError(t, err)
+	require.Equal(t, "c1-20260102T140405Z-aaaaaa", name, "UTC timestamp, base32 suffix")
+
+	again, err := newIssuedKeyName(now, rand.Reader)
+	require.NoError(t, err)
+	require.Regexp(t, `^c1-\d{8}T\d{6}Z-[a-z2-7]{6}$`, again)
+
+	_, err = newIssuedKeyName(now, bytes.NewReader(nil))
+	require.Error(t, err)
 }
