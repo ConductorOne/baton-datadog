@@ -155,13 +155,20 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 	if serviceAccount.GetResourceType() != userResourceType.Id || serviceAccount.GetResource() == "" {
 		return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a %s resource", actionArgServiceAccountID, userResourceType.Id)
 	}
+	var scopes []string
+	if _, present := args.GetFields()[actionArgScopes]; present {
+		// GetStringSliceArg reports a malformed value as absent, and an absent
+		// scopes list mints an unscoped key with the service account's full
+		// permissions, so a malformed one is refused rather than dropped.
+		requested, ok := actions.GetStringSliceArg(args, actionArgScopes)
+		if !ok {
+			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a list of strings", actionArgScopes)
+		}
+		scopes = requested
+	}
 	name, err := newIssuedKeyName(time.Now(), rand.Reader)
 	if err != nil {
 		return nil, nil, nil, err
-	}
-	var scopes []string
-	if requested, ok := actions.GetStringSliceArg(args, actionArgScopes); ok {
-		scopes = requested
 	}
 
 	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccount.GetResource(), name, "", scopes)

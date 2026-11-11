@@ -205,6 +205,21 @@ func TestIssuerActionsRejectBadArguments(t *testing.T) {
 
 	_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "the subject is required")
+
+	// A malformed scopes list must not be read as absent, which would mint an
+	// unscoped key. The wrapper points at a closed port, so reaching Datadog fails
+	// with a different code.
+	for name, scopes := range map[string]*structpb.Value{
+		"string":     structpb.NewStringValue("logs_read"),
+		"mixed list": structpb.NewListValue(&structpb.ListValue{Values: []*structpb.Value{structpb.NewStringValue("x"), structpb.NewNumberValue(5)}}),
+		"null":       structpb.NewNullValue(),
+	} {
+		_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{Fields: map[string]*structpb.Value{
+			actionArgServiceAccountID: subjectArg(t, userResourceType.Id, testServiceAccountID),
+			actionArgScopes:           scopes,
+		}})
+		require.Equal(t, codes.InvalidArgument, status.Code(err), "scopes as %s must be refused", name)
+	}
 }
 
 // TestIssuerThroughActionManagerEncryptsTheSecret drives the issuer the way the
