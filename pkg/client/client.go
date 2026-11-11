@@ -42,13 +42,6 @@ func (w *DatadogClient) GetOfficialClient() *datadog.APIClient {
 	return w.officialClient
 }
 
-// GetSite returns the configured Datadog site (e.g. "datadoghq.com"). Callers
-// that hand out a credential need it to say which API endpoint the credential
-// authenticates against.
-func (w *DatadogClient) GetSite() string {
-	return w.site
-}
-
 // withAuthContext adds authentication context to the request context.
 func (w *DatadogClient) withAuthContext(ctx context.Context) context.Context {
 	ctx = context.WithValue(
