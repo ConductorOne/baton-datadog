@@ -53,6 +53,14 @@ func newCredentialUserBuilder(wrapper *client.DatadogClient, offerOrgAPIKey, off
 	}
 }
 
+// Keep the legacy CredentialIssuer (IssueCapabilityDetails and Issue) until C1
+// no longer depends on it. baton-sdk v0.44.2 advertises
+// CAPABILITY_CREDENTIAL_ENCRYPTION_JWE_XWING_V1 on the user resource type only
+// when a CredentialIssuer is registered for it, and C1 admits the
+// service-account application key issuer action for full-knowledge delivery
+// only when the user type advertises that capability. Removing these would
+// silently stop app-key issuance.
+
 // IssueCapabilityDetails advertises the credential kinds this connector mints.
 // Both are the API_KEY shape and they are distinguished only by
 // secret_resource_type_id, which is what that field is for: the closed Option
