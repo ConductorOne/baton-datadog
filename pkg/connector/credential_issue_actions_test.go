@@ -206,13 +206,13 @@ func TestIssuerActionsRejectBadArguments(t *testing.T) {
 	_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "the subject is required")
 
-	// A malformed scopes list must not be read as absent, which would mint an
-	// unscoped key. The wrapper points at a closed port, so reaching Datadog fails
+	// A malformed or empty scopes list must not be read as absent, which would
+	// mint an unscoped key. The wrapper points at a closed port, so reaching Datadog fails
 	// with a different code.
 	for name, scopes := range map[string]*structpb.Value{
 		"string":     structpb.NewStringValue("logs_read"),
 		"mixed list": structpb.NewListValue(&structpb.ListValue{Values: []*structpb.Value{structpb.NewStringValue("x"), structpb.NewNumberValue(5)}}),
-		"null":       structpb.NewNullValue(),
+		"empty list": structpb.NewListValue(&structpb.ListValue{}),
 	} {
 		_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{Fields: map[string]*structpb.Value{
 			actionArgServiceAccountID: subjectArg(t, userResourceType.Id, testServiceAccountID),
@@ -220,6 +220,29 @@ func TestIssuerActionsRejectBadArguments(t *testing.T) {
 		}})
 		require.Equal(t, codes.InvalidArgument, status.Code(err), "scopes as %s must be refused", name)
 	}
+}
+
+// TestApplicationKeyNullScopesIsOmitted: an explicit null scopes mints an
+// unscoped key, exactly as an omitted one does, matching the SDK's convention.
+func TestApplicationKeyNullScopesIsOmitted(t *testing.T) {
+	server, requests := newMultipassAppKeyServer(t, "app-key-id", "app-key-secret",
+		`{"key":"app-key-secret","name":"c1-tkt-1"}`)
+	u := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false, true, testAPIBaseURL)
+
+	_, _, _, err := u.issueServiceAccountApplicationKeyAction(context.Background(), &structpb.Struct{Fields: map[string]*structpb.Value{
+		actionArgServiceAccountID: subjectArg(t, userResourceType.Id, testServiceAccountID),
+		actionArgScopes:           structpb.NewNullValue(),
+	}})
+	require.NoError(t, err)
+
+	var posted bool
+	for _, r := range *requests {
+		if r.method == "POST" {
+			posted = true
+			require.NotContains(t, r.body, "scopes", "a null scopes must mint an unscoped key")
+		}
+	}
+	require.True(t, posted)
 }
 
 // TestIssuerThroughActionManagerEncryptsTheSecret drives the issuer the way the

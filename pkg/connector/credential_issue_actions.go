@@ -93,7 +93,7 @@ func serviceAccountApplicationKeyActionSchema() *v2.BatonActionSchema {
 			configv1.Field_builder{
 				Name:             actionArgScopes,
 				DisplayName:      "Scopes",
-				Description:      "Application key scopes. Omit for an unscoped key.",
+				Description:      "Application key scopes. Must not be empty. Omit for an unscoped key.",
 				StringSliceField: configv1.StringSliceField_builder{}.Build(),
 			}.Build(),
 		},
@@ -156,15 +156,20 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 		return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a %s resource", actionArgServiceAccountID, userResourceType.Id)
 	}
 	var scopes []string
-	if _, present := args.GetFields()[actionArgScopes]; present {
-		// GetStringSliceArg reports a malformed value as absent, and an absent
-		// scopes list mints an unscoped key with the service account's full
-		// permissions, so a malformed one is refused rather than dropped.
-		requested, ok := actions.GetStringSliceArg(args, actionArgScopes)
-		if !ok {
-			return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a list of strings", actionArgScopes)
+	// A null scopes is absent, as in the SDK. Absent mints an unscoped key with
+	// the service account's full permissions, so a value that is present but
+	// unreadable or empty is refused rather than silently widened to that.
+	if v, present := args.GetFields()[actionArgScopes]; present {
+		if _, isNull := v.GetKind().(*structpb.Value_NullValue); !isNull {
+			requested, ok := actions.GetStringSliceArg(args, actionArgScopes)
+			if !ok {
+				return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a list of strings", actionArgScopes)
+			}
+			if len(requested) == 0 {
+				return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a non-empty list of strings; omit it for an unscoped key", actionArgScopes)
+			}
+			scopes = requested
 		}
-		scopes = requested
 	}
 	name, err := newIssuedKeyName(time.Now(), rand.Reader)
 	if err != nil {
