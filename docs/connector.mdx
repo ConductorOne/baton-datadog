@@ -49,7 +49,7 @@ Connector actions are custom capabilities that extend C1 automations with app-sp
 | disable_user | `user_id` (string, required) | Disables a Datadog user. Datadog has no permanent delete, so the account is retained and can be re-enabled later. |
 | update_user | `user_id` (string, required), `name` (string, optional), `email` (string, optional), `title` (string, optional) | Updates the user's display name, email and/or job title. At least one optional field must be provided. |
 | issue_organization_api_key | None | Creates a Datadog organization API key and returns it as Multipass API key JSON. The key is named `c1-<UTC timestamp>-<random suffix>`. Registered only when **Sync secrets** and **Allow organization API key deletion** are both enabled. |
-| issue_service_account_application_key | `service_account_id` (user resource, required), `scopes` (list of strings, optional) | Creates an application key for a Datadog service account and returns it as Multipass API key JSON. Omit `scopes` for an unscoped key. The key is named `c1-<UTC timestamp>-<random suffix>`. Registered only when **Sync secrets** and **Sync service account application keys** are both enabled. |
+| issue_service_account_application_key | `service_account_id` (user resource, required), `scopes` (list of strings, optional) | Creates an application key for a Datadog service account and returns it as Multipass API key JSON. Omit `scopes` for an unscoped key; an empty list is refused. The key is named `c1-<UTC timestamp>-<random suffix>`. Registered only when **Sync secrets** and **Sync service account application keys** are both enabled. |
 
 ## Gather Datadog credentials
 
