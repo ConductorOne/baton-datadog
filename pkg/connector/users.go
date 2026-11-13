@@ -265,11 +265,15 @@ func (u *credentialUserBuilder) discardServiceAccountApplicationKey(ctx context.
 }
 
 // mintOrganizationAPIKey mints an organization API key called name and renders
-// its plaintext, or returns an error having minted nothing. IssueCredential and
-// the issuer action both call it, so the create call and the
-// discard-on-encode-failure behave the same on both paths. A non-empty requestID
-// (the legacy path) refuses a key that already carries name; the issuer action
-// passes "" because its names are unique per call.
+// its plaintext. IssueCredential and the issuer action both call it, so the
+// create call and the discard-on-encode-failure behave the same on both paths.
+// On an error before the create call nothing was minted. If the plaintext
+// cannot be encoded after the create, the key exists and is discarded on a
+// best-effort basis; a failed discard is only logged.
+//
+// A non-empty requestID (the legacy path) refuses a key that already carries
+// name. An empty requestID means no duplicate guard: the issuer action passes ""
+// because it names every key afresh.
 func (u *credentialUserBuilder) mintOrganizationAPIKey(ctx context.Context, name, requestID string) (*client.IssuedAPIKey, *v2.PlaintextData, error) {
 	if requestID != "" {
 		existing, err := u.wrapper.FindAPIKeyByName(ctx, name)

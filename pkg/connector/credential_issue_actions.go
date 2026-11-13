@@ -219,8 +219,9 @@ func issueActionResult(
 const issuedKeyNameSuffixLen = 6
 
 // newIssuedKeyName names a key the issuer actions mint: c1-<UTC time>-<random>,
-// e.g. c1-20260102T150405Z-k3x9qa. Every call gets a fresh name, so the issuer
-// needs no duplicate guard.
+// e.g. c1-20260102T150405Z-k3x9qa. Every call gets a fresh name, which avoids name
+// collisions; the issuer has no duplicate guard of its own and relies on C1
+// dispatching the action once.
 func newIssuedKeyName(now time.Time, random io.Reader) (string, error) {
 	buf := make([]byte, 4)
 	if _, err := io.ReadFull(random, buf); err != nil {
