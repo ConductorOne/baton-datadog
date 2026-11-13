@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
-	"github.com/conductorone/baton-datadog/pkg/client"
 	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
@@ -122,14 +121,8 @@ func TestOrgAPIKeyBaseURLFollowsOverride(t *testing.T) {
 // TestDatadogAPIBaseURL: the override wins when set, and the site decides
 // otherwise.
 func TestDatadogAPIBaseURL(t *testing.T) {
-	ctx := context.Background()
-	siteClient, err := client.NewDatadogRestClient(ctx, "datadoghq.eu", "api", "app", "")
-	require.NoError(t, err)
-	require.Equal(t, "https://api.datadoghq.eu", (&Datadog{wrapper: client.NewDatadogClient(siteClient, nil, "datadoghq.eu", "api", "app")}).apiBaseURL())
-
-	overrideClient, err := client.NewDatadogRestClient(ctx, "datadoghq.eu", "api", "app", "https://dd.example.test")
-	require.NoError(t, err)
-	require.Equal(t, "https://dd.example.test", (&Datadog{wrapper: client.NewDatadogClient(overrideClient, nil, "datadoghq.eu", "api", "app")}).apiBaseURL(),
+	require.Equal(t, "https://api.datadoghq.eu", (&Datadog{site: "datadoghq.eu"}).apiBaseURL())
+	require.Equal(t, "https://dd.example.test", (&Datadog{site: "datadoghq.eu", baseURL: "https://dd.example.test"}).apiBaseURL(),
 		"the base-url override must win over the site")
 }
 
@@ -258,4 +251,16 @@ func TestDiscardContextSurvivesCancellation(t *testing.T) {
 	deadline, ok := ctx.Deadline()
 	require.True(t, ok, "the cleanup must be bounded")
 	require.LessOrEqual(t, time.Until(deadline), discardTimeout)
+}
+
+// TestResourceSyncersWithoutClient: the capabilities command builds the connector
+// with no API client, so listing syncers must not need one.
+func TestResourceSyncersWithoutClient(t *testing.T) {
+	require.NotPanics(t, func() {
+		(&Datadog{
+			SyncSecrets:                       true,
+			AllowOrgAPIKeyDeletion:            true,
+			SyncServiceAccountApplicationKeys: true,
+		}).ResourceSyncers(context.Background())
+	})
 }

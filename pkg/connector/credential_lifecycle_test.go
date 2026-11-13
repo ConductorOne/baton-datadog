@@ -46,13 +46,7 @@ const testAPIBaseURL = "https://api.example.com"
 func newLifecycleTestWrapper(serverURL string) *client.DatadogClient {
 	cfg := datadog.NewConfiguration()
 	cfg.Servers = datadog.ServerConfigurations{{URL: serverURL}}
-	// A real REST client, so the wrapper reports the same resolved base URL
-	// (https://api.example.com, testAPIBaseURL) the connector would advertise.
-	restClient, err := client.NewDatadogRestClient(context.Background(), "example.com", "connector-api-key", "connector-app-key", "")
-	if err != nil {
-		panic(err)
-	}
-	return client.NewDatadogClient(restClient, datadog.NewAPIClient(cfg), "example.com", "connector-api-key", "connector-app-key")
+	return client.NewDatadogClient(nil, datadog.NewAPIClient(cfg), "example.com", "connector-api-key", "connector-app-key")
 }
 
 func recordRequest(t *testing.T, requests *[]recordedRequest, r *http.Request) recordedRequest {

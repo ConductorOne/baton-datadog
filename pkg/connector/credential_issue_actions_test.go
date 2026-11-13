@@ -25,6 +25,7 @@ import (
 func fullGrantsDatadog(serverURL string) *Datadog {
 	return &Datadog{
 		wrapper:                           newLifecycleTestWrapper(serverURL),
+		baseURL:                           testAPIBaseURL,
 		SyncSecrets:                       true,
 		AllowOrgAPIKeyDeletion:            true,
 		SyncServiceAccountApplicationKeys: true,

@@ -27,6 +27,7 @@ type Datadog struct {
 	site          string
 	apiKey        string
 	appKey        string
+	baseURL       string
 	SyncSecrets   bool
 	SyncSchedules bool
 	// AllowOrgAPIKeyDeletion is the operator's explicit grant to destroy
@@ -44,11 +45,11 @@ type Datadog struct {
 	SyncServiceAccountApplicationKeys bool
 }
 
-// apiBaseURL is the Datadog API endpoint this connector talks to, as resolved by
-// the REST client that sends its requests. A credential it issues advertises
-// this, so an issued key names the endpoint it works against.
+// apiBaseURL is the Datadog API endpoint this connector talks to: the base-url
+// override when configured, otherwise the endpoint the site implies. A credential
+// it issues advertises this, so an issued key names the endpoint it works against.
 func (d *Datadog) apiBaseURL() string {
-	return d.wrapper.GetRestClient().BaseURL()
+	return client.ResolveBaseURL(d.site, d.baseURL)
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -226,6 +227,7 @@ func New(ctx context.Context, ddc *cfg.Datadog, _ *cli.ConnectorOpts) (connector
 		site:                   site,
 		apiKey:                 apiKey,
 		appKey:                 appKey,
+		baseURL:                baseURL,
 		client:                 officialClient,
 		wrapper:                wrapper,
 		SyncSecrets:            syncSecrets,
