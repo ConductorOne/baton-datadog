@@ -9,6 +9,7 @@ import (
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -45,7 +46,23 @@ type apiTokenBuilder struct {
 // sync-secrets install regardless of the grant, and a capability that is
 // advertised but refuses at call time is worse than one that is absent: C1
 // resolves what it may do from the advertisement, not from the error.
-type deletableAPITokenBuilder struct{ *apiTokenBuilder }
+type deletableAPITokenBuilder struct {
+	*apiTokenBuilder
+	// issuer mints organization API keys. Its issuer action rides on this
+	// variant for the same reason Delete does: an issuer is only advertised where
+	// its keys can also be revoked.
+	issuer *credentialUserBuilder
+}
+
+var _ connectorbuilder.ResourceActionProvider = &deletableAPITokenBuilder{}
+
+// ResourceActions registers the organization API key issuer, when there is one.
+func (o *deletableAPITokenBuilder) ResourceActions(ctx context.Context, registry actions.ActionRegistry) error {
+	if o.issuer == nil {
+		return nil
+	}
+	return o.issuer.registerOrganizationAPIKeyIssuer(ctx, registry)
+}
 
 var _ connectorbuilder.ResourceSyncerV2 = &apiTokenBuilder{}
 var _ connectorbuilder.ResourceSyncerV2 = &deletableAPITokenBuilder{}

@@ -45,6 +45,13 @@ type Datadog struct {
 	SyncServiceAccountApplicationKeys bool
 }
 
+// apiBaseURL is the Datadog API endpoint this connector talks to: the base-url
+// override when configured, otherwise the endpoint the site implies. A credential
+// it issues advertises this, so an issued key names the endpoint it works against.
+func (d *Datadog) apiBaseURL() string {
+	return client.ResolveBaseURL(d.site, d.baseURL)
+}
+
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
 	offerServiceAccountKey := d.SyncSecrets && d.SyncServiceAccountApplicationKeys
@@ -54,8 +61,10 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 	// registered and CAPABILITY_CREDENTIAL_ISSUE is absent rather than
 	// advertised with an empty option list.
 	userSyncer := connectorbuilder.ResourceSyncerV2(newUserBuilder(d.wrapper))
+	var issuer *credentialUserBuilder
 	if offerServiceAccountKey || offerOrgAPIKey {
-		userSyncer = newCredentialUserBuilder(d.wrapper, offerOrgAPIKey, offerServiceAccountKey)
+		issuer = newCredentialUserBuilder(d.wrapper, offerOrgAPIKey, offerServiceAccountKey, d.apiBaseURL())
+		userSyncer = issuer
 	}
 	resourceSyncers := []connectorbuilder.ResourceSyncerV2{
 		userSyncer,
@@ -70,11 +79,15 @@ func (d *Datadog) ResourceSyncers(ctx context.Context) []connectorbuilder.Resour
 		// than advertised and refused.
 		apiTokenSyncer := connectorbuilder.ResourceSyncerV2(newApiTokenBuilder(d.wrapper))
 		if d.AllowOrgAPIKeyDeletion {
-			apiTokenSyncer = newDeletableAPITokenBuilder(d.wrapper)
+			deletable := newDeletableAPITokenBuilder(d.wrapper)
+			deletable.issuer = issuer
+			apiTokenSyncer = deletable
 		}
 		resourceSyncers = append(resourceSyncers, apiTokenSyncer)
 		if d.SyncServiceAccountApplicationKeys {
-			resourceSyncers = append(resourceSyncers, newApplicationKeyBuilder(d.wrapper))
+			applicationKeySyncer := newApplicationKeyBuilder(d.wrapper)
+			applicationKeySyncer.issuer = issuer
+			resourceSyncers = append(resourceSyncers, applicationKeySyncer)
 		}
 	}
 

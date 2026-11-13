@@ -2,11 +2,13 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
 	"github.com/conductorone/baton-datadog/pkg/client"
 	cfg "github.com/conductorone/baton-datadog/pkg/config"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -56,7 +58,7 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	require.True(t, ok)
 
 	// The grant is what puts the organization API key on the menu at all.
-	details, _, err := newCredentialUserBuilder(datadogConnector.wrapper, datadogConnector.AllowOrgAPIKeyDeletion, true).IssueCapabilityDetails(ctx)
+	details, _, err := newCredentialUserBuilder(datadogConnector.wrapper, datadogConnector.AllowOrgAPIKeyDeletion, true, datadogConnector.apiBaseURL()).IssueCapabilityDetails(ctx)
 	require.NoError(t, err)
 	var advertised bool
 	for _, descriptor := range details.GetOptions() {
@@ -66,7 +68,7 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	}
 	require.True(t, advertised, "organization API key issuance must be advertised when the grant is set")
 
-	issuer := newCredentialUserBuilder(datadogConnector.wrapper, true, true)
+	issuer := newCredentialUserBuilder(datadogConnector.wrapper, true, true, datadogConnector.apiBaseURL())
 	requestID := "orgsmoke-" + time.Now().UTC().Format("20060102T150405")
 	t.Logf("issuing Datadog organization API key with request id %q", requestID)
 	issued, err := issuer.Issue(ctx, &connectorbuilder.CredentialIssueInput{
@@ -95,8 +97,15 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	require.Nil(t, issued.Secret.GetParentResourceId(),
 		"an organization API key belongs to the organization, not to the identity it was vended to")
 	require.Len(t, issued.PlaintextData, 1)
-	require.Equal(t, "api_key", issued.PlaintextData[0].GetName())
-	require.NotEmpty(t, issued.PlaintextData[0].GetBytes())
+	require.Equal(t, datadogAPIKeyFieldName, issued.PlaintextData[0].GetName())
+	require.Equal(t, multipass.ContentType, issued.PlaintextData[0].GetSchema())
+	// The credential arrives as Multipass api_key_v2 JSON rather than bare
+	// bytes, so the key the provider probe authenticates with has to come out
+	// of key_value.
+	var apiKeyPayload multipass.APIKeyV2
+	require.NoError(t, json.Unmarshal(issued.PlaintextData[0].GetBytes(), &apiKeyPayload),
+		"the issued plaintext must be api_key_v2 JSON")
+	require.NotEmpty(t, apiKeyPayload.KeyValue)
 
 	orgKeyID := issued.Secret.GetId().GetResource()
 	t.Logf("issued organization API key id=%s; plaintext material returned but not logged", maskedValue(orgKeyID))
@@ -106,7 +115,12 @@ func TestOrganizationAPIKeyIssueLifecycle(t *testing.T) {
 	require.NotNil(t, found, "issued organization API key id=%s not found via ListAPIKeys", maskedValue(orgKeyID))
 	t.Logf("confirmed organization API key id=%s exists in Datadog", maskedValue(orgKeyID))
 
-	issuedKey := string(issued.PlaintextData[0].GetBytes())
+	// key_id is Datadog's id for the key, so it must agree with the id the
+	// issued resource names -- the same key, described two ways.
+	require.Equal(t, orgKeyID, apiKeyPayload.KeyID,
+		"the payload's key_id must be the issued key's id, not a different key")
+
+	issuedKey := apiKeyPayload.KeyValue
 	t.Logf("waiting for issued organization API key id=%s to authenticate", maskedValue(orgKeyID))
 	require.Eventually(t, func() bool {
 		ok, err := orgAPIKeyValidates(ctx, site, issuedKey)

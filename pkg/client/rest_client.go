@@ -93,18 +93,21 @@ func NewDatadogRestClient(ctx context.Context, site string, apiKey string, appKe
 		return nil, err
 	}
 
-	// Use provided baseURL or construct from site
-	effectiveBaseURL := baseURL
-	if effectiveBaseURL == "" {
-		effectiveBaseURL = fmt.Sprintf(DefaultBaseURL, site)
-	}
-
 	return &DatadogRestClient{
 		httpClient: uhttpClient,
-		baseURL:    effectiveBaseURL,
+		baseURL:    ResolveBaseURL(site, baseURL),
 		apiKey:     apiKey,
 		appKey:     appKey,
 	}, nil
+}
+
+// ResolveBaseURL is the Datadog API endpoint for a site: the base-url override
+// when set, otherwise the endpoint the site implies.
+func ResolveBaseURL(site string, baseURL string) string {
+	if baseURL != "" {
+		return baseURL
+	}
+	return fmt.Sprintf(DefaultBaseURL, site)
 }
 
 // doRequest is a helper function that handles the common HTTP request logic.

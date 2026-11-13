@@ -53,7 +53,7 @@ baton resources
 - Sync users, roles, teams (and optionally on-call schedules and API keys)
 - Provision role and team membership (grant/revoke)
 - Create users (Datadog sends an invitation email)
-- Connector actions: `enable_user`, `disable_user`, `update_user` (display name, email and/or job title)
+- Connector actions: `enable_user`, `disable_user`, `update_user` (display name, email and/or job title), `issue_organization_api_key`, `issue_service_account_application_key` (each returns the new key as Multipass API key JSON)
 
 Datadog does not expose a permanent user delete; `disable_user` retains the account, and `enable_user` reverses it.
 
