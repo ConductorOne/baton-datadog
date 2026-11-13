@@ -107,6 +107,12 @@ func NewDatadogRestClient(ctx context.Context, site string, apiKey string, appKe
 	}, nil
 }
 
+// BaseURL is the endpoint requests are sent to: the configured base URL, or the
+// one the site implies when none was configured.
+func (c *DatadogRestClient) BaseURL() string {
+	return c.baseURL
+}
+
 // doRequest is a helper function that handles the common HTTP request logic.
 func (c *DatadogRestClient) doRequest(
 	ctx context.Context,

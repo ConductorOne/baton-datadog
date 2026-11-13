@@ -139,7 +139,12 @@ func (u *credentialUserBuilder) issueOrganizationAPIKeyAction(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return issueActionResult(ctx, u.discardOrganizationAPIKeyFunc(key.ID), secret, plaintext)
+	result, plaintexts, annos, err := issueActionResult(secret, plaintext)
+	if err != nil {
+		// The key exists but its result cannot be returned: nobody would hold it.
+		u.discardOrganizationAPIKey(ctx, key.ID)
+	}
+	return result, plaintexts, annos, err
 }
 
 // issueServiceAccountApplicationKeyAction mints an application key for the
@@ -184,15 +189,12 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return issueActionResult(ctx, u.discardApplicationKeyFunc(key.ServiceAccountID, key.ID), secret, plaintext)
-}
-
-func (u *credentialUserBuilder) discardOrganizationAPIKeyFunc(keyID string) func(context.Context) {
-	return func(ctx context.Context) { u.discardOrganizationAPIKey(ctx, keyID) }
-}
-
-func (u *credentialUserBuilder) discardApplicationKeyFunc(serviceAccountID, keyID string) func(context.Context) {
-	return func(ctx context.Context) { u.discardServiceAccountApplicationKey(ctx, serviceAccountID, keyID) }
+	result, plaintexts, annos, err := issueActionResult(secret, plaintext)
+	if err != nil {
+		// The key exists but its result cannot be returned: nobody would hold it.
+		u.discardServiceAccountApplicationKey(ctx, key.ServiceAccountID, key.ID)
+	}
+	return result, plaintexts, annos, err
 }
 
 // issueActionResult builds the handler result: the created secret as a resource
@@ -200,15 +202,11 @@ func (u *credentialUserBuilder) discardApplicationKeyFunc(serviceAccountID, keyI
 // secret return field's content type, which the SDK does not copy from the
 // schema, so the plaintext must already carry it.
 func issueActionResult(
-	ctx context.Context,
-	discard func(context.Context),
 	secret *v2.Resource,
 	plaintext *v2.PlaintextData,
 ) (*structpb.Struct, []*v2.PlaintextData, annotations.Annotations, error) {
 	field, err := actions.NewResourceReturnField(actionReturnResource, secret)
 	if err != nil {
-		// The key exists but its result cannot be returned: nobody would hold it.
-		discard(ctx)
 		return nil, nil, nil, fmt.Errorf("baton-datadog: build issuer resource return: %w", err)
 	}
 	return actions.NewReturnValues(true, field), []*v2.PlaintextData{plaintext}, nil, nil

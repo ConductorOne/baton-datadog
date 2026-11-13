@@ -167,11 +167,12 @@ func issuedCredentialName(requestID string) string {
 func (u *credentialUserBuilder) issueServiceAccountApplicationKey(ctx context.Context, input *connectorbuilder.CredentialIssueInput) (*connectorbuilder.CredentialIssueOutput, error) {
 	serviceAccountID := input.IdentityID.GetResource()
 
-	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccountID, issuedCredentialName(input.RequestID), input.RequestID, input.CredentialOptions.GetApiKey().GetScopes())
+	name := issuedCredentialName(input.RequestID)
+	key, plaintext, err := u.mintServiceAccountApplicationKey(ctx, serviceAccountID, name, input.RequestID, input.CredentialOptions.GetApiKey().GetScopes())
 	if err != nil {
 		return nil, err
 	}
-	secret, err := u.applicationKeyResource(ctx, issuedCredentialName(input.RequestID), key, input.IdentityID)
+	secret, err := u.applicationKeyResource(ctx, name, key, input.IdentityID)
 	if err != nil {
 		return nil, err
 	}
@@ -220,11 +221,12 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 			"baton-datadog: Datadog organization API keys cannot be scoped; request a service account application key for a scoped credential")
 	}
 
-	key, plaintext, err := u.mintOrganizationAPIKey(ctx, issuedCredentialName(input.RequestID), input.RequestID)
+	name := issuedCredentialName(input.RequestID)
+	key, plaintext, err := u.mintOrganizationAPIKey(ctx, name, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
-	secretResource, err := u.organizationAPIKeyResource(ctx, issuedCredentialName(input.RequestID), key, input.IdentityID)
+	secretResource, err := u.organizationAPIKeyResource(ctx, name, key, input.IdentityID)
 	if err != nil {
 		return nil, err
 	}

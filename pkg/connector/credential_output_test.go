@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
+	"github.com/conductorone/baton-datadog/pkg/client"
 	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
@@ -120,8 +121,14 @@ func TestOrgAPIKeyBaseURLFollowsOverride(t *testing.T) {
 // TestDatadogAPIBaseURL: the override wins when set, and the site decides
 // otherwise.
 func TestDatadogAPIBaseURL(t *testing.T) {
-	require.Equal(t, "https://api.datadoghq.eu", (&Datadog{site: "datadoghq.eu"}).apiBaseURL())
-	require.Equal(t, "https://dd.example.test", (&Datadog{site: "datadoghq.eu", baseURL: "https://dd.example.test"}).apiBaseURL(),
+	ctx := context.Background()
+	siteClient, err := client.NewDatadogRestClient(ctx, "datadoghq.eu", "api", "app", "")
+	require.NoError(t, err)
+	require.Equal(t, "https://api.datadoghq.eu", (&Datadog{wrapper: client.NewDatadogClient(siteClient, nil, "datadoghq.eu", "api", "app")}).apiBaseURL())
+
+	overrideClient, err := client.NewDatadogRestClient(ctx, "datadoghq.eu", "api", "app", "https://dd.example.test")
+	require.NoError(t, err)
+	require.Equal(t, "https://dd.example.test", (&Datadog{wrapper: client.NewDatadogClient(overrideClient, nil, "datadoghq.eu", "api", "app")}).apiBaseURL(),
 		"the base-url override must win over the site")
 }
 
