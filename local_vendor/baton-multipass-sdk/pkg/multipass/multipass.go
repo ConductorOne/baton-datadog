@@ -1,5 +1,5 @@
 // Temporary trimmed copy of github.com/conductorone/baton-multipass-sdk/pkg/multipass
-// v0.0.1 (commit b9f4b6776da475759bbcdc18f8209fedab389a6c).
+// v0.0.1.
 // To be replaced by the public baton-multipass-sdk module when available (IGA-5320).
 // Swap: delete this directory, add the public module to go.mod, and change the import path in the files that use it.
 
