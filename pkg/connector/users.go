@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV2"
 	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
@@ -237,6 +238,17 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 	}, nil
 }
 
+// discardTimeout bounds a cleanup delete, which runs after the request context
+// may already be cancelled.
+const discardTimeout = 10 * time.Second
+
+// discardContext detaches a cleanup delete from the request's cancellation, so
+// a cancellation right after the mint cannot orphan the key, and bounds it by
+// discardTimeout. It keeps the request context's values, such as its logger.
+func discardContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), discardTimeout)
+}
+
 // discardOrganizationAPIKey revokes an organization API key whose plaintext
 // cannot be returned. Issuance is not retried automatically, so a mint whose
 // result never reaches the caller would otherwise be an orphaned live
@@ -244,6 +256,8 @@ func (u *credentialUserBuilder) issueOrganizationAPIKey(ctx context.Context, inp
 // original error is what the caller needs to see, and the key id is what lets
 // an operator clean up by hand.
 func (u *credentialUserBuilder) discardOrganizationAPIKey(ctx context.Context, keyID string) {
+	ctx, cancel := discardContext(ctx)
+	defer cancel()
 	if deleteErr := u.wrapper.DeleteAPIKey(ctx, keyID); deleteErr != nil {
 		ctxzap.Extract(ctx).Warn("failed to clean up Datadog organization API key after issuance error",
 			zap.String("api_key_id", keyID),
@@ -257,6 +271,8 @@ func (u *credentialUserBuilder) discardOrganizationAPIKey(ctx context.Context, k
 // discardOrganizationAPIKey: issuance is not retried, so a mint that never
 // reaches the caller would otherwise be an orphaned live credential.
 func (u *credentialUserBuilder) discardServiceAccountApplicationKey(ctx context.Context, serviceAccountID, keyID string) {
+	ctx, cancel := discardContext(ctx)
+	defer cancel()
 	if deleteErr := u.wrapper.DeleteServiceAccountApplicationKey(ctx, serviceAccountID, keyID); deleteErr != nil {
 		ctxzap.Extract(ctx).Warn("failed to clean up Datadog service account application key after issuance error",
 			zap.String("service_account_id", serviceAccountID),

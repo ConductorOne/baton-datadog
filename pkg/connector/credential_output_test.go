@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/conductorone/baton-datadog/local_vendor/baton-multipass-sdk/pkg/multipass"
 	"github.com/conductorone/baton-datadog/pkg/client"
@@ -241,4 +242,20 @@ func TestAppKeyIssueCarriesReportedScopes(t *testing.T) {
 
 	payload := issueMultipassAppKey(t, server)
 	require.Equal(t, []any{"logs_read", "metrics_read"}, payload["scopes"])
+}
+
+// TestDiscardContextSurvivesCancellation: the cleanup delete after a failed
+// post-mint step must still run when the request context is already cancelled,
+// and must stay bounded.
+func TestDiscardContextSurvivesCancellation(t *testing.T) {
+	parent, cancelParent := context.WithCancel(context.Background())
+	cancelParent()
+
+	ctx, cancel := discardContext(parent)
+	defer cancel()
+
+	require.NoError(t, ctx.Err(), "a cancelled request must not cancel the cleanup")
+	deadline, ok := ctx.Deadline()
+	require.True(t, ok, "the cleanup must be bounded")
+	require.LessOrEqual(t, time.Until(deadline), discardTimeout)
 }
