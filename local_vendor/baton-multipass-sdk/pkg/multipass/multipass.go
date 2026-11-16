@@ -1,15 +1,13 @@
 // Temporary trimmed copy of github.com/conductorone/baton-multipass-sdk/pkg/multipass
 // v0.0.1.
-// To be replaced by the public baton-multipass-sdk module when available (IGA-5320).
-// Swap: delete this directory, add the public module to go.mod, and change the import path in the files that use it.
+// To be replaced by the published baton-multipass-sdk module when available.
+// Swap: delete this directory, add the published module to go.mod, and change the import path in the files that use it.
 
 // Package multipass serializes the API key value this connector issues under
 // Multipass's api_key_v2 content type. The struct matches the field names
-// Multipass decodes, mirroring
-// crates/latchkey-client-sdk/src/secret_types/definitions.rs at
-// ductone/multipass a5d4dad2dfb3a7ec820bf78fc7135ce6c8eda531. It does no
-// validation: Multipass owns the schema, and a value it rejects must come back
-// as its error rather than as a connector-side guess.
+// Multipass decodes. It does no validation: Multipass owns the schema, and a
+// value it rejects must come back as its error rather than as a connector-side
+// guess.
 package multipass
 
 import (
