@@ -106,7 +106,13 @@ func TestIssuerCustomNamePrefixReachesProvider(t *testing.T) {
 					return
 				}
 				names <- body.Data.Attributes.Name
-				_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"id": "issued-id", "type": keyType, "attributes": map[string]any{"name": body.Data.Attributes.Name, "key": "test-secret"}}})
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"data": map[string]any{
+						"id":         "issued-id",
+						"type":       keyType,
+						"attributes": map[string]any{"name": body.Data.Attributes.Name, "key": "test-secret"},
+					},
+				})
 			}))
 			defer server.Close()
 			issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, true, testAPIBaseURL)
