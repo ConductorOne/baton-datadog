@@ -94,8 +94,10 @@ func TestOrganizationAPIKeyIssuerSchema(t *testing.T) {
 	require.True(t, ok, "the organization key issuer registers on the api-key type")
 	requireIssuerShape(t, schema, apiTokenResourceType.Id, datadogAPIKeyFieldName)
 
-	// An organization key belongs to the organization: no subject, no arguments.
-	require.Empty(t, schema.GetArguments())
+	// Organization keys have no subject, but expose a naming prefix.
+	require.Len(t, schema.GetArguments(), 1)
+	require.Equal(t, actionArgNamePrefix, schema.GetArguments()[0].GetName())
+	require.Equal(t, "c1", schema.GetArguments()[0].GetStringField().GetDefaultValue())
 }
 
 func TestApplicationKeyIssuerSchema(t *testing.T) {
@@ -313,14 +315,14 @@ func TestIssuerThroughActionManagerEncryptsTheSecret(t *testing.T) {
 
 func TestNewIssuedKeyName(t *testing.T) {
 	now := time.Date(2026, 1, 2, 15, 4, 5, 0, time.FixedZone("x", 3600))
-	name, err := newIssuedKeyName(now, bytes.NewReader([]byte{0, 0, 0, 0}))
+	name, err := newIssuedKeyName(issuedKeyNameDefaultPrefix, now, bytes.NewReader([]byte{0, 0, 0, 0}))
 	require.NoError(t, err)
 	require.Equal(t, "c1-20260102T140405Z-aaaaaa", name, "UTC timestamp, base32 suffix")
 
-	again, err := newIssuedKeyName(now, rand.Reader)
+	again, err := newIssuedKeyName(issuedKeyNameDefaultPrefix, now, rand.Reader)
 	require.NoError(t, err)
 	require.Regexp(t, `^c1-\d{8}T\d{6}Z-[a-z2-7]{6}$`, again)
 
-	_, err = newIssuedKeyName(now, bytes.NewReader(nil))
+	_, err = newIssuedKeyName(issuedKeyNameDefaultPrefix, now, bytes.NewReader(nil))
 	require.Error(t, err)
 }

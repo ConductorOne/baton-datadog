@@ -13,6 +13,7 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/field"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -33,9 +34,9 @@ const (
 	// actionArgServiceAccountID is the identity an application key is issued
 	// for: a Datadog service account, which is a user resource.
 	actionArgServiceAccountID = "service_account_id"
-	// actionArgScopes is the application key's one provider input. Datadog
-	// application keys accept a free-form scope list.
-	actionArgScopes = "scopes"
+	// actionArgScopes controls permissions on application keys.
+	actionArgScopes     = "scopes"
+	actionArgNamePrefix = "name_prefix"
 
 	// actionReturnResource is the created secret resource, carrying its
 	// SecretTrait.
@@ -57,7 +58,7 @@ func resourceReturnField() *configv1.Field {
 }
 
 // organizationAPIKeyActionSchema is the organization API key issuer. An
-// organization key belongs to the organization, so it takes no arguments.
+// organization key belongs to the organization, so it takes no subject.
 func organizationAPIKeyActionSchema() *v2.BatonActionSchema {
 	secret := organizationAPIKeyOutput()
 	secret.SetIsRequired(true)
@@ -65,6 +66,7 @@ func organizationAPIKeyActionSchema() *v2.BatonActionSchema {
 		Name:        ActionIssueOrganizationAPIKey,
 		DisplayName: datadogIssueOrgKeyActionDisplayName,
 		Description: "Creates a Datadog organization API key and returns it as a Multipass api_key_v2 secret.",
+		Arguments:   []*configv1.Field{namePrefixField(apiTokenResourceType.Id)},
 		ReturnTypes: []*configv1.Field{secret, resourceReturnField()},
 		ActionType:  []v2.ActionType{v2.ActionType_ACTION_TYPE_RESOURCE_CREATE},
 	}.Build()
@@ -80,6 +82,7 @@ func serviceAccountApplicationKeyActionSchema() *v2.BatonActionSchema {
 		DisplayName: datadogIssueAppKeyActionDisplayName,
 		Description: "Creates an application key for a Datadog service account and returns it as a Multipass api_key_v2 secret.",
 		Arguments: []*configv1.Field{
+			namePrefixField(serviceAccountApplicationKeyResourceType.Id),
 			configv1.Field_builder{
 				Name:        actionArgServiceAccountID,
 				DisplayName: "Service account",
@@ -134,7 +137,7 @@ func (u *credentialUserBuilder) issueOrganizationAPIKeyAction(
 	ctx context.Context,
 	args *structpb.Struct,
 ) (*structpb.Struct, []*v2.PlaintextData, annotations.Annotations, error) {
-	name, err := newIssuedKeyName(time.Now(), rand.Reader)
+	name, err := actionKeyName(args, apiTokenResourceType.Id)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -179,7 +182,7 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 			scopes = requested
 		}
 	}
-	name, err := newIssuedKeyName(time.Now(), rand.Reader)
+	name, err := actionKeyName(args, serviceAccountApplicationKeyResourceType.Id)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -217,17 +220,61 @@ func issueActionResult(
 
 // issuedKeyNameSuffixLen is the length of the random suffix of an action-issued
 // key name: 6 base32 characters, 30 bits.
-const issuedKeyNameSuffixLen = 6
+const (
+	issuedKeyNameSuffixLen       = 6
+	issuedKeyNameTimeLayout      = "20060102T150405Z"
+	issuedKeyNameDefaultPrefix   = "c1"
+	issuedKeyNameMaxLength       = 256
+	issuedKeyNamePrefixMaxLength = issuedKeyNameMaxLength - (1 + len(issuedKeyNameTimeLayout) + 1 + issuedKeyNameSuffixLen)
+)
 
-// newIssuedKeyName names a key the issuer actions mint: c1-<UTC time>-<random>,
+func namePrefixField(resourceTypeID string) *configv1.Field {
+	rules := configv1.StringRules_builder{
+		MinLen:        proto.Uint64(1),
+		ValidateEmpty: true,
+		IsRequired:    true,
+	}
+	unit := "characters"
+	if resourceTypeID == serviceAccountApplicationKeyResourceType.Id {
+		unit = "UTF-8 bytes"
+		rules.MaxLen = proto.Uint64(uint64(issuedKeyNamePrefixMaxLength))
+	} else {
+		// SDK length rules count bytes. POSIX regex repetition counts Unicode code points,
+		// matching Datadog organization key names without restricting valid multibyte prefixes.
+		rules.Pattern = proto.String(fmt.Sprintf("^(.|\n){1,%d}$", issuedKeyNamePrefixMaxLength))
+	}
+	return configv1.Field_builder{
+		Name:        actionArgNamePrefix,
+		DisplayName: "Key name prefix",
+		Description: fmt.Sprintf("Used at the start of the key name. Up to %d %s; a unique suffix is added automatically.", issuedKeyNamePrefixMaxLength, unit),
+		StringField: configv1.StringField_builder{DefaultValue: issuedKeyNameDefaultPrefix, Rules: rules.Build()}.Build(),
+	}.Build()
+}
+
+func actionKeyName(args *structpb.Struct, resourceTypeID string) (string, error) {
+	prefix := issuedKeyNameDefaultPrefix
+	if _, present := args.GetFields()[actionArgNamePrefix]; present {
+		var ok bool
+		prefix, ok = actions.GetStringArg(args, actionArgNamePrefix)
+		if !ok {
+			return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a string", actionArgNamePrefix)
+		}
+	}
+	if err := field.ValidateStringRules(namePrefixField(resourceTypeID).GetStringField().GetRules(), prefix, actionArgNamePrefix); err != nil {
+		return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %v", err)
+	}
+	return newIssuedKeyName(prefix, time.Now(), rand.Reader)
+}
+
+// newIssuedKeyName names a key the issuer actions mint: <prefix>-<UTC time>-<random>,
 // e.g. c1-20260102T150405Z-k3x9qa. Every call gets a fresh name, which avoids name
 // collisions; the issuer has no duplicate guard of its own and relies on C1
 // dispatching the action once.
-func newIssuedKeyName(now time.Time, random io.Reader) (string, error) {
+func newIssuedKeyName(prefix string, now time.Time, random io.Reader) (string, error) {
 	buf := make([]byte, 4)
 	if _, err := io.ReadFull(random, buf); err != nil {
 		return "", fmt.Errorf("baton-datadog: generate key name: %w", err)
 	}
 	suffix := strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(buf))[:issuedKeyNameSuffixLen]
-	return "c1-" + now.UTC().Format("20060102T150405Z") + "-" + suffix, nil
+	return prefix + "-" + now.UTC().Format(issuedKeyNameTimeLayout) + "-" + suffix, nil
 }
