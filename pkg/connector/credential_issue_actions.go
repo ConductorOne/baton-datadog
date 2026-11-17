@@ -15,6 +15,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -91,10 +92,16 @@ func serviceAccountApplicationKeyActionSchema() *v2.BatonActionSchema {
 				}.Build(),
 			}.Build(),
 			configv1.Field_builder{
-				Name:             actionArgScopes,
-				DisplayName:      "Scopes",
-				Description:      "Application key scopes. Must not be empty. Omit for an unscoped key.",
-				StringSliceField: configv1.StringSliceField_builder{}.Build(),
+				Name:        actionArgScopes,
+				DisplayName: "Scopes",
+				Description: "An empty scope list issues an unscoped key with the service account's full permissions.",
+				StringSliceField: configv1.StringSliceField_builder{
+					Rules: configv1.RepeatedStringRules_builder{
+						// Explicit zero lets schema consumers distinguish allowed empty lists from unspecified bounds.
+						MinItems:      proto.Uint64(0),
+						ValidateEmpty: true,
+					}.Build(),
+				}.Build(),
 			}.Build(),
 		},
 		ReturnTypes: []*configv1.Field{secret, resourceReturnField()},
@@ -161,17 +168,13 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 		return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a %s resource", actionArgServiceAccountID, userResourceType.Id)
 	}
 	var scopes []string
-	// A null scopes is absent, as in the SDK. Absent mints an unscoped key with
-	// the service account's full permissions, so a value that is present but
-	// unreadable or empty is refused rather than silently widened to that.
+	// Empty lists deliberately request an unscoped key; omitted/null retain the
+	// SDK's absence convention. Malformed values must never fall back to unscoped.
 	if v, present := args.GetFields()[actionArgScopes]; present {
 		if _, isNull := v.GetKind().(*structpb.Value_NullValue); !isNull {
 			requested, ok := actions.GetStringSliceArg(args, actionArgScopes)
 			if !ok {
 				return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a list of strings", actionArgScopes)
-			}
-			if len(requested) == 0 {
-				return nil, nil, nil, status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a non-empty list of strings; omit it for an unscoped key", actionArgScopes)
 			}
 			scopes = requested
 		}

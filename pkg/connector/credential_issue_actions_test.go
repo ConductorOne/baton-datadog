@@ -14,6 +14,7 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -116,6 +117,15 @@ func TestApplicationKeyIssuerSchema(t *testing.T) {
 	require.True(t, subject.GetIsRequired())
 	require.Equal(t, []string{userResourceType.Id}, subject.GetResourceIdField().GetRules().GetAllowedResourceTypeIds())
 	require.True(t, args[actionArgScopes].HasStringSliceField())
+	scopes := args[actionArgScopes]
+	require.Contains(t, scopes.GetDescription(), "service account's full permissions")
+	rules := scopes.GetStringSliceField().GetRules()
+	require.NotNil(t, rules)
+	require.True(t, rules.HasMinItems(), "C1 needs explicit zero presence to offer zero selections")
+	require.Zero(t, rules.GetMinItems())
+	require.True(t, rules.GetValidateEmpty())
+	require.False(t, rules.GetIsRequired())
+	require.NoError(t, field.ValidateRepeatedStringRules(rules, []string{}, actionArgScopes))
 }
 
 // TestIssuersFollowTheGrants: an issuer registers only where its secret type's
@@ -206,13 +216,14 @@ func TestIssuerActionsRejectBadArguments(t *testing.T) {
 	_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "the subject is required")
 
-	// A malformed or empty scopes list must not be read as absent, which would
+	// A malformed scopes value must not be read as absent, which would
 	// mint an unscoped key. The wrapper points at a closed port, so reaching Datadog fails
 	// with a different code.
 	for name, scopes := range map[string]*structpb.Value{
 		"string":     structpb.NewStringValue("logs_read"),
 		"mixed list": structpb.NewListValue(&structpb.ListValue{Values: []*structpb.Value{structpb.NewStringValue("x"), structpb.NewNumberValue(5)}}),
-		"empty list": structpb.NewListValue(&structpb.ListValue{}),
+		"number":     structpb.NewNumberValue(1),
+		"object":     structpb.NewStructValue(&structpb.Struct{}),
 	} {
 		_, _, _, err = u.issueServiceAccountApplicationKeyAction(ctx, &structpb.Struct{Fields: map[string]*structpb.Value{
 			actionArgServiceAccountID: subjectArg(t, userResourceType.Id, testServiceAccountID),
@@ -222,27 +233,38 @@ func TestIssuerActionsRejectBadArguments(t *testing.T) {
 	}
 }
 
-// TestApplicationKeyNullScopesIsOmitted: an explicit null scopes mints an
-// unscoped key, exactly as an omitted one does, matching the SDK's convention.
-func TestApplicationKeyNullScopesIsOmitted(t *testing.T) {
-	server, requests := newMultipassAppKeyServer(t, "app-key-id", "app-key-secret",
-		`{"key":"app-key-secret","name":"c1-tkt-1"}`)
-	u := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false, true, testAPIBaseURL)
-
-	_, _, _, err := u.issueServiceAccountApplicationKeyAction(context.Background(), &structpb.Struct{Fields: map[string]*structpb.Value{
-		actionArgServiceAccountID: subjectArg(t, userResourceType.Id, testServiceAccountID),
-		actionArgScopes:           structpb.NewNullValue(),
-	}})
-	require.NoError(t, err)
-
-	var posted bool
-	for _, r := range *requests {
-		if r.method == "POST" {
-			posted = true
-			require.NotContains(t, r.body, "scopes", "a null scopes must mint an unscoped key")
-		}
+// Empty scopes deliberately request an unscoped key. Omitted/null retain the SDK's absence convention.
+func TestApplicationKeyUnscopedArguments(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value *structpb.Value
+	}{
+		{name: "omitted"},
+		{name: "null", value: structpb.NewNullValue()},
+		{name: "empty list", value: structpb.NewListValue(&structpb.ListValue{})},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server, requests := newMultipassAppKeyServer(t, "app-key-id", "app-key-secret",
+				`{"key":"app-key-secret","name":"c1-tkt-1"}`)
+			u := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), false, true, testAPIBaseURL)
+			args := &structpb.Struct{Fields: map[string]*structpb.Value{
+				actionArgServiceAccountID: subjectArg(t, userResourceType.Id, testServiceAccountID),
+			}}
+			if tc.value != nil {
+				args.Fields[actionArgScopes] = tc.value
+			}
+			_, _, _, err := u.issueServiceAccountApplicationKeyAction(context.Background(), args)
+			require.NoError(t, err)
+			var posted bool
+			for _, r := range *requests {
+				if r.method == "POST" {
+					posted = true
+					require.NotContains(t, r.body, "scopes", "unscoped issuance omits provider restrictions")
+				}
+			}
+			require.True(t, posted, "an unscoped key must actually be created")
+		})
 	}
-	require.True(t, posted)
 }
 
 // TestIssuerThroughActionManagerEncryptsTheSecret drives the issuer the way the
