@@ -8,6 +8,8 @@ import (
 	"io"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	configv1 "github.com/conductorone/baton-sdk/pb/c1/config/v1"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -241,12 +243,15 @@ func namePrefixField(resourceTypeID string) *configv1.Field {
 	} else {
 		// SDK length rules count bytes. POSIX regex repetition counts Unicode code points,
 		// matching Datadog organization key names without restricting valid multibyte prefixes.
-		rules.Pattern = proto.String(fmt.Sprintf("^(.|\n){1,%d}$", issuedKeyNamePrefixMaxLength))
+		// The SDK compiles patterns with regexp.CompilePOSIX, where ^ and $ are line-anchored,
+		// so a value with a newline can match line by line. The pattern is published for
+		// schema consumers; actionKeyName checks length and control characters itself.
+		rules.Pattern = proto.String(fmt.Sprintf("^[^[:cntrl:]]{1,%d}$", issuedKeyNamePrefixMaxLength))
 	}
 	return configv1.Field_builder{
 		Name:        actionArgNamePrefix,
 		DisplayName: "Key name prefix",
-		Description: fmt.Sprintf("Used at the start of the key name. Up to %d %s; a unique suffix is added automatically.", issuedKeyNamePrefixMaxLength, unit),
+		Description: fmt.Sprintf("Used at the start of the key name. Up to %d %s, no control characters; a unique suffix is added automatically.", issuedKeyNamePrefixMaxLength, unit),
 		StringField: configv1.StringField_builder{DefaultValue: issuedKeyNameDefaultPrefix, Rules: rules.Build()}.Build(),
 	}.Build()
 }
@@ -262,6 +267,14 @@ func actionKeyName(args *structpb.Struct, resourceTypeID string) (string, error)
 	}
 	if err := field.ValidateStringRules(namePrefixField(resourceTypeID).GetStringField().GetRules(), prefix, actionArgNamePrefix); err != nil {
 		return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %v", err)
+	}
+	if strings.IndexFunc(prefix, unicode.IsControl) >= 0 {
+		return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %s must not contain control characters", actionArgNamePrefix)
+	}
+	if resourceTypeID != serviceAccountApplicationKeyResourceType.Id {
+		if n := utf8.RuneCountInString(prefix); n < 1 || n > issuedKeyNamePrefixMaxLength {
+			return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be 1 to %d characters", actionArgNamePrefix, issuedKeyNamePrefixMaxLength)
+		}
 	}
 	return newIssuedKeyName(prefix, time.Now(), rand.Reader)
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -133,4 +134,36 @@ func TestIssuerCustomNamePrefixReachesProvider(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKeyNamePrefixRejectsControlCharacters(t *testing.T) {
+	for _, resourceType := range []string{apiTokenResourceType.Id, serviceAccountApplicationKeyResourceType.Id} {
+		for _, tc := range []struct {
+			name   string
+			prefix string
+		}{
+			{"newline bypass", strings.Repeat("a", 100) + "\n" + strings.Repeat("a", 300)},
+			{"newline", "a\nb"},
+			{"carriage return", "a\rb"},
+			{"tab", "a\tb"},
+			{"NUL", "a\x00b"},
+			{"DEL", "a\x7fb"},
+			{"C1 NEL", "a\u0085b"},
+			{"leading newline", "\nab"},
+			{"trailing newline", "ab\n"},
+		} {
+			t.Run(resourceType+"/"+tc.name, func(t *testing.T) {
+				_, err := actionKeyName(&structpb.Struct{Fields: map[string]*structpb.Value{actionArgNamePrefix: structpb.NewStringValue(tc.prefix)}}, resourceType)
+				require.Equal(t, codes.InvalidArgument, status.Code(err))
+			})
+		}
+	}
+}
+
+func TestOrgKeyNamePrefixPatternCompilesPOSIX(t *testing.T) {
+	pattern := namePrefixField(apiTokenResourceType.Id).GetStringField().GetRules().GetPattern()
+	re, err := regexp.CompilePOSIX(pattern)
+	require.NoError(t, err)
+	require.True(t, re.MatchString("team-prod"))
+	require.False(t, re.MatchString("a\x7fb"))
 }
