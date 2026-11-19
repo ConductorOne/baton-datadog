@@ -224,10 +224,11 @@ const (
 	// validNamePrefix accepts. The SDK compiles patterns with regexp.CompilePOSIX,
 	// which cannot name Unicode letter, mark or digit classes and anchors ^ and $
 	// per line, so the pattern is a published hint: it treats every non-ASCII
-	// code point from U+00C0 up as a possible letter, mark or digit. The
+	// code point from U+00C0 up, and the letters U+00AA, U+00B5 and U+00BA, as a possible
+	// letter, mark or digit. The
 	// length bound is in code points, which is why the schema sets no MaxLen
 	// (it counts bytes). validNamePrefix, called by actionKeyName, enforces.
-	namePrefixPattern = `^[A-Za-z\x{C0}-\x{10FFFF}][-_0-9A-Za-z\x{C0}-\x{10FFFF}]{0,63}$`
+	namePrefixPattern = `^[A-Za-z\x{AA}\x{B5}\x{BA}\x{C0}-\x{10FFFF}][-_0-9A-Za-z\x{AA}\x{B5}\x{BA}\x{C0}-\x{10FFFF}]{0,63}$`
 )
 
 // namePrefixField is the name_prefix argument of both issuers.
@@ -288,13 +289,21 @@ func actionKeyName(args *structpb.Struct) (string, error) {
 		return "", status.Errorf(codes.InvalidArgument,
 			"baton-datadog: %s must be 1 to %d characters: a letter, then letters, combining marks, digits, _ or -", actionArgNamePrefix, maxNamePrefixLen)
 	}
-	return newIssuedKeyName(prefix), nil
+	return newIssuedKeyName(prefix)
 }
 
 // newIssuedKeyName names a key the issuer actions mint: <prefix>-<KSUID>, e.g.
 // c1-0ujsswThIGTUYm2K8FjOOfXtY1K. Every call gets a fresh name, which avoids name
 // collisions; the issuer has no duplicate guard of its own and relies on C1
 // dispatching the action once.
-func newIssuedKeyName(prefix string) string {
-	return prefix + "-" + ksuid.New().String()
+func newIssuedKeyName(prefix string) (string, error) {
+	id, err := newKSUID()
+	if err != nil {
+		return "", status.Errorf(codes.Internal, "baton-datadog: generate key name: %v", err)
+	}
+	return prefix + "-" + id.String(), nil
 }
+
+// newKSUID is ksuid.NewRandom, a variable so tests can inject a failure.
+// ksuid.New would panic if the system random source failed.
+var newKSUID = ksuid.NewRandom

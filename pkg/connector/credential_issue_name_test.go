@@ -3,13 +3,16 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/conductorone/baton-sdk/pkg/field"
+	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,6 +35,8 @@ var namePrefixCases = map[string]struct {
 	"cjk":                  {"\u65e5\u672c", true},
 	"mixed scripts":        {"\u00dcn\u00efc\u00f6d\u00e9_x-1", true},
 	"combining mark":       {"e\u0301", true},
+	"latin-1 letters":      {"\u00aa\u00b5\u00ba", true},
+	"latin-1 letter tail":  {"a\u00b5", true},
 	"mixed case":           {"Team_A-ci", true},
 	"64 cjk runes":         {strings.Repeat("\u65e5", maxNamePrefixLen), true},
 	"65 cjk runes":         {strings.Repeat("\u65e5", maxNamePrefixLen+1), false},
@@ -181,4 +186,31 @@ func TestIssuerCustomNamePrefixReachesProvider(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Every rune the parser accepts, alone or after "a", must match the advisory
+// pattern, so the schema never turns away a valid prefix.
+func TestNamePrefixPatternSupersetOfParserForEveryRune(t *testing.T) {
+	re := regexp.MustCompilePOSIX(namePrefixPattern)
+	for r := rune(0); r <= unicode.MaxRune; r++ {
+		if r >= 0xD800 && r <= 0xDFFF {
+			continue
+		}
+		for _, s := range []string{string(r), "a" + string(r)} {
+			if validNamePrefix(s) && !re.MatchString(s) {
+				t.Fatalf("pattern rejects %q (U+%04X) that the parser accepts", s, r)
+			}
+		}
+	}
+}
+
+func TestNewKSUIDFailureIsInternal(t *testing.T) {
+	prev := newKSUID
+	newKSUID = func() (ksuid.KSUID, error) { return ksuid.KSUID{}, errors.New("entropy exhausted") }
+	t.Cleanup(func() { newKSUID = prev })
+
+	_, err := newIssuedKeyName("c1")
+	require.Equal(t, codes.Internal, status.Code(err))
+	require.ErrorContains(t, err, "baton-datadog: ")
+	require.ErrorContains(t, err, "entropy exhausted")
 }

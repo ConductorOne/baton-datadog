@@ -313,7 +313,10 @@ func TestIssuerThroughActionManagerEncryptsTheSecret(t *testing.T) {
 }
 
 func TestNewIssuedKeyName(t *testing.T) {
-	name := newIssuedKeyName(issuedKeyNameDefaultPrefix)
+	name, err := newIssuedKeyName(issuedKeyNameDefaultPrefix)
+	require.NoError(t, err)
 	require.Regexp(t, `^c1-[0-9A-Za-z]{27}$`, name)
-	require.NotEqual(t, name, newIssuedKeyName(issuedKeyNameDefaultPrefix), "unique per call")
+	again, err := newIssuedKeyName(issuedKeyNameDefaultPrefix)
+	require.NoError(t, err)
+	require.NotEqual(t, name, again, "unique per call")
 }
