@@ -220,15 +220,15 @@ const (
 	issuedKeyNameDefaultPrefix = "c1"
 	// maxNamePrefixLen bounds the admin-supplied prefix, in Unicode code points.
 	maxNamePrefixLen = 64
-	// namePrefixPattern is an advisory POSIX ERE that accepts a superset of what
-	// validNamePrefix accepts. The SDK compiles patterns with regexp.CompilePOSIX,
-	// which cannot name Unicode letter, mark or digit classes and anchors ^ and $
-	// per line, so the pattern is a published hint: it treats every non-ASCII
-	// code point from U+00C0 up, and the letters U+00AA, U+00B5 and U+00BA, as a possible
-	// letter, mark or digit. The
-	// length bound is in code points, which is why the schema sets no MaxLen
-	// (it counts bytes). validNamePrefix, called by actionKeyName, enforces.
-	namePrefixPattern = `^[A-Za-z\x{AA}\x{B5}\x{BA}\x{C0}-\x{10FFFF}][-_0-9A-Za-z\x{AA}\x{B5}\x{BA}\x{C0}-\x{10FFFF}]{0,63}$`
+	// namePrefixPattern is an advisory pattern that accepts a superset of what
+	// validNamePrefix accepts. It uses only \xHH escapes, so Go (RE2/POSIX) and
+	// ECMAScript consumers both compile it. It is a negated class that excludes
+	// ASCII and Latin-1 non-letters; every code point from U+00C0 up, and the
+	// letters U+00AA, U+00B5 and U+00BA, pass as a possible letter, mark or digit.
+	// The first character also excludes digits, "_" and "-". The length bound is
+	// in code points, which is why the schema sets no MaxLen (it counts bytes).
+	// validNamePrefix, called by actionKeyName, enforces.
+	namePrefixPattern = `^[^\x00-\x40\x5B-\x60\x7B-\xA9\xAB-\xB4\xB6-\xB9\xBB-\xBF][^\x00-\x2C\x2E\x2F\x3A-\x40\x5B-\x5E\x60\x7B-\xA9\xAB-\xB4\xB6-\xB9\xBB-\xBF]{0,63}$`
 )
 
 // namePrefixField is the name_prefix argument of both issuers.
