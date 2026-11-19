@@ -46,6 +46,7 @@ func TestCreateAccountConflict(t *testing.T) {
 				}
 				require.Equal(t, http.MethodGet, r.Method)
 				require.Equal(t, fmt.Sprint(requests), r.URL.Query().Get("page[number]"))
+				require.Equal(t, fmt.Sprint(defaultV2PageSize), r.URL.Query().Get("page[size]"))
 				require.Empty(t, r.URL.Query().Get("filter"))
 				if requests < len(tt.pages) {
 					_, _ = fmt.Fprintf(w, `{"data":[%s]}`, tt.pages[requests])

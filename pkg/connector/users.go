@@ -623,7 +623,7 @@ func (u *userBuilder) CreateAccount(
 func (u *userBuilder) existingAccount(ctx context.Context, email string) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
 	var match *datadogV2.User
 	for page := int64(0); ; page++ {
-		users, err := u.wrapper.ListUsers(ctx, datadogV2.NewListUsersOptionalParameters().WithPageNumber(page))
+		users, err := u.wrapper.ListUsers(ctx, datadogV2.NewListUsersOptionalParameters().WithPageNumber(page).WithPageSize(defaultV2PageSize))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("baton-datadog: failed to look up existing user after create conflict: %w", err)
 		}
