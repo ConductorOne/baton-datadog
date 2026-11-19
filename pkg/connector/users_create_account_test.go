@@ -30,6 +30,7 @@ func TestCreateAccountConflict(t *testing.T) {
 		{name: "exact match on later page", createStatus: 409, pages: []string{partial, exact}, wantID: "existing-id"},
 		{name: "no exact match", createStatus: 409, pages: []string{partial}, wantCode: codes.AlreadyExists, wantMessage: "no user matches"},
 		{name: "ambiguous including service account", createStatus: 409, pages: []string{exact, service}, wantCode: codes.AlreadyExists, wantMessage: "multiple users"},
+		{name: "service account is not a human match", createStatus: 409, pages: []string{service}, wantCode: codes.AlreadyExists, wantMessage: "service account"},
 		{name: "non conflict", createStatus: 403, wantCode: codes.PermissionDenied},
 	}
 	for _, tt := range tests {

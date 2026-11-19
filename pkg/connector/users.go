@@ -647,6 +647,11 @@ func (u *userBuilder) existingAccount(ctx context.Context, email string) (connec
 	if match.GetId() == "" {
 		return nil, nil, nil, status.Error(codes.AlreadyExists, "baton-datadog: create user conflict: matching user has no ID")
 	}
+	// CreateAccount requests a human user; never bind that identity to a
+	// service account merely because Datadog reports the same email.
+	if match.Attributes.GetServiceAccount() {
+		return nil, nil, nil, status.Error(codes.AlreadyExists, "baton-datadog: create user conflict: matching account is a service account")
+	}
 	res, err := userResource(match)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("baton-datadog: failed to build existing user resource: %w", err)
