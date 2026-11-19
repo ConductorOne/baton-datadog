@@ -3,7 +3,6 @@ package connector
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"io"
 	"testing"
 	"time"
@@ -200,7 +199,7 @@ func TestApplicationKeyActionResult(t *testing.T) {
 	for _, r := range *requests {
 		if r.method == "POST" {
 			created = true
-			require.Regexp(t, `"name":"c1-\d{8}T\d{6}Z-[a-z2-7]{6}"`, r.body, "the key is named by timestamp and random suffix")
+			require.Regexp(t, `"name":"c1-[0-9A-Za-z]{27}"`, r.body, "the key is named <prefix>-<KSUID>")
 		}
 	}
 	require.True(t, created)
@@ -314,15 +313,7 @@ func TestIssuerThroughActionManagerEncryptsTheSecret(t *testing.T) {
 }
 
 func TestNewIssuedKeyName(t *testing.T) {
-	now := time.Date(2026, 1, 2, 15, 4, 5, 0, time.FixedZone("x", 3600))
-	name, err := newIssuedKeyName(issuedKeyNameDefaultPrefix, now, bytes.NewReader([]byte{0, 0, 0, 0}))
-	require.NoError(t, err)
-	require.Equal(t, "c1-20260102T140405Z-aaaaaa", name, "UTC timestamp, base32 suffix")
-
-	again, err := newIssuedKeyName(issuedKeyNameDefaultPrefix, now, rand.Reader)
-	require.NoError(t, err)
-	require.Regexp(t, `^c1-\d{8}T\d{6}Z-[a-z2-7]{6}$`, again)
-
-	_, err = newIssuedKeyName(issuedKeyNameDefaultPrefix, now, bytes.NewReader(nil))
-	require.Error(t, err)
+	name := newIssuedKeyName(issuedKeyNameDefaultPrefix)
+	require.Regexp(t, `^c1-[0-9A-Za-z]{27}$`, name)
+	require.NotEqual(t, name, newIssuedKeyName(issuedKeyNameDefaultPrefix), "unique per call")
 }

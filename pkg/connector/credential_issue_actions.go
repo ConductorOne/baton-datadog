@@ -2,12 +2,8 @@ package connector
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base32"
 	"fmt"
-	"io"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -15,7 +11,7 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/actions"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/field"
+	"github.com/segmentio/ksuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -68,7 +64,7 @@ func organizationAPIKeyActionSchema() *v2.BatonActionSchema {
 		Name:        ActionIssueOrganizationAPIKey,
 		DisplayName: datadogIssueOrgKeyActionDisplayName,
 		Description: "Creates a Datadog organization API key and returns it as a Multipass api_key_v2 secret.",
-		Arguments:   []*configv1.Field{namePrefixField(apiTokenResourceType.Id)},
+		Arguments:   []*configv1.Field{namePrefixField()},
 		ReturnTypes: []*configv1.Field{secret, resourceReturnField()},
 		ActionType:  []v2.ActionType{v2.ActionType_ACTION_TYPE_RESOURCE_CREATE},
 	}.Build()
@@ -84,7 +80,7 @@ func serviceAccountApplicationKeyActionSchema() *v2.BatonActionSchema {
 		DisplayName: datadogIssueAppKeyActionDisplayName,
 		Description: "Creates an application key for a Datadog service account and returns it as a Multipass api_key_v2 secret.",
 		Arguments: []*configv1.Field{
-			namePrefixField(serviceAccountApplicationKeyResourceType.Id),
+			namePrefixField(),
 			configv1.Field_builder{
 				Name:        actionArgServiceAccountID,
 				DisplayName: "Service account",
@@ -139,7 +135,7 @@ func (u *credentialUserBuilder) issueOrganizationAPIKeyAction(
 	ctx context.Context,
 	args *structpb.Struct,
 ) (*structpb.Struct, []*v2.PlaintextData, annotations.Annotations, error) {
-	name, err := actionKeyName(args, apiTokenResourceType.Id)
+	name, err := actionKeyName(args)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -184,7 +180,7 @@ func (u *credentialUserBuilder) issueServiceAccountApplicationKeyAction(
 			scopes = requested
 		}
 	}
-	name, err := actionKeyName(args, serviceAccountApplicationKeyResourceType.Id)
+	name, err := actionKeyName(args)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -220,74 +216,85 @@ func issueActionResult(
 	return actions.NewReturnValues(true, field), []*v2.PlaintextData{plaintext}, nil, nil
 }
 
-// issuedKeyNameSuffixLen is the length of the random suffix of an action-issued
-// key name: 6 base32 characters, 30 bits.
 const (
-	issuedKeyNameSuffixLen       = 6
-	issuedKeyNameTimeLayout      = "20060102T150405Z"
-	issuedKeyNameDefaultPrefix   = "c1"
-	issuedKeyNameMaxLength       = 256
-	issuedKeyNamePrefixMaxLength = issuedKeyNameMaxLength - (1 + len(issuedKeyNameTimeLayout) + 1 + issuedKeyNameSuffixLen)
+	issuedKeyNameDefaultPrefix = "c1"
+	// maxNamePrefixLen bounds the admin-supplied prefix, in Unicode code points.
+	maxNamePrefixLen = 64
+	// namePrefixPattern is an advisory POSIX ERE that accepts a superset of what
+	// validNamePrefix accepts. The SDK compiles patterns with regexp.CompilePOSIX,
+	// which cannot name Unicode letter, mark or digit classes and anchors ^ and $
+	// per line, so the pattern is a published hint: it treats every non-ASCII
+	// code point from U+00C0 up as a possible letter, mark or digit. The
+	// length bound is in code points, which is why the schema sets no MaxLen
+	// (it counts bytes). validNamePrefix, called by actionKeyName, enforces.
+	namePrefixPattern = `^[A-Za-z\x{C0}-\x{10FFFF}][-_0-9A-Za-z\x{C0}-\x{10FFFF}]{0,63}$`
 )
 
-func namePrefixField(resourceTypeID string) *configv1.Field {
-	rules := configv1.StringRules_builder{
-		MinLen:        proto.Uint64(1),
-		ValidateEmpty: true,
-		IsRequired:    true,
-	}
-	unit := "characters"
-	if resourceTypeID == serviceAccountApplicationKeyResourceType.Id {
-		unit = "UTF-8 bytes"
-		rules.MaxLen = proto.Uint64(uint64(issuedKeyNamePrefixMaxLength))
-	} else {
-		// SDK length rules count bytes. POSIX regex repetition counts Unicode code points,
-		// matching Datadog organization key names without restricting valid multibyte prefixes.
-		// The SDK compiles patterns with regexp.CompilePOSIX, where ^ and $ are line-anchored,
-		// so a value with a newline can match line by line. The pattern is published for
-		// schema consumers; actionKeyName checks length and control characters itself.
-		rules.Pattern = proto.String(fmt.Sprintf("^[^[:cntrl:]]{1,%d}$", issuedKeyNamePrefixMaxLength))
-	}
+// namePrefixField is the name_prefix argument of both issuers.
+func namePrefixField() *configv1.Field {
 	return configv1.Field_builder{
 		Name:        actionArgNamePrefix,
 		DisplayName: "Key name prefix",
-		Description: fmt.Sprintf("Used at the start of the key name. Up to %d %s, no control characters; a unique suffix is added automatically.", issuedKeyNamePrefixMaxLength, unit),
-		StringField: configv1.StringField_builder{DefaultValue: issuedKeyNameDefaultPrefix, Rules: rules.Build()}.Build(),
+		Description: fmt.Sprintf("Optional. Start of the key name, which is <prefix>-<KSUID>. "+
+			"1 to %d characters: a letter, then letters, combining marks, digits, _ or -, in any script; case is kept. "+
+			"Blank or omitted uses %s.", maxNamePrefixLen, issuedKeyNameDefaultPrefix),
+		StringField: configv1.StringField_builder{
+			DefaultValue: issuedKeyNameDefaultPrefix,
+			Rules: configv1.StringRules_builder{
+				MinLen:  proto.Uint64(1),
+				Pattern: proto.String(namePrefixPattern),
+			}.Build(),
+		}.Build(),
 	}.Build()
 }
 
-func actionKeyName(args *structpb.Struct, resourceTypeID string) (string, error) {
-	prefix := issuedKeyNameDefaultPrefix
-	if _, present := args.GetFields()[actionArgNamePrefix]; present {
-		var ok bool
-		prefix, ok = actions.GetStringArg(args, actionArgNamePrefix)
-		if !ok {
-			return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a string", actionArgNamePrefix)
+// validNamePrefix reports whether s is 1 to maxNamePrefixLen code points: a
+// letter, then letters, combining marks, digits, _ or -. There is no Unicode
+// normalization, so the prefix is used as given.
+func validNamePrefix(s string) bool {
+	if n := utf8.RuneCountInString(s); n < 1 || n > maxNamePrefixLen {
+		return false
+	}
+	for i, r := range s {
+		if i == 0 {
+			if !unicode.IsLetter(r) {
+				return false
+			}
+			continue
+		}
+		if !unicode.IsLetter(r) && !unicode.IsMark(r) && !unicode.IsDigit(r) && r != '_' && r != '-' {
+			return false
 		}
 	}
-	if err := field.ValidateStringRules(namePrefixField(resourceTypeID).GetStringField().GetRules(), prefix, actionArgNamePrefix); err != nil {
-		return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %v", err)
-	}
-	if strings.IndexFunc(prefix, unicode.IsControl) >= 0 {
-		return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %s must not contain control characters", actionArgNamePrefix)
-	}
-	if resourceTypeID != serviceAccountApplicationKeyResourceType.Id {
-		if n := utf8.RuneCountInString(prefix); n < 1 || n > issuedKeyNamePrefixMaxLength {
-			return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be 1 to %d characters", actionArgNamePrefix, issuedKeyNamePrefixMaxLength)
-		}
-	}
-	return newIssuedKeyName(prefix, time.Now(), rand.Reader)
+	return true
 }
 
-// newIssuedKeyName names a key the issuer actions mint: <prefix>-<UTC time>-<random>,
-// e.g. c1-20260102T150405Z-k3x9qa. Every call gets a fresh name, which avoids name
+// actionKeyName reads the optional name_prefix and returns the key name to
+// mint. Absent, null or blank means the default.
+func actionKeyName(args *structpb.Struct) (string, error) {
+	prefix := issuedKeyNameDefaultPrefix
+	if v, present := args.GetFields()[actionArgNamePrefix]; present {
+		if _, isNull := v.GetKind().(*structpb.Value_NullValue); !isNull {
+			sv, ok := v.GetKind().(*structpb.Value_StringValue)
+			if !ok {
+				return "", status.Errorf(codes.InvalidArgument, "baton-datadog: %s must be a string", actionArgNamePrefix)
+			}
+			if trimmed := strings.TrimSpace(sv.StringValue); trimmed != "" {
+				prefix = trimmed
+			}
+		}
+	}
+	if !validNamePrefix(prefix) {
+		return "", status.Errorf(codes.InvalidArgument,
+			"baton-datadog: %s must be 1 to %d characters: a letter, then letters, combining marks, digits, _ or -", actionArgNamePrefix, maxNamePrefixLen)
+	}
+	return newIssuedKeyName(prefix), nil
+}
+
+// newIssuedKeyName names a key the issuer actions mint: <prefix>-<KSUID>, e.g.
+// c1-0ujsswThIGTUYm2K8FjOOfXtY1K. Every call gets a fresh name, which avoids name
 // collisions; the issuer has no duplicate guard of its own and relies on C1
 // dispatching the action once.
-func newIssuedKeyName(prefix string, now time.Time, random io.Reader) (string, error) {
-	buf := make([]byte, 4)
-	if _, err := io.ReadFull(random, buf); err != nil {
-		return "", fmt.Errorf("baton-datadog: generate key name: %w", err)
-	}
-	suffix := strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(buf))[:issuedKeyNameSuffixLen]
-	return prefix + "-" + now.UTC().Format(issuedKeyNameTimeLayout) + "-" + suffix, nil
+func newIssuedKeyName(prefix string) string {
+	return prefix + "-" + ksuid.New().String()
 }

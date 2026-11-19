@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"unicode/utf8"
 
 	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/stretchr/testify/require"
@@ -17,61 +16,109 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestKeyNamePrefixLimits(t *testing.T) {
-	for _, tc := range []struct {
-		name         string
-		resourceType string
-		prefix       string
-		valid        bool
-	}{
-		{"org ASCII boundary", apiTokenResourceType.Id, strings.Repeat("a", 232), true},
-		{"org ASCII too long", apiTokenResourceType.Id, strings.Repeat("a", 233), false},
-		{"org Unicode boundary", apiTokenResourceType.Id, strings.Repeat("é", 232), true},
-		{"org Unicode too long", apiTokenResourceType.Id, strings.Repeat("é", 233), false},
-		{"org emoji boundary", apiTokenResourceType.Id, strings.Repeat("😀", 232), true},
-		{"app ASCII boundary", serviceAccountApplicationKeyResourceType.Id, strings.Repeat("a", 232), true},
-		{"app ASCII too long", serviceAccountApplicationKeyResourceType.Id, strings.Repeat("a", 233), false},
-		{"app Unicode boundary", serviceAccountApplicationKeyResourceType.Id, strings.Repeat("é", 116), true},
-		{"app Unicode too long", serviceAccountApplicationKeyResourceType.Id, strings.Repeat("é", 117), false},
-		{"app emoji boundary", serviceAccountApplicationKeyResourceType.Id, strings.Repeat("😀", 58), true},
-		{"app emoji too long", serviceAccountApplicationKeyResourceType.Id, strings.Repeat("😀", 59), false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			declared := namePrefixField(tc.resourceType)
-			require.Equal(t, "c1", declared.GetStringField().GetDefaultValue())
-			require.False(t, declared.GetIsRequired(), "omitting the prefix preserves generated names")
-			schemaErr := field.ValidateStringRules(declared.GetStringField().GetRules(), tc.prefix, actionArgNamePrefix)
-			name, err := actionKeyName(&structpb.Struct{Fields: map[string]*structpb.Value{actionArgNamePrefix: structpb.NewStringValue(tc.prefix)}}, tc.resourceType)
+func prefixArgs(v *structpb.Value) *structpb.Struct {
+	return &structpb.Struct{Fields: map[string]*structpb.Value{actionArgNamePrefix: v}}
+}
+
+// namePrefixCases is the parser table. The advisory schema pattern must accept
+// every valid case.
+var namePrefixCases = map[string]struct {
+	prefix string
+	valid  bool
+}{
+	"default":              {"c1", true},
+	"single letter":        {"a", true},
+	"accented":             {"caf\u00e9", true},
+	"cjk":                  {"\u65e5\u672c", true},
+	"mixed scripts":        {"\u00dcn\u00efc\u00f6d\u00e9_x-1", true},
+	"combining mark":       {"e\u0301", true},
+	"mixed case":           {"Team_A-ci", true},
+	"64 cjk runes":         {strings.Repeat("\u65e5", maxNamePrefixLen), true},
+	"65 cjk runes":         {strings.Repeat("\u65e5", maxNamePrefixLen+1), false},
+	"64 ascii":             {strings.Repeat("a", maxNamePrefixLen), true},
+	"65 ascii":             {strings.Repeat("a", maxNamePrefixLen+1), false},
+	"leading digit":        {"9abc", false},
+	"leading underscore":   {"_a", false},
+	"leading dash":         {"-a", false},
+	"leading mark":         {"\u0301a", false},
+	"space":                {"a b", false},
+	"newline":              {"a\nb", false},
+	"tab":                  {"a\tb", false},
+	"carriage return":      {"a\rb", false},
+	"NUL":                  {"a\x00b", false},
+	"DEL":                  {"a\x7fb", false},
+	"C1 NEL":               {"a\u0085b", false},
+	"dot":                  {"a.b", false},
+	"emoji":                {"\U0001F642", false},
+	"trailing emoji":       {"a\U0001F642", false},
+	"leading newline form": {"9\na", false},
+}
+
+func TestKeyNamePrefixParser(t *testing.T) {
+	for name, tc := range namePrefixCases {
+		t.Run(name, func(t *testing.T) {
+			got, err := actionKeyName(prefixArgs(structpb.NewStringValue(tc.prefix)))
 			if !tc.valid {
-				require.Error(t, schemaErr)
 				require.Equal(t, codes.InvalidArgument, status.Code(err))
 				return
 			}
-			require.NoError(t, schemaErr)
 			require.NoError(t, err)
-			require.True(t, strings.HasPrefix(name, tc.prefix+"-"))
-			if tc.resourceType == apiTokenResourceType.Id {
-				require.Equal(t, 256, utf8.RuneCountInString(name))
-			} else {
-				require.Equal(t, 256, len(name))
-			}
+			require.Regexp(t, `^`+regexp.QuoteMeta(tc.prefix)+`-[0-9A-Za-z]{27}$`, got)
 		})
 	}
 }
 
-func TestKeyNamePrefixPresence(t *testing.T) {
-	for _, resourceType := range []string{apiTokenResourceType.Id, serviceAccountApplicationKeyResourceType.Id} {
-		t.Run(resourceType, func(t *testing.T) {
-			name, err := actionKeyName(&structpb.Struct{}, resourceType)
+func TestKeyNamePrefixDefaultsAndTypes(t *testing.T) {
+	for name, args := range map[string]*structpb.Struct{
+		"absent":     {},
+		"empty":      prefixArgs(structpb.NewStringValue("")),
+		"whitespace": prefixArgs(structpb.NewStringValue("  \t ")),
+		"null":       prefixArgs(structpb.NewNullValue()),
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := actionKeyName(args)
 			require.NoError(t, err)
-			require.Regexp(t, `^c1-\d{8}T\d{6}Z-[a-z2-7]{6}$`, name)
-			for _, value := range []*structpb.Value{
-				structpb.NewStringValue(""), structpb.NewNullValue(), structpb.NewNumberValue(3), structpb.NewBoolValue(false), structpb.NewListValue(&structpb.ListValue{}),
-			} {
-				_, err = actionKeyName(&structpb.Struct{Fields: map[string]*structpb.Value{actionArgNamePrefix: value}}, resourceType)
-				require.Equal(t, codes.InvalidArgument, status.Code(err), "explicit invalid values cannot silently use the default")
-			}
+			require.Regexp(t, `^c1-[0-9A-Za-z]{27}$`, got)
 		})
+	}
+	for name, v := range map[string]*structpb.Value{
+		"number": structpb.NewNumberValue(3), "bool": structpb.NewBoolValue(false), "list": structpb.NewListValue(&structpb.ListValue{}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := actionKeyName(prefixArgs(v))
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+	got, err := actionKeyName(prefixArgs(structpb.NewStringValue("  Team_A  ")))
+	require.NoError(t, err)
+	require.Regexp(t, `^Team_A-[0-9A-Za-z]{27}$`, got, "trimmed, case kept")
+}
+
+func TestKeyNamePrefixSchema(t *testing.T) {
+	declared := namePrefixField()
+	require.Equal(t, actionArgNamePrefix, declared.GetName())
+	require.False(t, declared.GetIsRequired(), "omitting the prefix uses the default")
+	require.Contains(t, declared.GetDescription(), "KSUID")
+	sf := declared.GetStringField()
+	require.Equal(t, "c1", sf.GetDefaultValue())
+	rules := sf.GetRules()
+	require.EqualValues(t, 1, rules.GetMinLen())
+	require.False(t, rules.HasMaxLen(), "MaxLen counts bytes and would reject 64 CJK characters")
+	require.False(t, rules.GetValidateEmpty())
+	require.False(t, rules.GetIsRequired())
+	require.Equal(t, namePrefixPattern, rules.GetPattern())
+}
+
+// The advisory pattern is a superset of the parser: it must accept every
+// prefix the parser accepts, or the schema would turn valid input away.
+func TestKeyNamePrefixPatternAcceptsEveryParserAcceptedCase(t *testing.T) {
+	re := regexp.MustCompilePOSIX(namePrefixPattern)
+	rules := namePrefixField().GetStringField().GetRules()
+	for name, tc := range namePrefixCases {
+		if tc.valid {
+			require.True(t, re.MatchString(tc.prefix), name)
+			require.NoError(t, field.ValidateStringRules(rules, tc.prefix, actionArgNamePrefix), name)
+		}
 	}
 }
 
@@ -117,7 +164,7 @@ func TestIssuerCustomNamePrefixReachesProvider(t *testing.T) {
 			}))
 			defer server.Close()
 			issuer := newCredentialUserBuilder(newLifecycleTestWrapper(server.URL), true, true, testAPIBaseURL)
-			args := &structpb.Struct{Fields: map[string]*structpb.Value{actionArgNamePrefix: structpb.NewStringValue("team-prod")}}
+			args := prefixArgs(structpb.NewStringValue("team-prod"))
 			var err error
 			if resourceType == apiTokenResourceType.Id {
 				_, _, _, err = issuer.issueOrganizationAPIKeyAction(context.Background(), args)
@@ -128,42 +175,10 @@ func TestIssuerCustomNamePrefixReachesProvider(t *testing.T) {
 			require.NoError(t, err)
 			select {
 			case name := <-names:
-				require.Regexp(t, `^team-prod-\d{8}T\d{6}Z-[a-z2-7]{6}$`, name)
+				require.Regexp(t, `^team-prod-[0-9A-Za-z]{27}$`, name)
 			default:
 				t.Fatal("issuer did not create a key")
 			}
 		})
 	}
-}
-
-func TestKeyNamePrefixRejectsControlCharacters(t *testing.T) {
-	for _, resourceType := range []string{apiTokenResourceType.Id, serviceAccountApplicationKeyResourceType.Id} {
-		for _, tc := range []struct {
-			name   string
-			prefix string
-		}{
-			{"newline bypass", strings.Repeat("a", 100) + "\n" + strings.Repeat("a", 300)},
-			{"newline", "a\nb"},
-			{"carriage return", "a\rb"},
-			{"tab", "a\tb"},
-			{"NUL", "a\x00b"},
-			{"DEL", "a\x7fb"},
-			{"C1 NEL", "a\u0085b"},
-			{"leading newline", "\nab"},
-			{"trailing newline", "ab\n"},
-		} {
-			t.Run(resourceType+"/"+tc.name, func(t *testing.T) {
-				_, err := actionKeyName(&structpb.Struct{Fields: map[string]*structpb.Value{actionArgNamePrefix: structpb.NewStringValue(tc.prefix)}}, resourceType)
-				require.Equal(t, codes.InvalidArgument, status.Code(err))
-			})
-		}
-	}
-}
-
-func TestOrgKeyNamePrefixPatternCompilesPOSIX(t *testing.T) {
-	pattern := namePrefixField(apiTokenResourceType.Id).GetStringField().GetRules().GetPattern()
-	re, err := regexp.CompilePOSIX(pattern)
-	require.NoError(t, err)
-	require.True(t, re.MatchString("team-prod"))
-	require.False(t, re.MatchString("a\x7fb"))
 }
