@@ -475,10 +475,7 @@ func userResource(user *datadogV2.User) (*v2.Resource, error) {
 	case "Disabled":
 		status = v2.Status_RESOURCE_STATUS_DISABLED
 	case "Pending":
-		// Pending users have been invited but haven't accepted yet, so they
-		// don't have active access to Datadog. Keep the raw status as detail
-		// so reviewers can tell them apart from actively disabled users.
-		status = v2.Status_RESOURCE_STATUS_DISABLED
+		status = v2.Status_RESOURCE_STATUS_PENDING
 	default:
 		status = v2.Status_RESOURCE_STATUS_UNSPECIFIED
 	}
@@ -602,6 +599,9 @@ func (u *userBuilder) CreateAccount(
 	// Create user
 	createdUserResp, err := u.wrapper.CreateUser(ctx, *req)
 	if err != nil {
+		if client.IsAlreadyExists(err) {
+			return u.existingAccount(ctx, email)
+		}
 		return nil, nil, nil, fmt.Errorf("error creating Datadog user: %w", err)
 	}
 
@@ -616,4 +616,40 @@ func (u *userBuilder) CreateAccount(
 	return &v2.CreateAccountResponse_SuccessResult{
 		Resource: res,
 	}, nil, nil, nil
+}
+
+// existingAccount scans every page without an email filter: the provider's
+// search may be fuzzy or case-sensitive, and service accounts must count too.
+func (u *userBuilder) existingAccount(ctx context.Context, email string) (connectorbuilder.CreateAccountResponse, []*v2.PlaintextData, annotations.Annotations, error) {
+	var match *datadogV2.User
+	for page := int64(0); ; page++ {
+		users, err := u.wrapper.ListUsers(ctx, datadogV2.NewListUsersOptionalParameters().WithPageNumber(page))
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("baton-datadog: failed to look up existing user after create conflict: %w", err)
+		}
+		if len(users.GetData()) == 0 {
+			break
+		}
+		for _, user := range users.GetData() {
+			if !strings.EqualFold(user.Attributes.GetEmail(), email) {
+				continue
+			}
+			if match != nil {
+				return nil, nil, nil, status.Error(codes.AlreadyExists, "baton-datadog: create user conflict: multiple users match the requested email")
+			}
+			userCopy := user
+			match = &userCopy
+		}
+	}
+	if match == nil {
+		return nil, nil, nil, status.Error(codes.AlreadyExists, "baton-datadog: create user conflict: no user matches the requested email")
+	}
+	if match.GetId() == "" {
+		return nil, nil, nil, status.Error(codes.AlreadyExists, "baton-datadog: create user conflict: matching user has no ID")
+	}
+	res, err := userResource(match)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("baton-datadog: failed to build existing user resource: %w", err)
+	}
+	return &v2.CreateAccountResponse_AlreadyExistsResult{Resource: res}, nil, nil, nil
 }

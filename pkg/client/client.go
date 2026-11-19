@@ -74,6 +74,9 @@ func (w *DatadogClient) CreateUser(ctx context.Context, req datadogV2.UserCreate
 	if httpRes != nil {
 		defer httpRes.Body.Close()
 	}
+	if err != nil && httpRes != nil && httpRes.StatusCode == http.StatusConflict {
+		return nil, errors.Join(ErrAlreadyExists, wrapOfficialClientError("create user", httpRes, err))
+	}
 	if err != nil {
 		return nil, wrapOfficialClientError("create user", httpRes, err)
 	}
