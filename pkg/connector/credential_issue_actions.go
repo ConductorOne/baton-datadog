@@ -226,7 +226,8 @@ const (
 	// ASCII and Latin-1 non-letters; every code point from U+00C0 up, and the
 	// letters U+00AA, U+00B5 and U+00BA, pass as a possible letter, mark or digit.
 	// The first character also excludes digits, "_" and "-". The length bound is
-	// in code points, which is why the schema sets no MaxLen (it counts bytes).
+	// in code points (ECMAScript needs the u or v flag to count that way), which
+	// is why the schema sets no MaxLen (it counts bytes).
 	// validNamePrefix, called by actionKeyName, enforces.
 	namePrefixPattern = `^[^\x00-\x40\x5B-\x60\x7B-\xA9\xAB-\xB4\xB6-\xB9\xBB-\xBF][^\x00-\x2C\x2E\x2F\x3A-\x40\x5B-\x5E\x60\x7B-\xA9\xAB-\xB4\xB6-\xB9\xBB-\xBF]{0,63}$`
 )

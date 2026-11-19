@@ -188,8 +188,6 @@ func TestIssuerCustomNamePrefixReachesProvider(t *testing.T) {
 	}
 }
 
-// Every rune the parser accepts, alone or after "a", must match the advisory
-// pattern, so the schema never turns away a valid prefix.
 // The published patterns must compile in ECMAScript as well as Go: no \x{...}
 // escapes and no POSIX bracket classes.
 func TestPublishedPatternsArePortable(t *testing.T) {
@@ -199,6 +197,8 @@ func TestPublishedPatternsArePortable(t *testing.T) {
 	}
 }
 
+// Every rune the parser accepts, alone or after "a", must match the advisory
+// pattern, so the schema never turns away a valid prefix.
 func TestNamePrefixPatternSupersetOfParserForEveryRune(t *testing.T) {
 	re := regexp.MustCompilePOSIX(namePrefixPattern)
 	for r := rune(0); r <= unicode.MaxRune; r++ {
