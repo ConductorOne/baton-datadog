@@ -5,7 +5,7 @@ go 1.27.4
 require (
 	filippo.io/age v1.3.2
 	github.com/DataDog/datadog-api-client-go/v2 v2.43.0
-	github.com/conductorone/baton-sdk v0.46.1
+	github.com/conductorone/baton-sdk v0.47.0
 	github.com/ennyjfrick/ruleguard-logfatal v0.0.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/quasilyte/go-ruleguard/dsl v0.3.23
